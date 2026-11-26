@@ -37,7 +37,6 @@ async function equipo(b, sesion, conLector, movil = true) {
 const tarjetaInc = p => p.$$eval('#lista-inc li', l => l.map(x => x.innerText.replace(/\s+/g, ' ')));
 
 (async () => {
-  await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });
   const b = await chromium.launch();
 
   // Foto de una credencial ficticia (de pie)
@@ -58,7 +57,7 @@ const tarjetaInc = p => p.$$eval('#lista-inc li', l => l.map(x => x.innerText.re
   await K.p.screenshot({ path: D + 'inc_botones.png' });
   await K.p.evaluate(f => window.__lecturas.push({ codigo: '00287', nombre: 'Ramiro Esteban Villarreal Duarte', foto: f, ms: 900 }), foto);
   await K.p.click('.cap.inc'); await K.p.waitForTimeout(800);
-  ok(/^INCIDENCIA · PUNTO DE CONTROL 1$/.test(await K.p.evaluate(() => window.__opciones[0].titulo)), 'el lector se abre con el título «INCIDENCIA · PUNTO DE CONTROL 1»');
+  ok(/^INCIDENCIA · ACCESO$/.test(await K.p.evaluate(() => window.__opciones[0].titulo)), 'el lector se abre con el título «INCIDENCIA · ACCESO»');
   ok(await K.p.isVisible('#v-inc'), 'después de leer, se abre la ventana «¿Qué pasó?»');
   ok((await K.p.inputValue('#inc-id')) === '00287' && /ramiro esteban/i.test(await K.p.inputValue('#inc-nombre')) && await K.p.isVisible('#inc-img'),
      'con el ID, el nombre y la foto de la credencial');
@@ -72,7 +71,7 @@ const tarjetaInc = p => p.$$eval('#lista-inc li', l => l.map(x => x.innerText.re
   ok(hecho.vis && /INCIDENCIA REGISTRADA/.test(hecho.txt) && /Alcoholímetro positivo/.test(hecho.txt) && /incidencia/.test(hecho.clase), 'confirmación: «' + hecho.txt.slice(0, 80) + '»');
   await K.p.screenshot({ path: D + 'inc_hecho.png' });
   await K.p.waitForTimeout(3500);
-  ok(sql("SELECT CONCAT(tipo,'|',codigo,'|',lugar,'|',(foto<>''),'|',detalle) FROM accesos_incidencias") === 'ALCOHOLIMETRO|00287|PUNTO DE CONTROL 1|1|Prueba positiva 0.4, se le negó el acceso',
+  ok(sql("SELECT CONCAT(tipo,'|',codigo,'|',lugar,'|',(foto<>''),'|',detalle) FROM accesos_incidencias") === 'ALCOHOLIMETRO|00287|ACCESO|1|Prueba positiva 0.4, se le negó el acceso',
      'en el servidor: tipo, ID, punto, foto y descripción');
   let filas = await tarjetaInc(K.p);
   ok(filas.length === 1 && /ALCOHOLÍMETRO POSITIVO/.test(filas[0]) && /RAMIRO ESTEBAN VILLARREAL DUARTE · 00287/.test(filas[0]), 'la tarjeta «Tus incidencias» la muestra: ' + (filas[0] || '').slice(0, 90));

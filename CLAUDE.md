@@ -2,7 +2,7 @@
 
 Plataforma **independiente** de AVBA para el control de accesos de planta: entradas y
 salidas del personal (contratistas y planta) con la **credencial de acceso**, leída por
-el teléfono del guardia en la caseta, y el panel del administrador.
+los teléfonos de los guardias en el **único acceso** de la planta, y el panel del administrador.
 
 Está separada del **Sistema de Gestión** (certificaciones, raíz de
 gestion.avba.com.mx) igual que **Extintores** (`/extintores/`) y **Socios Comerciales**
@@ -44,7 +44,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `api/index.php` | Enrutador propio: sesión, cuentas y las acciones de `accesos.html`. |
 | `api/Auth.php`, `api/helpers.php` | Cuentas, sesiones por equipo, límite de intentos; conexión a la base propia y utilidades. |
 | `js/destinos.js` | Pantalla de inicio de cada perfil y la clave de la sesión (`ca_sesion`). |
-| `accesos.html` | Módulo real que ya funcionaba en el Sistema de Gestión: pantalla del guardia (lee la credencial con la app, ENTRADA/SALIDA, cola sin señal, foto de evidencia) y del administrador (registros por turno, **En planta**, movimientos por ID, dar salida, PDF, puntos de control). |
+| `accesos.html` | Módulo real que ya funcionaba en el Sistema de Gestión: pantalla del guardia (lee la credencial con la app, ENTRADA/SALIDA, cola sin señal, foto de evidencia) y del administrador (registros por turno, **En planta**, movimientos por ID, dar salida, incidencias, PDF). |
 | `api/ControlAccesos.php` | Lógica del servidor del módulo (registros, turnos, puntos y equipos, en planta, PDF con mPDF). |
 | `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). |
 | `api/lib/qrcode.php` | Generador de códigos QR (lo usa la portada de la maqueta). |
@@ -55,10 +55,9 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `tests/referencia/` | Pruebas (PHP, API y pantallas con Playwright) contra la API propia. Todas: `bash tests/referencia/correr.sh` (una: `… correr.sh pantalla/sesion`). |
 | `.github/workflows/` | `deploy-control-accesos.yml` (publica en `/controlaccesos/` en cada push a esta rama) y `app-caseta.yml` (compila y publica la app cuando cambia `mobile/caseta/`). **Encendidos** desde la fase 1. |
 
-**Perfiles** (`Auth::ROLES`): **ADMIN** (Administración AVBA: todo, cuentas y asignar
-puntos), **PLANTA** (administrador de accesos de la planta: registros, En planta, PDF,
-dar salida, liberar el equipo de un punto) y **ACCESOS** (guardia: sólo registra en su
-punto; el enrutador le rechaza todo lo demás). Cada guardia tiene su **turno** (`usuarios.turno`:
+**Perfiles** (`Auth::ROLES`): **ADMIN** (Administración AVBA: todo, incluidas las cuentas),
+**PLANTA** (administrador de accesos de la planta: registros, En planta, PDF, dar salida)
+y **ACCESOS** (guardia: sólo registra; el enrutador le rechaza todo lo demás). Cada guardia tiene su **turno** (`usuarios.turno`:
 D día | N noche), que se elige en Cuentas.
 
 ## Cuidados importantes
@@ -88,11 +87,12 @@ D día | N noche), que se elige en Cuentas.
    cuenta para el turno que empieza (desde 2 h antes), una salida para el que termina (hasta
    2 h después), y la salida de quien tiene su entrada abierta (últimas 16 h) va al turno de
    esa entrada (`turnoDeEntradaAbierta`). Administración ve los turnos en curso por reloj.
-5. **Puntos de control:** 4 fijos («PUNTO DE CONTROL 1…4»); cada uno con la cuenta del
-   guardia de **día** (`accesos_puntos.usuario`) y la del de **noche** (`usuario_noche`), y
-   **un solo equipo** compartido por los dos (el teléfono de la caseta: el primero que entra
-   queda ligado; el administrador de accesos lo libera). Se asignan en Cuentas o en Puntos
-   de control; una cuenta sin turno no se puede asignar.
+5. **Un solo acceso, varios teléfonos a la vez:** todo se registra en `ACCESO`
+   (`ControlAccesos::ACCESO`, se muestra «Acceso»). No hay puntos que asignar ni teléfono
+   ligado: cualquier cuenta de guardia registra desde cualquier teléfono, varias al mismo
+   tiempo, y cada registro guarda qué cuenta lo capturó (cada guardia ve sólo lo suyo). Los
+   registros de antes conservan su «PUNTO DE CONTROL n»; la tabla `accesos_puntos` de una
+   base vieja queda sin uso. Con un solo punto, la pantalla esconde el selector de punto.
 6. **Incidencias (botón INCIDENCIA de la caseta):** el guardia lee la credencial como en
    una entrada y dice qué pasó: Alcoholímetro positivo, Mala conducta, Problema con la
    persona u Otro (con descripción). Tabla propia `accesos_incidencias` (no cuentan como

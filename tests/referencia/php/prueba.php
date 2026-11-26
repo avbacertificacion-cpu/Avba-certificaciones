@@ -37,12 +37,10 @@ ok($pdo->query("SELECT origen FROM accesos_registros WHERE uid='fotovieja000001'
 $idx = array_column($pdo->query("SHOW INDEX FROM accesos_registros")->fetchAll(), 'Key_name');
 ok(in_array('idx_codigo', $idx), 'índice por código');
 
-// 2) La cuenta de caseta trabaja en su punto (lo asigna Administración)
-$pdo->exec("DROP TABLE IF EXISTS accesos_puntos");
-$sinPunto = $ca->registrar(['uid' => 'sinp-0000000001', 'tipo' => 'entrada', 'capturado' => '2026-11-26 06:00:00', 'lugar' => 'X', 'codigo' => '1', 'persona' => 'A', 'dispositivo' => 'eq-prueba-0001'], [], $caseta);
-ok($sinPunto['status'] === 'error' && ($sinPunto['codigo'] ?? '') === 'SIN_PUNTO', 'sin punto asignado no registra');
-$as = $ca->asignarPunto(['punto' => 'PUNTO DE CONTROL 1', 'usuario' => 'punto1'], $admin);
-ok($as['status'] === 'success', 'asignar punto: ' . $as['message']);
+// 2) La cuenta de caseta registra en el único acceso, sin punto que asignar ni teléfono ligado
+$sinPunto = $ca->registrar(['uid' => 'sinp-0000000001', 'tipo' => 'entrada', 'capturado' => '2026-11-26 06:00:00', 'lugar' => 'X', 'codigo' => '1', 'persona' => 'A', 'dispositivo' => 'eq-cualquiera-01'], [], $caseta);
+ok($sinPunto['status'] === 'success' && $pdo->query("SELECT lugar FROM accesos_registros WHERE uid='sinp-0000000001'")->fetchColumn() === 'ACCESO', 'registra en «ACCESO» sin asignar nada');
+$pdo->exec("DELETE FROM accesos_registros WHERE uid='sinp-0000000001'");
 
 // 3) Registros con tarjeta (sin foto)
 $reg = function ($uid, $tipo, $cap, $codigo, $persona, $usr, $origen = 'tarjeta', $lugar = 'Quantum Energy · Caseta 1') use ($ca) {
@@ -61,7 +59,7 @@ ok(!empty($r2['duplicado']), 'reenvío del mismo registro no se duplica');
 $r3 = $ca->registrar(['uid' => 'nada-0000000001', 'tipo' => 'entrada', 'capturado' => '2026-11-26 08:00:00', 'lugar' => 'X', 'dispositivo' => 'eq-prueba-0001'], [], $caseta);
 ok($r3['status'] === 'error' && strpos($r3['message'], 'código de la tarjeta') !== false, 'sin foto ni código se rechaza: ' . $r3['message']);
 $fila = $pdo->query("SELECT nombre, codigo, origen, foto, lugar FROM accesos_registros WHERE uid='tarj-0000000001'")->fetch();
-ok($fila['nombre'] === 'JUAN PEREZ LOPEZ' && $fila['codigo'] === '004512' && $fila['origen'] === 'tarjeta' && $fila['foto'] === '' && $fila['lugar'] === 'PUNTO DE CONTROL 1', 'guardado en su punto: ' . json_encode($fila, JSON_UNESCAPED_UNICODE));
+ok($fila['nombre'] === 'JUAN PEREZ LOPEZ' && $fila['codigo'] === '004512' && $fila['origen'] === 'tarjeta' && $fila['foto'] === '' && $fila['lugar'] === 'ACCESO', 'guardado en el acceso: ' . json_encode($fila, JSON_UNESCAPED_UNICODE));
 ok($pdo->query("SELECT origen FROM accesos_registros WHERE uid='tarj-0000000005'")->fetchColumn() === 'manual', 'código escrito a mano: origen «manual»');
 $cod = $ca->registrar(['uid' => 'raro-0000000001', 'tipo' => 'entrada', 'capturado' => '2026-11-26 08:00:00', 'lugar' => 'X', 'codigo' => "12<script>34", 'persona' => 'A', 'dispositivo' => 'eq-prueba-0001'], [], $caseta);
 ok($cod['status'] === 'success' && $pdo->query("SELECT codigo FROM accesos_registros WHERE uid='raro-0000000001'")->fetchColumn() === '12SCRIPT34', 'el código sólo guarda letras, números y guiones');

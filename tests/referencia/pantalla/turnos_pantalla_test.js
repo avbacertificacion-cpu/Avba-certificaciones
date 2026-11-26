@@ -26,8 +26,6 @@ const bloques = p => p.$$eval('.bloque-turno', l => l.map(x => x.innerText.repla
 const turnoBD = cod => sql(`SELECT GROUP_CONCAT(CONCAT(tipo,':',turno_fecha,'-',turno) ORDER BY id) FROM accesos_registros WHERE codigo='${cod}'`);
 
 (async () => {
-  await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });   // día
-  await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'noche1' });   // noche
   const b = await chromium.launch();
   // El teléfono de la caseta (el mismo para los dos guardias)
   const ctx = await b.newContext({ timezoneId: 'America/Mexico_City', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -45,7 +43,7 @@ const turnoBD = cod => sql(`SELECT GROUP_CONCAT(CONCAT(tipo,':',turno_fecha,'-',
   // ── Guardia de DÍA a las 17:56 ──
   await p.clock.setFixedTime(a('17:56:00'));
   await p.goto(B + 'accesos.html'); await p.waitForTimeout(1800);
-  ok(/Punto de control 1 · Turno de día/.test(await p.textContent('#sub-usuario')), 'encabezado: «' + await p.textContent('#sub-usuario') + '»');
+  ok(/^Acceso · Turno de día · PUNTO1$/.test(await p.textContent('#sub-usuario')), 'encabezado: «' + await p.textContent('#sub-usuario') + '»');
   let t = await bloques(p);
   ok(t.length === 1 && /Turno de día · en curso/.test(await p.textContent('#t-nombre')), 'sólo ve su turno (sin «cambio de turno»): ' + await p.textContent('#t-nombre'));
   await leer(p, '17:57:26', 'ent', '00601', 'Ramiro Esteban Villarreal Duarte');

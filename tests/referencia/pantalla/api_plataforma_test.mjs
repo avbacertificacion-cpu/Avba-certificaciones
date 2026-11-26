@@ -91,12 +91,10 @@ ok(!!tNorte, 'la cuenta nueva entra con su contraseña');
 r = await get('CUENTAS_LISTAR', tAdmin);
 const norte = (r.cuentas || []).find(c => c.usuario === 'caseta.norte');
 ok(r.status === 'success' && norte && norte.nombre === 'CASETA NORTE' && norte.rol === 'ACCESOS' && norte.sesiones === 1, 'la lista trae la cuenta nueva con 1 sesión abierta');
-// Asignarle un punto y cambiarle el perfil: deja el punto libre
-await post('ACCESOS_PUNTO_ASIGNAR', tAdmin, { punto: 'PUNTO DE CONTROL 3', usuario: 'caseta.norte' });
-r = await get('CUENTAS_LISTAR', tAdmin);
-ok((r.cuentas.find(c => c.usuario === 'caseta.norte') || {}).punto === 'Punto de control 3', 'la lista muestra su punto de control');
+ok(norte.turno === 'D', 'la lista trae su turno');
+// Cambiarle el perfil: deja de ser guardia
 r = await post('CUENTA_EDITAR', tAdmin, { id: idNorte, rol: 'PLANTA' });
-ok(r.status === 'success' && sql("SELECT COUNT(*) FROM accesos_puntos WHERE usuario='caseta.norte'") === '0', 'deja de ser guardia: su punto queda libre');
+ok(r.status === 'success' && sql("SELECT IFNULL(turno,'-') FROM usuarios WHERE usuario='caseta.norte'") === '-', 'deja de ser guardia: ya no tiene turno');
 ok((await get('SESION', tNorte)).http === 401, 'con perfil nuevo, sus sesiones abiertas se cierran');
 // Contraseña nueva
 r = await post('CUENTA_EDITAR', tAdmin, { id: idNorte, password: 'nueva-contrasena' });
@@ -137,17 +135,8 @@ r = await get('ACCESOS_TARJETA_REGLAS', 'tok-punto1');
 ok(r.status === 'success' && r.reglas && r.reglas.orientacion, 'el guardia recibe las reglas del lector');
 r = await get('ACCESOS_EN_PLANTA', tPlanta);
 ok(r.status === 'success', 'el administrador de la planta ve «En planta»');
-r = await get('ACCESOS_PUNTOS', tPlanta);
-ok(r.status === 'success' && r.puede_editar === false && r.puede_liberar === true, 'planta ve los puntos: no asigna, sí libera');
-r = await post('ACCESOS_PUNTO_ASIGNAR', tPlanta, { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });
-ok(r.status === 'error' && /Administración/.test(r.message), 'planta no asigna puntos: ' + r.message);
-await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });
 r = await get('ACCESOS_MI_PUNTO', 'tok-punto1', { dispositivo: 'eq-prueba-plataforma-1' });
-ok(r.status === 'success' && r.punto === 'PUNTO DE CONTROL 1', 'el guardia entra a su punto y liga su equipo');
-r = await post('ACCESOS_EQUIPO_LIBERAR', tPlanta, { punto: 'PUNTO DE CONTROL 1' });
-ok(r.status === 'success', 'planta libera el equipo: ' + r.message);
-r = await post('ACCESOS_EQUIPO_LIBERAR', 'tok-punto1', { punto: 'PUNTO DE CONTROL 1', dispositivo: 'eq-prueba-plataforma-1' });
-ok(r.http === 403, 'el guardia no libera equipos');
+ok(r.status === 'success' && r.punto === 'ACCESO' && r.turno_cuenta === 'D', 'el guardia entra al acceso, en su turno, sin que le asignen nada');
 // Registrar con tarjeta y dar salida como planta
 const fd = new FormData();
 for (const [k, v] of Object.entries({ action: 'ACCESO_REGISTRAR', uid: 'plat-000000000001', tipo: 'entrada', capturado: new Date(Date.now() - 3600e3).toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' }),

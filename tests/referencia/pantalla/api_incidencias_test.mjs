@@ -26,8 +26,6 @@ const incidencia = async (tok, campos, conFoto = false) => {
 const ahora = () => new Date().toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' });
 const EQ = 'eq-prueba-incidencias-1';
 
-await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });
-await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 2', usuario: 'punto2' });
 await get('ACCESOS_MI_PUNTO', 'tok-punto1', { dispositivo: EQ });
 await get('ACCESOS_MI_PUNTO', 'tok-punto2', { dispositivo: 'eq-prueba-incidencias-2' });
 
@@ -38,8 +36,6 @@ r = await incidencia('tok-punto1', { uid: 'inc-000000000001', incidencia: 'OTRO'
 ok(r.status === 'error' && /Describe/.test(r.message), '«Otro» sin descripción: ' + r.message);
 r = await incidencia('tok-punto1', { uid: 'inc-000000000001', incidencia: 'CONDUCTA', dispositivo: EQ });
 ok(r.status === 'error' && /quién es/.test(r.message), 'sin ID, nombre ni foto: ' + r.message);
-r = await incidencia('tok-punto1', { uid: 'inc-000000000001', incidencia: 'CONDUCTA', codigo: '00287', dispositivo: 'eq-otro-equipo-xx' });
-ok(r.status === 'error' && r.codigo === 'OTRO_EQUIPO', 'desde otro equipo: rechazada (como las entradas)');
 r = await get('ACCESO_INCIDENCIA', 'tok-punto1', { uid: 'inc-000000000001', incidencia: 'CONDUCTA', codigo: '1' });
 ok(r.http === 405, 'por GET no se permite');
 
@@ -49,7 +45,7 @@ r = await incidencia('tok-punto1', { uid: 'inc-000000000001', incidencia: 'ALCOH
 ok(r.status === 'success' && /Alcoholímetro positivo · RAMIRO ESTEBAN VILLARREAL DUARTE/.test(r.message), 'alcoholímetro con foto: ' + r.message);
 const idInc = r.id;
 const fila = sql("SELECT CONCAT(tipo,'|',codigo,'|',nombre,'|',lugar,'|',usuario,'|',origen,'|',(foto<>'')) FROM accesos_incidencias WHERE uid='inc-000000000001'");
-ok(fila === 'ALCOHOLIMETRO|00287|RAMIRO ESTEBAN VILLARREAL DUARTE|PUNTO DE CONTROL 1|punto1|tarjeta|1', 'guardada en su punto, con foto: ' + fila);
+ok(fila === 'ALCOHOLIMETRO|00287|RAMIRO ESTEBAN VILLARREAL DUARTE|ACCESO|punto1|tarjeta|1', 'guardada en el acceso, con foto y la cuenta que la reportó: ' + fila);
 r = await incidencia('tok-punto1', { uid: 'inc-000000000001', incidencia: 'ALCOHOLIMETRO', codigo: '00287', dispositivo: EQ });
 ok(r.status === 'success' && r.duplicado && r.id === idInc, 'reenvío (sin señal a medias): no se duplica');
 r = await incidencia('tok-punto1', { uid: 'inc-000000000002', incidencia: 'PERSONA', persona: 'Visitante sin credencial', detalle: 'Quiso entrar sin cita', dispositivo: EQ });
@@ -72,9 +68,9 @@ ok(alc && alc.tipo_nombre === 'Alcoholímetro positivo' && alc.detalle === 'Prue
 // Los guardias punto1 y punto2 son de día: lo suyo va al turno de día de hoy, a cualquier hora
 const kDia = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' }) + '-D';
 r = await get('LISTAR_ACCESOS', 'tok-admin', { turnos: kDia });
-ok(r.incidencias.length === 3, 'Administración ve las de todos los puntos: ' + r.incidencias.length);
-r = await get('LISTAR_ACCESOS', 'tok-planta', { lugar: 'PUNTO DE CONTROL 2', turnos: kDia });
-ok(r.incidencias.length === 1 && r.incidencias[0].codigo === '412', 'filtradas por punto de control');
+ok(r.incidencias.length === 3 && new Set(r.incidencias.map(x => x.usuario)).size === 2, 'Administración ve las de todos los guardias: ' + r.incidencias.length);
+r = await get('LISTAR_ACCESOS', 'tok-punto2', { turnos: kDia, dispositivo: 'eq-prueba-incidencias-2' });
+ok(r.incidencias.length === 1 && r.incidencias[0].codigo === '412', 'el otro guardia (otro teléfono, al mismo tiempo) ve sólo la suya');
 r = await get('ACCESOS_EN_PLANTA', 'tok-admin');
 ok(r.total === 0, 'una incidencia no pone a nadie «en planta»');
 

@@ -17,7 +17,7 @@ SET NAMES utf8mb4;
 -- Perfiles (rol), los tres de la maqueta («Quién ve qué»):
 --   ADMIN    Administración AVBA (todo, incluidas las cuentas)
 --   PLANTA   Administrador de accesos de la planta (su planta)
---   ACCESOS  Guardia de caseta (sólo registra en su punto de control)
+--   ACCESOS  Guardia de caseta (sólo registra en el acceso, en su turno: usuarios.turno)
 CREATE TABLE IF NOT EXISTS usuarios (
   id             INT AUTO_INCREMENT PRIMARY KEY,
   usuario        VARCHAR(50)  NOT NULL UNIQUE,
@@ -109,19 +109,5 @@ CREATE TABLE IF NOT EXISTS accesos_incidencias (
   KEY idx_fecha (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ── Puntos de control: cuenta de día, cuenta de noche y un solo equipo ─
--- usuario = guardia del turno de día; usuario_noche = guardia del turno de noche.
-CREATE TABLE IF NOT EXISTS accesos_puntos (
-  punto            VARCHAR(40)  NOT NULL PRIMARY KEY,
-  usuario          VARCHAR(50)  NULL,
-  usuario_noche    VARCHAR(50)  NULL,
-  dispositivo      VARCHAR(80)  NULL,
-  dispositivo_desc VARCHAR(150) NOT NULL DEFAULT '',
-  ligado           DATETIME     NULL,
-  ultimo_uso       DATETIME     NULL,
-  UNIQUE KEY uk_usuario (usuario),
-  UNIQUE KEY uk_usuario_noche (usuario_noche)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-INSERT IGNORE INTO accesos_puntos (punto) VALUES
-  ('PUNTO DE CONTROL 1'), ('PUNTO DE CONTROL 2'), ('PUNTO DE CONTROL 3'), ('PUNTO DE CONTROL 4');
+-- (Ya no hay tabla de puntos de control: la planta tiene un solo acceso y los guardias
+--  registran a la vez desde cualquier teléfono. Una base de antes conserva la suya, sin uso.)

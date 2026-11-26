@@ -55,11 +55,13 @@ class ControlAccesos {
         return in_array((string)($usr['rol'] ?? ''), ['ADMIN', 'PLANTA'], true);
     }
 
-    /** Puntos de control fijos de la planta. Cada uno tiene su propia cuenta de
-     *  caseta y trabaja en un solo equipo (ver accesos_puntos). */
-    public const PUNTOS = ['PUNTO DE CONTROL 1', 'PUNTO DE CONTROL 2', 'PUNTO DE CONTROL 3', 'PUNTO DE CONTROL 4'];
+    /** La planta tiene UN solo acceso: todo se registra ahí, desde varios teléfonos a la vez,
+     *  cada uno con su cuenta de guardia. (Los registros de antes conservan su «PUNTO DE CONTROL n».) */
+    public const ACCESO = 'ACCESO';
+    public const PUNTOS = [self::ACCESO];
 
     public static function nombrePunto(string $p): string {
+        if ($p === self::ACCESO) return 'Acceso';
         return preg_match('/^PUNTO DE CONTROL (\d+)$/', $p, $m) ? 'Punto de control ' . $m[1] : $p;
     }
 
@@ -132,58 +134,12 @@ class ControlAccesos {
         $hecho[$k] = true;
     }
 
-    /* ── Puntos de control: dos cuentas (día y noche) y un solo equipo por punto ──
-       accesos_puntos guarda, para cada uno de los 4 puntos fijos, la cuenta del
-       guardia de DÍA (columna usuario) y la del guardia de NOCHE (usuario_noche),
-       que asigna Administración, y el equipo ligado: el teléfono de la caseta,
-       el primero que entra con cualquiera de las dos. Otro equipo queda fuera
-       hasta que el administrador de accesos libere el punto. El identificador
-       del equipo lo genera la pantalla y lo guarda en el propio teléfono. */
+    /* ── Guardias: turno por cuenta, varios teléfonos a la vez ──────────────────
+       Cada guardia (perfil ACCESOS) tiene su turno, día o noche (usuarios.turno), y
+       lo que registra va a ese turno a cualquier hora. Ya no hay puntos que asignar
+       ni teléfono ligado: cualquier cuenta de guardia registra desde cualquier
+       teléfono, varias a la vez, y cada registro guarda qué cuenta lo capturó. */
     public const TURNOS = ['D' => 'turno de día', 'N' => 'turno de noche'];
-
-    private static array $puntosListos = [];
-    private static array $conNoche = [];
-    public static function asegurarPuntos(PDO $pdo): bool {
-        $k = spl_object_id($pdo);
-        if (isset(self::$puntosListos[$k])) return self::$puntosListos[$k];
-        try {
-            $pdo->exec(
-                "CREATE TABLE IF NOT EXISTS accesos_puntos (
-                   punto            VARCHAR(40)  NOT NULL PRIMARY KEY,
-                   usuario          VARCHAR(50)  NULL,
-                   usuario_noche    VARCHAR(50)  NULL,
-                   dispositivo      VARCHAR(80)  NULL,
-                   dispositivo_desc VARCHAR(150) NOT NULL DEFAULT '',
-                   ligado           DATETIME     NULL,
-                   ultimo_uso       DATETIME     NULL,
-                   UNIQUE KEY uk_usuario (usuario),
-                   UNIQUE KEY uk_usuario_noche (usuario_noche)
-                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
-            );
-            $ins = $pdo->prepare("INSERT IGNORE INTO accesos_puntos (punto) VALUES (?)");
-            foreach (self::PUNTOS as $p) $ins->execute([$p]);
-            self::$puntosListos[$k] = true;
-        } catch (\Throwable $e) {
-            error_log('[ControlAccesos] puntos de control: ' . $e->getMessage());
-            self::$puntosListos[$k] = false;
-            return false;
-        }
-        // Tablas de antes de los turnos por cuenta: se agrega la cuenta de noche
-        try { $pdo->query("SELECT usuario_noche FROM accesos_puntos LIMIT 1"); self::$conNoche[$k] = true; }
-        catch (\Throwable $e) {
-            try {
-                $pdo->exec("ALTER TABLE accesos_puntos ADD COLUMN usuario_noche VARCHAR(50) NULL AFTER usuario");
-                try { $pdo->exec("CREATE UNIQUE INDEX uk_usuario_noche ON accesos_puntos (usuario_noche)"); } catch (\Throwable $e3) {}
-                self::$conNoche[$k] = true;
-            } catch (\Throwable $e2) {
-                error_log('[ControlAccesos] sin cuenta de noche en los puntos: ' . $e2->getMessage());
-                self::$conNoche[$k] = false;
-            }
-        }
-        self::asegurarTurnoCuentas($pdo);
-        return true;
-    }
-    private static function conNoche(PDO $pdo): bool { return self::asegurarPuntos($pdo) && !empty(self::$conNoche[spl_object_id($pdo)]); }
 
     /** usuarios.turno (D | N): el turno de cada cuenta de guardia. Se agrega si falta. */
     public static function asegurarTurnoCuentas(PDO $pdo): bool {
@@ -215,178 +171,17 @@ class ControlAccesos {
         return [$d, $t === 'N' ? 'N' : 'D'];
     }
 
-    private static function equipoValido($v): string {
-        $v = is_scalar($v) ? (string)$v : '';
-        return preg_match('/^[A-Za-z0-9-]{8,80}$/', $v) ? $v : '';
-    }
-
-    /** La fila del punto de una cuenta de guardia (de día o de noche), o null */
-    private function puntoDeCuenta(string $cuenta): ?array {
-        $sql = "SELECT * FROM accesos_puntos WHERE usuario = ?" . (self::conNoche($this->pdo) ? " OR usuario_noche = ?" : "");
-        $st = $this->pdo->prepare($sql);
-        $st->execute(self::conNoche($this->pdo) ? [$cuenta, $cuenta] : [$cuenta]);
-        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
-    }
-
-    /**
-     * Revisa que una cuenta de caseta tenga su punto y que use su equipo. El
-     * primer equipo que llega queda ligado. Regresa ['ok' => true, 'punto']
-     * o ['ok' => false, 'error' => respuesta para la pantalla].
-     */
+    /** El punto donde registra una cuenta de caseta: el único acceso de la planta. */
     private function equipoDeCaseta(array $p, array $usr): array {
-        if (!self::esCaseta($usr) || !self::asegurarPuntos($this->pdo)) return ['ok' => true, 'punto' => ''];
-        $cuenta = (string)($usr['usuario'] ?? '');
-        $f = $this->puntoDeCuenta($cuenta);
-        if (!$f) {
-            return ['ok' => false, 'error' => ['status' => 'error', 'codigo' => 'SIN_PUNTO',
-                    'message' => 'Esta cuenta no tiene punto de control asignado. Pide a Administración que te asigne uno.']];
-        }
-        $eq = self::equipoValido($p['dispositivo'] ?? '');
-        if ($eq === '') {
-            return ['ok' => false, 'error' => ['status' => 'error', 'codigo' => 'SIN_EQUIPO',
-                    'message' => 'No se pudo identificar este equipo. Cierra y vuelve a abrir la pantalla.']];
-        }
-        if ((string)$f['dispositivo'] === '') {
-            // El teléfono de la caseta: el primero que entra con la cuenta de día o la de noche
-            $desc = mb_substr(trim((string)preg_replace('/[\x00-\x1F\x7F]/u', ' ', (string)($p['dispositivo_desc'] ?? ''))), 0, 150);
-            $up = $this->pdo->prepare("UPDATE accesos_puntos SET dispositivo = ?, dispositivo_desc = ?, ligado = ?, ultimo_uso = ?
-                                        WHERE punto = ? AND (dispositivo IS NULL OR dispositivo = '')");
-            $ahora = date('Y-m-d H:i:s');
-            $up->execute([$eq, $desc, $ahora, $ahora, $f['punto']]);
-            if ($up->rowCount() === 0) $f = $this->puntoDeCuenta($cuenta) ?: $f;   // otro equipo se ligó al mismo tiempo
-            else $f['dispositivo'] = $eq;
-        }
-        if ((string)$f['dispositivo'] !== $eq) {
-            return ['ok' => false, 'error' => ['status' => 'error', 'codigo' => 'OTRO_EQUIPO', 'punto' => $f['punto'],
-                    'message' => 'El ' . self::nombrePunto($f['punto']) . ' ya está en otro equipo'
-                               . ($f['dispositivo_desc'] !== '' ? ' (' . $f['dispositivo_desc'] . ')' : '')
-                               . '. Para usarlo en éste, el administrador de accesos debe liberarlo en Control de accesos → Puntos de control.']];
-        }
-        if (!$f['ultimo_uso'] || strtotime((string)$f['ultimo_uso']) < time() - 60) {
-            $this->pdo->prepare("UPDATE accesos_puntos SET ultimo_uso = ? WHERE punto = ?")->execute([date('Y-m-d H:i:s'), $f['punto']]);
-        }
-        return ['ok' => true, 'punto' => (string)$f['punto']];
+        return ['ok' => true, 'punto' => self::esCaseta($usr) ? self::ACCESO : ''];
     }
 
-    /** La cuenta de caseta pregunta su punto (y su turno) al entrar, y liga su equipo */
+    /** La cuenta de caseta pregunta al entrar dónde registra y cuál es su turno */
     public function miPunto(array $p, array $usr): array {
         if (!self::esCaseta($usr)) return ['status' => 'success', 'punto' => ''];
-        $v = $this->equipoDeCaseta($p, $usr);
-        if (!$v['ok']) return $v['error'];
         $t = self::turnoCuenta($usr);
-        return ['status' => 'success', 'punto' => $v['punto'], 'nombre_punto' => self::nombrePunto($v['punto']),
+        return ['status' => 'success', 'punto' => self::ACCESO, 'nombre_punto' => self::nombrePunto(self::ACCESO),
                 'turno_cuenta' => $t, 'turno_actual' => $t !== '' ? implode('-', self::turnoDeGuardia($t, date('Y-m-d H:i:s'))) : ''];
-    }
-
-    /** Administración: los 4 puntos con sus cuentas (día y noche) y su equipo, y las cuentas de caseta */
-    public function puntos(array $usr): array {
-        if (self::esCaseta($usr)) return ['status' => 'error', 'message' => 'Esta cuenta sólo registra entradas y salidas.'];
-        if (!self::asegurarPuntos($this->pdo)) return ['status' => 'error', 'message' => 'No se pudieron preparar los puntos de control en el servidor.'];
-        $filas = $this->pdo->query("SELECT * FROM accesos_puntos")->fetchAll(PDO::FETCH_ASSOC);
-        $porPunto = [];
-        foreach ($filas as $f) $porPunto[$f['punto']] = $f;
-        $cuentas = [];
-        try {
-            $cuentas = $this->pdo->query("SELECT usuario, nombre, activo" . (self::asegurarTurnoCuentas($this->pdo) ? ", turno" : ", NULL AS turno")
-                                         . " FROM usuarios WHERE rol = 'ACCESOS' ORDER BY usuario")->fetchAll(PDO::FETCH_ASSOC);
-        } catch (\Throwable $e) {}
-        $nombres = [];
-        foreach ($cuentas as $c) $nombres[$c['usuario']] = $c['nombre'];
-        $out = [];
-        foreach (self::PUNTOS as $pt) {
-            $f = $porPunto[$pt] ?? [];
-            $out[] = [
-                'punto' => $pt, 'nombre' => self::nombrePunto($pt),
-                'usuario' => (string)($f['usuario'] ?? ''), 'usuario_nombre' => (string)($nombres[$f['usuario'] ?? ''] ?? ''),
-                'usuario_noche' => (string)($f['usuario_noche'] ?? ''), 'usuario_noche_nombre' => (string)($nombres[$f['usuario_noche'] ?? ''] ?? ''),
-                'dispositivo' => (string)($f['dispositivo'] ?? '') !== '', 'dispositivo_desc' => (string)($f['dispositivo_desc'] ?? ''),
-                'ligado' => $f['ligado'] ?? null, 'ultimo_uso' => $f['ultimo_uso'] ?? null,
-            ];
-        }
-        return ['status' => 'success', 'puntos' => $out, 'con_noche' => self::conNoche($this->pdo),
-                'cuentas' => array_map(fn($c) => ['usuario' => $c['usuario'], 'nombre' => $c['nombre'], 'activo' => (bool)$c['activo'],
-                                                  'turno' => isset(self::TURNOS[(string)$c['turno']]) ? (string)$c['turno'] : ''], $cuentas),
-                'puede_editar' => ($usr['rol'] ?? '') === 'ADMIN', 'puede_liberar' => self::esGestor($usr)];
-    }
-
-    /**
-     * Administración: pone una cuenta de guardia en un punto, en el lugar de SU turno (día o
-     * noche); la que estuviera ahí queda sin punto. Con usuario '' quita la cuenta de ese
-     * turno (turno 'D' | 'N') o las dos (sin turno).
-     */
-    public function asignarPunto(array $p, array $usr): array {
-        if (($usr['rol'] ?? '') !== 'ADMIN') return ['status' => 'error', 'message' => 'Sólo Administración asigna los puntos de control.'];
-        if (!self::asegurarPuntos($this->pdo)) return ['status' => 'error', 'message' => 'No se pudieron preparar los puntos de control en el servidor.'];
-        $punto = textoEstandar($p['punto'] ?? '');
-        if (!in_array($punto, self::PUNTOS, true)) return ['status' => 'error', 'message' => 'Ese punto de control no existe.'];
-        $cuenta = trim((string)($p['usuario'] ?? ''));
-        if ($cuenta === '') {
-            $t = strtoupper((string)($p['turno'] ?? ''));
-            $cols = $t === 'D' ? ['usuario'] : ($t === 'N' ? ['usuario_noche'] : ['usuario', 'usuario_noche']);
-            if (!self::conNoche($this->pdo)) $cols = array_values(array_diff($cols, ['usuario_noche']));
-            foreach ($cols as $c) $this->pdo->prepare("UPDATE accesos_puntos SET $c = NULL WHERE punto = ?")->execute([$punto]);
-            $this->soltarEquiposSinCuenta();
-            return ['status' => 'success', 'message' => self::nombrePunto($punto) . ': sin cuenta' . (isset(self::TURNOS[$t]) ? ' en el ' . self::TURNOS[$t] : '') . '.'];
-        }
-        return $this->colocarCuenta($cuenta, $punto);
-    }
-
-    /** Pone una cuenta de guardia en un punto, en el lugar de su turno (sin revisar quién lo pide). */
-    public function colocarCuenta(string $cuenta, string $punto): array {
-        if (!self::asegurarPuntos($this->pdo)) return ['status' => 'error', 'message' => 'No se pudieron preparar los puntos de control en el servidor.'];
-        if (!in_array($punto, self::PUNTOS, true)) return ['status' => 'error', 'message' => 'Ese punto de control no existe.'];
-        $st = $this->pdo->prepare("SELECT usuario" . (self::asegurarTurnoCuentas($this->pdo) ? ", turno" : ", NULL AS turno") . " FROM usuarios WHERE usuario = ? AND rol = 'ACCESOS'");
-        $st->execute([$cuenta]);
-        $c = $st->fetch(PDO::FETCH_ASSOC);
-        if (!$c) return ['status' => 'error', 'message' => 'Esa cuenta no existe o no es de guardia de caseta.'];
-        $t = (string)$c['turno'];
-        if (!isset(self::TURNOS[$t])) return ['status' => 'error', 'message' => 'La cuenta «' . $c['usuario'] . '» no tiene turno: elige en Cuentas si es de día o de noche.'];
-        if ($t === 'N' && !self::conNoche($this->pdo)) return ['status' => 'error', 'message' => 'El servidor todavía no acepta cuentas de noche en los puntos: avisa a AVBA.'];
-        $col = $t === 'N' ? 'usuario_noche' : 'usuario';
-        $cuenta = (string)$c['usuario'];
-        $this->pdo->beginTransaction();
-        try {
-            // Una cuenta sólo puede estar en un lugar: se quita de donde estuviera
-            $this->pdo->prepare("UPDATE accesos_puntos SET usuario = NULL WHERE usuario = ?")->execute([$cuenta]);
-            if (self::conNoche($this->pdo)) $this->pdo->prepare("UPDATE accesos_puntos SET usuario_noche = NULL WHERE usuario_noche = ?")->execute([$cuenta]);
-            $this->pdo->prepare("UPDATE accesos_puntos SET $col = ? WHERE punto = ?")->execute([$cuenta, $punto]);
-            $this->pdo->commit();
-        } catch (\Throwable $e) {
-            $this->pdo->rollBack();
-            throw $e;
-        }
-        $this->soltarEquiposSinCuenta();
-        return ['status' => 'success', 'message' => self::nombrePunto($punto) . ', ' . self::TURNOS[$t] . ': cuenta ' . $cuenta . '.'];
-    }
-
-    /** Quita una cuenta de cualquier punto (dejó de ser guardia, o cambia de turno). */
-    public function quitarCuenta(string $cuenta): void {
-        if (!self::asegurarPuntos($this->pdo)) return;
-        $this->pdo->prepare("UPDATE accesos_puntos SET usuario = NULL WHERE usuario = ?")->execute([$cuenta]);
-        if (self::conNoche($this->pdo)) $this->pdo->prepare("UPDATE accesos_puntos SET usuario_noche = NULL WHERE usuario_noche = ?")->execute([$cuenta]);
-        $this->soltarEquiposSinCuenta();
-    }
-
-    /** El punto de una cuenta ('' si no tiene) */
-    public function puntoDe(string $cuenta): string {
-        if (!self::asegurarPuntos($this->pdo)) return '';
-        return (string)($this->puntoDeCuenta($cuenta)['punto'] ?? '');
-    }
-
-    /** Un punto que se queda sin ninguna cuenta suelta también su equipo (el próximo se vuelve a ligar). */
-    private function soltarEquiposSinCuenta(): void {
-        $this->pdo->exec("UPDATE accesos_puntos SET dispositivo = NULL, dispositivo_desc = '', ligado = NULL
-                           WHERE usuario IS NULL" . (self::conNoche($this->pdo) ? " AND usuario_noche IS NULL" : ""));
-    }
-
-    /** Administración: libera el equipo de un punto (el siguiente que entre queda ligado) */
-    public function liberarEquipo(array $p, array $usr): array {
-        if (!self::esGestor($usr)) return ['status' => 'error', 'message' => 'Sólo el administrador de accesos libera los equipos.'];
-        if (!self::asegurarPuntos($this->pdo)) return ['status' => 'error', 'message' => 'No se pudieron preparar los puntos de control en el servidor.'];
-        $punto = textoEstandar($p['punto'] ?? '');
-        if (!in_array($punto, self::PUNTOS, true)) return ['status' => 'error', 'message' => 'Ese punto de control no existe.'];
-        $this->pdo->prepare("UPDATE accesos_puntos SET dispositivo = NULL, dispositivo_desc = '', ligado = NULL WHERE punto = ?")->execute([$punto]);
-        return ['status' => 'success', 'message' => self::nombrePunto($punto) . ' liberado: el próximo equipo que entre con su cuenta queda ligado.'];
     }
 
     /** ¿La tabla ya tiene nombre, código y origen? Si la migración no se pudo

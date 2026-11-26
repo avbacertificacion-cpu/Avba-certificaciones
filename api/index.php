@@ -91,7 +91,7 @@ try {
     // Lo que cambia algo va por POST (un enlace no puede borrar ni dar salidas)
     $soloPost = ['CAMBIAR_MI_CONTRASENA', 'CUENTA_CREAR', 'CUENTA_EDITAR', 'ACCESO_REGISTRAR', 'ACCESO_ELIMINAR',
                  'ACCESO_INCIDENCIA', 'INCIDENCIA_ELIMINAR',
-                 'ACCESOS_PDF', 'ACCESOS_PDF_DATOS', 'ACCESOS_PUNTO_ASIGNAR', 'ACCESOS_EQUIPO_LIBERAR', 'ACCESOS_DAR_SALIDA'];
+                 'ACCESOS_PDF', 'ACCESOS_PDF_DATOS', 'ACCESOS_DAR_SALIDA'];
     if ($metodo !== 'POST' && in_array($accion, $soloPost, true)) respuesta(['status' => 'error', 'message' => 'Método no permitido.'], 405);
 
     $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
@@ -123,9 +123,6 @@ try {
         case 'ACCESOS_EXISTEN':        respuesta($ca->existen((array)($datos['uids'] ?? [])));
         case 'ACCESOS_MI_PUNTO':       respuesta($ca->miPunto($datos, $usr));
         case 'ACCESOS_TARJETA_REGLAS': respuesta(ControlAccesos::reglasTarjeta());
-        case 'ACCESOS_PUNTOS':         respuesta($ca->puntos($usr));
-        case 'ACCESOS_PUNTO_ASIGNAR':  respuesta($ca->asignarPunto($datos, $usr));
-        case 'ACCESOS_EQUIPO_LIBERAR': respuesta($ca->liberarEquipo($datos, $usr));
         case 'ACCESOS_EN_PLANTA':      respuesta($ca->enPlanta($datos, $usr));
         case 'ACCESOS_PERSONA':        respuesta($ca->persona($datos, $usr));
         case 'ACCESOS_DAR_SALIDA':     respuesta($ca->darSalida($datos, $usr));

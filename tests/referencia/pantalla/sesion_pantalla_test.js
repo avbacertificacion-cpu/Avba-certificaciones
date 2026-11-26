@@ -61,11 +61,11 @@ async function entrar(p, usuario, password) {
   const alta = async (nombre, usuario, rol, pass, turno, punto) => {
     await p.click('#b-nueva'); await p.fill('#c-nombre', nombre); await p.fill('#c-usuario', usuario);
     await p.selectOption('#c-rol', rol); await p.fill('#c-pass', pass);
-    if (turno) { await p.selectOption('#c-turno', turno); await p.selectOption('#c-punto', punto || ''); }
+    if (turno) await p.selectOption('#c-turno', turno);
     await p.click('#b-guardar'); await p.waitForTimeout(1000);
   };
   await alta('Administrador Planta Norte', 'planta.norte', 'PLANTA', 'planta-norte-1');
-  ok(await p.isHidden('#campos-guardia'), 'turno y punto sólo aparecen para el perfil «Guardia de caseta»');
+  ok(await p.isHidden('#campos-guardia'), 'el turno sólo aparece para el perfil «Guardia de caseta»');
   // Guardia sin elegir turno: no se guarda
   await alta('Caseta punto 1', 'punto1', 'ACCESOS', 'caseta-punto-1');
   ok(await p.isVisible('#campos-guardia') && /turno del guardia/.test(await p.textContent('#f-err')), 'guardia sin turno: «' + await p.textContent('#f-err') + '»');
@@ -75,7 +75,7 @@ async function entrar(p, usuario, password) {
   ok(/Ya existe/.test(await p.textContent('#f-err')), 'usuario repetido: «' + await p.textContent('#f-err') + '»');
   await p.click('#b-cancelar');
   let filas = await p.$$eval('#lista .cuenta', l => l.map(x => x.innerText.replace(/\s+/g, ' ')));
-  ok(filas.length === 3 && filas.some(t => /CASETA PUNTO 1 punto1 Guardia de caseta Turno de día Sin punto de control/.test(t)) && filas.some(t => /ADMINISTRADOR PLANTA NORTE planta.norte Administrador de la planta/.test(t)),
+  ok(filas.length === 3 && filas.some(t => /CASETA PUNTO 1 punto1 Guardia de caseta Turno de día ·/.test(t)) && filas.some(t => /ADMINISTRADOR PLANTA NORTE planta.norte Administrador de la planta/.test(t)),
      'lista con las 3 cuentas y sus perfiles');
   ok(await sinScrollLateral(p), 'cuentas sin desplazamiento lateral en teléfono');
   await p.screenshot({ path: D + 'ses_cuentas.png', fullPage: true });
@@ -114,9 +114,7 @@ async function entrar(p, usuario, password) {
   await p.goto(B + 'cuentas.html'); await p.waitForTimeout(600);
   ok(await p.isVisible('#sin-permiso') && await p.isHidden('#todo'), 'planta en cuentas.html: «Sólo Administración AVBA…»');
   await p.goto(B + 'accesos.html'); await p.waitForTimeout(1800);
-  ok(await p.isVisible('#tarjeta-puntos') && (await p.$$('#puntos-lista select[data-turno="D"]')).length === 4 && (await p.$$('#puntos-lista select[data-turno="N"]')).length === 4 &&
-     await p.$$eval('#puntos-lista select', l => l.every(s => s.disabled)),
-     'planta ve los 4 puntos, con su guardia de día y de noche, sin poder cambiarlos');
+  ok(!(await p.$('#tarjeta-puntos')) && await p.isHidden('#tarjeta-lugar'), 'un solo acceso: sin tarjeta de puntos de control ni selector de punto');
   ok(await p.isVisible('#f-planta'), 'planta tiene el filtro «En planta»');
   ok((await p.getAttribute('#atras', 'href')) === 'index.html', 'el botón de regresar lleva al inicio');
   await p.screenshot({ path: D + 'ses_planta_accesos.png' });
@@ -129,7 +127,8 @@ async function entrar(p, usuario, password) {
   ok(!/accesos\.html/.test(p.url()), 'con la contraseña vieja ya no entra');
   await p.fill('#password', 'caseta-punto-1b'); await p.click('#b-login'); await p.waitForTimeout(2000);
   ok(p.url().endsWith('/accesos.html'), 'el guardia entra directo a registrar');
-  ok(/no tiene punto de control asignado/.test(await p.textContent('#banda-punto')), 'sin punto asignado: «' + (await p.textContent('#banda-punto')).slice(0, 70) + '…»');
+  ok(await p.isHidden('#banda-punto') && /^Acceso · Turno de día · /.test(await p.textContent('#sub-usuario')) && !(await p.$eval('.cap.ent', e => e.disabled)),
+     'el guardia registra de inmediato en el acceso, sin que le asignen nada: «' + await p.textContent('#sub-usuario') + '»');
   await p.goto(B + 'index.html'); await p.waitForTimeout(800);
   ok(p.url().endsWith('/accesos.html'), 'el guardia en el inicio: lo regresa a accesos.html');
   const tokGuardia = await p.evaluate(() => JSON.parse(localStorage.getItem('ca_sesion')).token);

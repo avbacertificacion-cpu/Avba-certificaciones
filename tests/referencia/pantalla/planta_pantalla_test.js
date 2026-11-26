@@ -68,11 +68,8 @@ const filas = p => p.$$eval('#lista li.planta', l => l.map(x => x.innerText.repl
   f = await filas(A.p);
   ok(f.length === 3 && !f.some(t => /00500/.test(t)) && (await A.p.textContent('#planta-n')) === '3', 'y ya no aparece en planta (quedan 3)');
 
-  // Por punto de entrada
-  await A.p.selectOption('#lugar', 'PUNTO DE CONTROL 2'); await A.p.check('#solo-punto'); await A.p.waitForTimeout(1200);
-  f = await filas(A.p);
-  ok(f.length === 2 && f.every(t => /Punto de control 2/.test(t)) && /entraron por Punto de control 2/.test(await A.p.textContent('#planta-txt')), 'sólo los que entraron por el Punto 2: ' + f.length);
-  await A.p.uncheck('#solo-punto'); await A.p.waitForTimeout(1000);
+  // Un solo acceso: no hay filtro por punto de entrada (los registros de antes conservan su punto)
+  ok(await A.p.isHidden('#campo-solo-punto'), 'sin casilla «Sólo este punto de control»');
 
   // De regreso a la lista del turno: el ID abre sus movimientos
   await A.p.click('#filtro button[data-v="todos"]'); await A.p.waitForTimeout(1500);

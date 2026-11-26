@@ -42,8 +42,6 @@ async function leer(p, lectura, tipo = 'ent') {
 (async () => {
   // Estado: Punto 1 con su cuenta, sin equipo; sin registros
   sql("DELETE FROM accesos_registros");
-  sql("UPDATE accesos_puntos SET usuario=NULL, dispositivo=NULL, dispositivo_desc='', ligado=NULL, ultimo_uso=NULL");
-  await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });
   const b = await chromium.launch();
 
   // Foto de una credencial ficticia (como la toma la cámara: de pie, 720 × 1280)
@@ -60,7 +58,7 @@ async function leer(p, lectura, tipo = 'ent') {
 
   // ── Caseta (Punto 1) ──
   const K = await equipo(b, ses('punto1'), true);
-  ok(K.p.errores.length === 0 && (await K.p.inputValue('#lugar')) === 'PUNTO DE CONTROL 1', 'la caseta abre en su punto');
+  ok(K.p.errores.length === 0 && (await K.p.inputValue('#lugar')) === 'ACCESO', 'la caseta abre en el acceso');
   // 1) Lectura con foto
   await leer(K.p, { codigo: '00287', nombre: 'Ramiro Esteban Villarreal Duarte', foto, ms: 900 });
   const hecho = await K.p.$eval('#hecho', e => ({ vis: !e.hidden, txt: e.innerText.replace(/\s+/g, ' '), img: !!e.querySelector('img.foto') }));
