@@ -10,6 +10,8 @@
               PDF y dar salida.
      ACCESOS  Guardia de caseta: sólo registra entradas y salidas en el acceso,
               en su turno (día o noche), desde cualquier teléfono.
+     CLIENTE  El cliente (la planta): sólo consulta el tablero con gráficas y
+              descarga el Excel y el PDF. No registra ni cambia nada.
 
    Tomado del Sistema de Gestión (api/Auth.php de la rama principal):
    contraseña con password_hash, una sesión por equipo (sesiones_usuario) y
@@ -19,11 +21,12 @@
 class Auth {
     private PDO $pdo;
 
-    public const ROLES = ['ADMIN', 'PLANTA', 'ACCESOS'];
+    public const ROLES = ['ADMIN', 'PLANTA', 'ACCESOS', 'CLIENTE'];
     public const NOMBRES_ROL = [
         'ADMIN'   => 'Administración AVBA',
         'PLANTA'  => 'Administrador de accesos de la planta',
         'ACCESOS' => 'Guardia de caseta',
+        'CLIENTE' => 'Cliente (tablero y reportes)',
     ];
     private const MIN_CONTRASENA = 8;
     private const MAX_INTENTOS = 5;
@@ -214,7 +217,7 @@ class Auth {
         $conTurno = ControlAccesos::asegurarTurnoCuentas($this->pdo);
         $filas = $this->pdo->query(
             "SELECT id, usuario, rol, nombre, activo, fecha_alta, ultimo_acceso" . ($conTurno ? ", turno" : ", NULL AS turno") . "
-               FROM usuarios ORDER BY FIELD(rol, 'ADMIN', 'PLANTA', 'ACCESOS'), FIELD(turno, 'D', 'N'), usuario"
+               FROM usuarios ORDER BY FIELD(rol, 'ADMIN', 'PLANTA', 'CLIENTE', 'ACCESOS'), FIELD(turno, 'D', 'N'), usuario"
         )->fetchAll(PDO::FETCH_ASSOC);
         $sesiones = [];
         foreach ($this->pdo->query("SELECT usuario_id, COUNT(*) n FROM sesiones_usuario WHERE expira > NOW() GROUP BY usuario_id")->fetchAll(PDO::FETCH_ASSOC) as $f) {

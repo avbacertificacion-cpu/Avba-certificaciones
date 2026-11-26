@@ -109,6 +109,12 @@ reportes por empresa y mes, y ligarlas a los vetos.
 
 ## Fase 5 — Tablero y reportes
 
+**Adelantado (a pedido del usuario):** perfil **CLIENTE** con su tablero (`tablero.html`,
+`api/Tablero.php`): periodo de hasta 93 días, cifras, personas dentro, entradas y salidas por
+día y por hora, tiempo dentro por visita, personas con más horas, incidencias, quién está
+dentro; descarga en **Excel** (todo el detalle) y **PDF** (con las gráficas). Falta lo que
+depende del padrón (fase 2): «por empresa» y documentación.
+
 - Tablero de la maqueta: personas dentro (24 h), alertas activas, entradas y salidas
   por hora, dentro ahora por empresa, horas en 7 días, incidencias, documentación por
   empresa, movimientos recientes y lo que se registra en vivo en la caseta.

@@ -24,7 +24,7 @@
   <div id="fuera">
     <div class="card">
       <h2>Entrar a la plataforma</h2>
-      <p>Guardias de caseta, administrador de accesos de la planta y Administración AVBA, cada quien con su cuenta.</p>
+      <p>Guardias de caseta, administrador de accesos de la planta, cliente y Administración AVBA, cada quien con su cuenta.</p>
       <a class="btn" href="login.html" style="margin-top:12px">Iniciar sesión</a>
     </div>
     <div class="card">
@@ -37,16 +37,19 @@
   <!-- Con sesión -->
   <div id="dentro" hidden>
     <div class="mosaicos">
-      <a class="mosaico" href="accesos.html">
+      <a class="mosaico" href="tablero.html" id="m-tablero">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+        <b>Tablero</b><span>Gráficas de entradas, salidas, personas en planta, horas e incidencias. Excel y PDF.</span></a>
+      <a class="mosaico" href="accesos.html" id="m-accesos">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h3"/></svg>
         <b>Control de accesos</b><span>Registros por turno, En planta, movimientos por ID, incidencias y PDF.</span></a>
       <a class="mosaico" href="cuentas.html" id="m-cuentas" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M17 8h5M19.5 5.5v5"/></svg>
-        <b>Cuentas</b><span>Guardias de caseta, administrador de la planta y Administración AVBA.</span></a>
+        <b>Cuentas</b><span>Guardias de caseta, administrador de la planta, cliente y Administración AVBA.</span></a>
       <button class="mosaico" type="button" id="m-pass">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
         <b>Mi contraseña</b><span>Cambiarla. Se cierran tus sesiones en otros equipos.</span></button>
-      <a class="mosaico" href="demo/">
+      <a class="mosaico" href="demo/" id="m-maqueta">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
         <b>Maqueta</b><span>Cómo va a quedar: personas, documentos, reglas, vales y jornadas. Datos ficticios.</span></a>
     </div>
@@ -70,7 +73,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var API = 'api/index.php', CLAVE = window.CA_SESION || 'ca_sesion';
-  var NOMBRES = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de accesos de la planta', ACCESOS: 'Guardia de caseta' };
+  var NOMBRES = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de accesos de la planta', ACCESOS: 'Guardia de caseta', CLIENTE: 'Cliente' };
   var ses = null;
   try { ses = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) {}
   function api(accion, payload) {
@@ -83,6 +86,7 @@
     $('fuera').hidden = true; $('dentro').hidden = false;
     $('saludo').textContent = (s.nombre || s.usuario) + ' · ' + (NOMBRES[s.rol] || s.rol);
     $('m-cuentas').hidden = s.rol !== 'ADMIN';
+    $('m-accesos').hidden = $('m-maqueta').hidden = s.rol === 'CLIENTE';      // el cliente: tablero y su contraseña
   }
   if (ses && ses.token) {
     mostrar(ses);                                  // al instante con lo guardado; el servidor lo confirma

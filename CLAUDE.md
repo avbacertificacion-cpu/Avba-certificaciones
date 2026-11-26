@@ -2,7 +2,8 @@
 
 Plataforma **independiente** de AVBA para el control de accesos de planta: entradas y
 salidas del personal (contratistas y planta) con la **credencial de acceso**, leída por
-los teléfonos de los guardias en el **único acceso** de la planta, y el panel del administrador.
+los teléfonos de los guardias en el **único acceso** de la planta, el panel del administrador y el
+**tablero del cliente** (gráficas, Excel y PDF).
 
 Está separada del **Sistema de Gestión** (certificaciones, raíz de
 gestion.avba.com.mx) igual que **Extintores** (`/extintores/`) y **Socios Comerciales**
@@ -37,15 +38,18 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 
 | Ruta | Qué es |
 |---|---|
-| `index.html` | Entrada: sin sesión, «Iniciar sesión»; con sesión, el menú del perfil (Control de accesos, Cuentas, Mi contraseña, Maqueta). |
+| `index.html` | Entrada: sin sesión, «Iniciar sesión»; con sesión, el menú del perfil (Tablero, Control de accesos, Cuentas, Mi contraseña, Maqueta; el cliente sólo Tablero y Mi contraseña). |
 | `login.html` | Inicio de sesión propio. Con la base vacía ofrece crear la primera cuenta ADMIN con la `CLAVE_INSTALACION` de `config.php`. |
 | `cuentas.html` | Cuentas (sólo ADMIN): alta, nombre, perfil, contraseña, desactivar. |
-| `descargar.php` | Fotos de credenciales y PDF, sólo con sesión (el guardia, sólo sus fotos). |
+| `descargar.php` | Fotos de credenciales, PDF y reportes del tablero, sólo con sesión (el guardia, sólo sus fotos; el cliente, sólo los reportes del tablero). |
 | `api/index.php` | Enrutador propio: sesión, cuentas y las acciones de `accesos.html`. |
 | `api/Auth.php`, `api/helpers.php` | Cuentas, sesiones por equipo, límite de intentos; conexión a la base propia y utilidades. |
 | `js/destinos.js` | Pantalla de inicio de cada perfil y la clave de la sesión (`ca_sesion`). |
 | `accesos.html` | Módulo real que ya funcionaba en el Sistema de Gestión: pantalla del guardia (lee la credencial con la app, ENTRADA/SALIDA, cola sin señal, foto de evidencia) y del administrador (registros por turno, **En planta**, movimientos por ID, dar salida, incidencias, PDF). |
 | `api/ControlAccesos.php` | Lógica del servidor del módulo (registros, turnos, puntos y equipos, en planta, PDF con mPDF). |
+| `tablero.html` | **Tablero** (perfil CLIENTE; también PLANTA y ADMIN): periodo (hoy, 7 y 30 días, mes, otras fechas; hasta 93 días), cifras, gráficas con Chart.js (`js/chart/`, colores validados: entradas azul `#257de0`, salidas naranja `#f47230`, tiempo dentro en escala de azules), «Ver datos» de cada gráfica, quién está dentro e incidencias. Descarga Excel y PDF (el PDF lleva las gráficas que dibuja la pantalla). |
+| `api/Tablero.php` | Cálculos del tablero (acciones `TABLERO`, `TABLERO_EXCEL`, `TABLERO_PDF`): entradas, salidas, personas por ID, visitas (entrada con su salida; más de 24 h no cuenta en horas), personas dentro hora por hora o máximo por día, tiempo dentro, más horas, incidencias. Archivos en `uploads/accesos/reportes/` (se borran al día). |
+| `api/lib/xlsx.php` | Excel (.xlsx) propio, sin librerías ni extensión zip: hojas con títulos fijos, filtros, fechas y el ID como texto. |
 | `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. |
 | `api/lib/qrcode.php` | Generador de códigos QR (lo usa la portada de la maqueta). |
 | `demo/` | **La maqueta** que hay que volver real: `control-accesos.html` (panel), `caseta.html` (guardia), `demo-datos.js` (datos ficticios y reglas), `index.html` (portada), `sala.php` (sincroniza la demo entre equipos). |
@@ -57,8 +61,9 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 
 **Perfiles** (`Auth::ROLES`): **ADMIN** (Administración AVBA: todo, incluidas las cuentas),
 **PLANTA** (administrador de accesos de la planta: registros, En planta, PDF, dar salida)
-y **ACCESOS** (guardia: sólo registra; el enrutador le rechaza todo lo demás). Cada guardia tiene su **turno** (`usuarios.turno`:
-D día | N noche), que se elige en Cuentas.
+**ACCESOS** (guardia: sólo registra; el enrutador le rechaza todo lo demás) y **CLIENTE** (el cliente: sólo el tablero
+y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le da fotos). Cada guardia tiene su **turno**
+(`usuarios.turno`: D día | N noche), que se elige en Cuentas.
 
 ## Cuidados importantes
 

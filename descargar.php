@@ -8,8 +8,10 @@
      descargar.php?tipo=acceso_foto&id=<registro>[&m=1]&token=<sesión>
      descargar.php?tipo=incidencia_foto&id=<incidencia>[&m=1]&token=<sesión>
      descargar.php?tipo=accesos_pdf&f=<archivo>&token=<sesión>
+     descargar.php?tipo=reporte&f=<archivo>&token=<sesión>      (Excel y PDF del tablero)
 
    El guardia de caseta sólo ve las fotos que registró él y no baja PDF.
+   El cliente sólo baja los reportes del tablero (ni fotos ni los otros PDF).
    ══════════════════════════════════════════════════════════════ */
 
 // Cualquier texto que se cuele antes (un espacio o salto de línea fuera de las etiquetas
@@ -28,11 +30,14 @@ if (!is_file(__DIR__ . '/config/config.php')) fallo(500, 'Falta la configuració
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/api/helpers.php';
 require_once __DIR__ . '/api/ControlAccesos.php';
+require_once __DIR__ . '/api/Tablero.php';
 
 $tipo = (string)($_GET['tipo'] ?? '');
 $pdo = Database::conexion();
 $usr = validarToken($pdo, tokenDePeticion());
 if (!$usr || !ControlAccesos::permitido($usr)) fallo(401, 'Tu sesión venció. Vuelve a iniciar sesión.');
+
+if (ControlAccesos::esCliente($usr) && $tipo !== 'reporte') fallo(403, 'Esta cuenta sólo descarga los reportes del tablero.');
 
 if ($tipo === 'acceso_foto' || $tipo === 'incidencia_foto') {
     $ca = new ControlAccesos($pdo);
@@ -50,6 +55,15 @@ if ($tipo === 'acceso_foto' || $tipo === 'incidencia_foto') {
     if (!$abs) fallo(404, 'El PDF ya no está disponible. Vuelve a generarlo.');
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="' . $archivo . '"');
+    header('Cache-Control: no-store');
+} elseif ($tipo === 'reporte') {
+    if (!Tablero::puede($usr)) fallo(403, 'Tu cuenta no tiene acceso al tablero.');
+    $archivo = basename((string)($_GET['f'] ?? ''));
+    $abs = Tablero::rutaReporte($archivo);
+    if (!$abs) fallo(404, 'El reporte ya no está disponible. Vuelve a generarlo.');
+    $excel = str_ends_with($archivo, '.xlsx');
+    header('Content-Type: ' . ($excel ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf'));
+    header('Content-Disposition: ' . ($excel ? 'attachment' : 'inline') . '; filename="' . $archivo . '"');
     header('Cache-Control: no-store');
 } else {
     fallo(400, 'Solicitud no válida.');

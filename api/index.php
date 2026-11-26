@@ -25,6 +25,7 @@ require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/ControlAccesos.php';
+require_once __DIR__ . '/Tablero.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -87,11 +88,17 @@ try {
         ], true)) {
         respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo puede registrar entradas y salidas.'], 403);
     }
+    // El cliente sólo consulta el tablero y descarga sus reportes
+    if (ControlAccesos::esCliente($usr) && !in_array($accion, [
+            'SESION', 'CAMBIAR_MI_CONTRASENA', 'TABLERO', 'TABLERO_EXCEL', 'TABLERO_PDF',
+        ], true)) {
+        respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo consulta el tablero y sus reportes.'], 403);
+    }
 
     // Lo que cambia algo va por POST (un enlace no puede borrar ni dar salidas)
     $soloPost = ['CAMBIAR_MI_CONTRASENA', 'CUENTA_CREAR', 'CUENTA_EDITAR', 'ACCESO_REGISTRAR', 'ACCESO_ELIMINAR',
                  'ACCESO_INCIDENCIA', 'INCIDENCIA_ELIMINAR',
-                 'ACCESOS_PDF', 'ACCESOS_PDF_DATOS', 'ACCESOS_DAR_SALIDA'];
+                 'ACCESOS_PDF', 'ACCESOS_PDF_DATOS', 'ACCESOS_DAR_SALIDA', 'TABLERO_EXCEL', 'TABLERO_PDF'];
     if ($metodo !== 'POST' && in_array($accion, $soloPost, true)) respuesta(['status' => 'error', 'message' => 'Método no permitido.'], 405);
 
     $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
@@ -128,6 +135,16 @@ try {
         case 'ACCESOS_DAR_SALIDA':     respuesta($ca->darSalida($datos, $usr));
         case 'ACCESOS_PDF':            respuesta($ca->generarPdf($datos, $usr));
         case 'ACCESOS_PDF_DATOS':      respuesta($ca->generarPdfDatos($datos, $usr));
+
+        // ── Tablero (Tablero.php): gráficas, Excel y PDF. Cliente, planta y Administración ──
+        case 'TABLERO':
+        case 'TABLERO_EXCEL':
+        case 'TABLERO_PDF':
+            if (!Tablero::puede($usr)) respuesta(['status' => 'error', 'message' => 'Tu cuenta no tiene acceso al tablero.'], 403);
+            $tb = new Tablero($pdo);
+            if ($accion === 'TABLERO') respuesta($tb->datos($datos, $usr));
+            if ($accion === 'TABLERO_EXCEL') respuesta($tb->excel($datos, $usr));
+            respuesta($tb->pdf($datos, $usr));
     }
     respuesta(['status' => 'error', 'message' => 'Acción no reconocida.'], 400);
 } catch (\Throwable $e) {

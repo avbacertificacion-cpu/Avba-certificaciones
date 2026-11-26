@@ -24,7 +24,7 @@
   <!-- Entrar -->
   <form class="card" id="f-login" autocomplete="on" hidden>
     <h2>Iniciar sesión</h2>
-    <p style="margin-bottom:14px">Con tu cuenta de Control de Accesos (guardia de caseta, administrador de la planta o Administración AVBA).</p>
+    <p style="margin-bottom:14px">Con tu cuenta de Control de Accesos (guardia de caseta, administrador de la planta, cliente o Administración AVBA).</p>
     <div class="aviso mal" id="err-login" hidden role="alert"></div>
     <div class="campo"><label for="usuario">Usuario</label>
       <input id="usuario" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="50"></div>
@@ -80,6 +80,7 @@
     if (/^[a-z0-9_-]+\.html$/i.test(v) && v !== 'login.html') {
       if (rol === 'ACCESOS' && v !== 'accesos.html') v = '';            // el guardia sólo usa accesos.html
       if (v === 'cuentas.html' && rol !== 'ADMIN') v = '';
+      if (rol === 'CLIENTE' && v !== 'tablero.html' && v !== 'index.html') v = '';   // el cliente sólo usa el tablero
       if (v) return v;
     }
     return (window.CA_DESTINOS || {})[rol] || 'index.html';

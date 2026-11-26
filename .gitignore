@@ -20,6 +20,7 @@ tests/referencia/**/*.png
 tests/referencia/**/*.pdf
 tests/referencia/**/*.jpg
 tests/referencia/**/*.csv
+tests/referencia/**/*.xlsx
 tests/referencia/php/uploads/
 tests/referencia/php/uploads_lim/
 tests/referencia/php/prueba_accesos/

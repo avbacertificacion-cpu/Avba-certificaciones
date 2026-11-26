@@ -18,6 +18,7 @@ SET NAMES utf8mb4;
 --   ADMIN    Administración AVBA (todo, incluidas las cuentas)
 --   PLANTA   Administrador de accesos de la planta (su planta)
 --   ACCESOS  Guardia de caseta (sólo registra en el acceso, en su turno: usuarios.turno)
+--   CLIENTE  El cliente: sólo consulta el tablero (gráficas) y descarga Excel y PDF
 CREATE TABLE IF NOT EXISTS usuarios (
   id             INT AUTO_INCREMENT PRIMARY KEY,
   usuario        VARCHAR(50)  NOT NULL UNIQUE,

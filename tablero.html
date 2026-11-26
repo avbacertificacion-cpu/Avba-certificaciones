@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tablero · Control de Accesos · AVBA</title>
+<link rel="icon" href="assets/logos/avba.png">
+<meta name="theme-color" content="#0B2545">
+<link rel="stylesheet" href="css/ca.css">
+<!--
+  Tablero de la plataforma de Control de Accesos: lo que pasó en la planta en un
+  periodo, en gráficas, con descarga en Excel y PDF. Lo usa el cliente (perfil
+  CLIENTE, sólo esto), el administrador de la planta y Administración AVBA.
+  Los datos los calcula el servidor (api/Tablero.php, acción TABLERO).
+
+  Colores de las gráficas (validados para distinguirse también con daltonismo):
+  entradas azul y salidas naranja; el tiempo dentro, una escala de azules.
+-->
+<style>
+  :root{
+    --s1:#257de0; --s2:#f47230;                /* entradas · salidas (y una sola serie: azul) */
+    --o1:#84b9f3; --o2:#519ced; --o3:#257de0; --o4:#1b64be; --o5:#0f4a96;   /* tiempo dentro: de menos a más */
+    --rejilla:#e7e7e7; --eje:#c2c2c2;
+  }
+  body{background:var(--fondo)}
+  header.barra{gap:10px}
+  header.barra .tit{min-width:0;flex:1}
+  header.barra .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.barra .salir{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  main.tab{max-width:1200px;margin:14px auto 40px;padding:0 16px}
+
+  /* Filtros: una sola fila arriba de todo lo que cambian */
+  .filtros{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px}
+  .periodos{display:flex;flex-wrap:wrap;gap:6px;flex:1 1 auto}
+  .periodos button{border:1.5px solid var(--borde);background:#fff;color:var(--texto);border-radius:999px;padding:7px 13px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+  .periodos button[aria-pressed="true"]{background:var(--azul);border-color:var(--azul);color:#fff}
+  .fechas{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%}
+  .fechas label{font-size:12.5px;font-weight:700;color:var(--sub);display:flex;align-items:center;gap:6px}
+  .fechas input{padding:8px 10px;border:1.5px solid var(--borde);border-radius:10px;font:inherit;font-size:14px}
+  .descargas{display:flex;gap:8px;flex-wrap:wrap}
+  .periodo-txt{font-size:13.5px;color:var(--sub);margin:4px 2px 10px;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+  .periodo-txt b{color:var(--texto)}
+  #msg{margin:0 0 12px}
+  #msg a{color:inherit;font-weight:800}
+
+  /* Cifras */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;margin-bottom:12px}
+  .kpi{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px 16px}
+  .kpi .l{font-size:12.5px;font-weight:700;color:var(--sub)}
+  .kpi .v{font-size:30px;font-weight:800;color:var(--marino);line-height:1.15;margin-top:4px}
+  .kpi .s{font-size:12.5px;color:var(--sub);margin-top:4px;line-height:1.35}
+  .kpi.hero{background:linear-gradient(160deg,var(--marino),var(--azul-dark));border:0;color:#fff}
+  .kpi.hero .l,.kpi.hero .s{color:rgba(255,255,255,.82)}
+  .kpi.hero .v{color:#fff}
+  .estado{display:inline-flex;align-items:center;gap:4px;font-weight:700;color:var(--ambar)}
+  .kpi.hero .estado{color:#ffd57a}
+  .estado svg{width:14px;height:14px}
+
+  /* Gráficas */
+  .rejilla{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+  .rejilla .ancha{grid-column:1 / -1}
+  @media (max-width:860px){ .rejilla{grid-template-columns:1fr} }
+  .graf{margin:0;display:flex;flex-direction:column}
+  .g-tit{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-bottom:8px}
+  .g-tit h2{margin:0}
+  .g-tit span{font-size:12.5px;color:var(--sub)}
+  .lienzo{position:relative;height:250px}
+  .lienzo.alto{height:310px}
+  .lienzo.bajo{height:190px}
+  @media (max-width:520px){ .lienzo{height:220px} .lienzo.alto{height:300px} }
+  .vacio{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:14px;color:var(--sub);
+    background:#fbfcfe;border:1px dashed var(--borde);border-radius:10px;padding:16px}
+  .nota-g{font-size:12px;color:var(--sub);margin-top:8px;line-height:1.45}
+  .ver{align-self:flex-start;margin-top:8px;background:none;border:0;color:var(--azul);font:inherit;font-size:13px;font-weight:700;cursor:pointer;padding:4px 0}
+  .tabla-env{overflow-x:auto;margin-top:6px}
+  table.t{width:100%;border-collapse:collapse;font-size:13px}
+  table.t th{text-align:left;font-size:12px;color:var(--sub);font-weight:700;border-bottom:1.5px solid var(--borde);padding:7px 8px;white-space:nowrap}
+  table.t td{border-bottom:1px solid var(--borde);padding:7px 8px;vertical-align:top}
+  table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.t td.id{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.t tr:last-child td{border-bottom:0}
+  @media (max-width:520px){ table.t{font-size:12.5px} table.t th,table.t td{padding:6px 5px} }
+  .lista-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:6px}
+  .lista-cab h2{margin:0}
+  .lista-cab input{margin-left:auto;padding:8px 10px;border:1.5px solid var(--borde);border-radius:10px;font:inherit;font-size:14px;min-width:0;flex:0 1 240px}
+  .etq.inc{background:#FCEBEB;color:#A32D2D}
+  .cargando .kpis,.cargando .rejilla,.cargando .listas{opacity:.55;transition:opacity .15s}
+  .pie{font-size:12px;color:var(--sub);line-height:1.5;margin-top:4px}
+  #fuera-pdf{position:fixed;left:-10000px;top:0;width:540px;height:290px}
+</style>
+</head>
+<body>
+<header class="barra">
+  <a class="atras" id="atras" href="index.html" aria-label="Menú">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>
+  <div class="tit"><h1>Tablero</h1><div class="sub" id="sub">Control de accesos</div></div>
+  <button class="salir" type="button" id="b-salir">Salir</button>
+</header>
+
+<main class="tab" id="todo">
+  <section class="card filtros" aria-label="Periodo y descargas">
+    <div class="periodos" id="periodos" role="group" aria-label="Periodo">
+      <button type="button" data-p="hoy">Hoy</button>
+      <button type="button" data-p="7">7 días</button>
+      <button type="button" data-p="30">30 días</button>
+      <button type="button" data-p="mes">Este mes</button>
+      <button type="button" data-p="mesant">Mes anterior</button>
+      <button type="button" data-p="otro">Otras fechas</button>
+    </div>
+    <div class="descargas">
+      <button class="btn sec chico" type="button" id="b-excel">Descargar Excel</button>
+      <button class="btn chico" type="button" id="b-pdf">Descargar PDF</button>
+    </div>
+    <form class="fechas" id="fechas" hidden>
+      <label>Desde <input type="date" id="desde" required></label>
+      <label>Hasta <input type="date" id="hasta" required></label>
+      <button class="btn chico" type="submit">Ver</button>
+      <small style="color:var(--sub);font-size:12px">Hasta 3 meses.</small>
+    </form>
+  </section>
+  <div class="aviso" id="msg" hidden role="status"></div>
+  <p class="periodo-txt" id="periodo-txt"></p>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="rejilla">
+    <section class="card graf ancha" data-g="ocupacion">
+      <div class="g-tit"><h2>Personas dentro de la planta</h2><span data-sub></span></div>
+      <div class="lienzo"><canvas role="img" aria-label="Personas dentro de la planta a lo largo del periodo"></canvas><div class="vacio" hidden></div></div>
+      <p class="nota-g">Cuenta a cada persona desde su entrada hasta su salida. En las 06:00 y las 18:00 se juntan los que salen y los que entran.</p>
+      <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+    </section>
+    <section class="card graf" data-g="dia">
+      <div class="g-tit"><h2>Entradas y salidas por día</h2><span data-sub></span></div>
+      <div class="lienzo"><canvas role="img" aria-label="Entradas y salidas de cada día"></canvas><div class="vacio" hidden></div></div>
+      <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+    </section>
+    <section class="card graf" data-g="hora">
+      <div class="g-tit"><h2>Entradas y salidas por hora del día</h2><span data-sub></span></div>
+      <div class="lienzo"><canvas role="img" aria-label="Entradas y salidas según la hora del día"></canvas><div class="vacio" hidden></div></div>
+      <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+    </section>
+    <section class="card graf" data-g="perm">
+      <div class="g-tit"><h2>Tiempo dentro por visita</h2><span data-sub></span></div>
+      <div class="lienzo"><canvas role="img" aria-label="Cuántas visitas duraron cada rango de horas"></canvas><div class="vacio" hidden></div></div>
+      <p class="nota-g">Una visita es la entrada de una persona junto con su salida. Los turnos de la planta son de 12 h.</p>
+      <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+    </section>
+    <section class="card graf" data-g="inc">
+      <div class="g-tit"><h2>Incidencias por tipo</h2><span data-sub></span></div>
+      <div class="lienzo bajo"><canvas role="img" aria-label="Incidencias reportadas en la caseta, por tipo"></canvas><div class="vacio" hidden></div></div>
+      <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+    </section>
+    <section class="card graf ancha" data-g="top">
+      <div class="g-tit"><h2>Personas con más horas en planta</h2><span data-sub></span></div>
+      <div class="lienzo alto"><canvas role="img" aria-label="Las personas que acumularon más horas dentro de la planta"></canvas><div class="vacio" hidden></div></div>
+      <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+    </section>
+  </div>
+
+  <div class="listas">
+    <section class="card" id="c-planta">
+      <div class="lista-cab"><h2>Dentro de la planta ahora</h2><span class="etq gris" id="n-planta"></span>
+        <input type="search" id="buscar-planta" placeholder="Buscar por ID o nombre" aria-label="Buscar en quién está dentro"></div>
+      <div class="tabla-env" id="t-planta"></div>
+    </section>
+    <section class="card" id="c-incs">
+      <div class="lista-cab"><h2>Incidencias del periodo</h2><span class="etq gris" id="n-incs"></span></div>
+      <div class="tabla-env" id="t-incs"></div>
+    </section>
+    <p class="pie">Cada persona se identifica por el ID de su credencial de acceso (el número del recuadro azul). El Excel trae todo el detalle del periodo: movimientos de cada persona, horas por persona, por día, por hora e incidencias.</p>
+  </div>
+</main>
+<div id="fuera-pdf" aria-hidden="true"></div>
+
+<script src="js/destinos.js"></script>
+<script src="js/chart/chart.umd.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var API = 'api/index.php', CLAVE = window.CA_SESION || 'ca_sesion', CLAVE_PERIODO = 'ca_tablero_periodo';
+  var ses = null;
+  try { ses = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) {}
+  if (!ses || !ses.token) { location.replace('login.html?volver=tablero.html'); return; }
+  if (['ADMIN', 'PLANTA', 'CLIENTE'].indexOf(ses.rol) < 0) { location.replace((window.CA_DESTINOS || {})[ses.rol] || 'index.html'); return; }
+  var PERFIL = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de la planta', CLIENTE: 'Cliente' };
+  $('sub').textContent = (ses.nombre || ses.usuario || '') + ' · ' + (PERFIL[ses.rol] || '');
+
+  var CSS = getComputedStyle(document.documentElement);
+  var tok = function (n) { return CSS.getPropertyValue(n).trim(); };
+  var C = { s1: tok('--s1'), s2: tok('--s2'), orden: [tok('--o1'), tok('--o2'), tok('--o3'), tok('--o4'), tok('--o5')],
+            rejilla: tok('--rejilla'), eje: tok('--eje'), tinta: tok('--sub'), texto: tok('--texto') };
+  var NUM = new Intl.NumberFormat('es-MX');
+  var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  function num(v) { return NUM.format(v || 0); }
+  function dos(n) { return (n < 10 ? '0' : '') + n; }
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function iso(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
+  function fechaDe(s) { return new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10), 12); }
+  function diaCorto(s) { return DIAS[fechaDe(s).getDay()] + ' ' + s.slice(8, 10) + '/' + s.slice(5, 7); }
+  function fechaLarga(s) { return DIAS[fechaDe(s).getDay()] + ' ' + s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4); }
+  function fechaHora(s) { return s ? s.slice(8, 10) + '/' + s.slice(5, 7) + ' ' + s.slice(11, 16) : ''; }
+  function hm(min) { min = Math.max(0, Math.round(min || 0)); return Math.floor(min / 60) + ' h ' + dos(min % 60) + ' min'; }
+  var ICO_AVISO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.5"/></svg>';
+
+  function api(accion, payload) {
+    var op = { headers: { Authorization: 'Bearer ' + ses.token } }, url = API;
+    if (payload === undefined) url += '?action=' + accion;
+    else { op.method = 'POST'; op.headers['Content-Type'] = 'application/json'; op.body = JSON.stringify({ action: accion, payload: payload }); }
+    return fetch(url, op).then(function (r) { return r.json().catch(function () { throw new Error('El servidor no respondió bien (' + r.status + ').'); }); })
+      .then(function (r) {
+        if (r && r.codigo === 'SIN_SESION') { try { localStorage.removeItem(CLAVE); } catch (e) {} location.replace('login.html?volver=tablero.html'); throw new Error(r.message); }
+        return r;
+      });
+  }
+  function aviso(html, tipo) { var m = $('msg'); m.innerHTML = html; m.className = 'aviso ' + (tipo || 'info'); m.hidden = !html; }
+
+  /* ══ Periodo ══ */
+  var P = { p: '7', desde: '', hasta: '' };
+  try { var g = JSON.parse(localStorage.getItem(CLAVE_PERIODO) || 'null'); if (g && g.p) P = g; } catch (e) {}
+  function rango(p) {
+    var h = new Date(), hoy = iso(h), menos = function (n) { var d = new Date(h); d.setDate(d.getDate() - n); return iso(d); };
+    if (p === 'hoy') return [hoy, hoy];
+    if (p === '30') return [menos(29), hoy];
+    if (p === 'mes') return [iso(new Date(h.getFullYear(), h.getMonth(), 1)), hoy];
+    if (p === 'mesant') return [iso(new Date(h.getFullYear(), h.getMonth() - 1, 1)), iso(new Date(h.getFullYear(), h.getMonth(), 0))];
+    if (p === 'otro' && P.desde && P.hasta) return [P.desde, P.hasta];
+    return [menos(6), hoy];
+  }
+  function marcar() {
+    document.querySelectorAll('#periodos button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.p === P.p ? 'true' : 'false'); });
+    $('fechas').hidden = P.p !== 'otro';
+    var r = rango(P.p); $('desde').value = r[0]; $('hasta').value = r[1]; $('desde').max = $('hasta').max = iso(new Date());
+  }
+  $('periodos').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-p]'); if (!b) return;
+    P.p = b.dataset.p;
+    if (P.p === 'otro' && !P.desde) { var r = rango('7'); P.desde = r[0]; P.hasta = r[1]; }
+    marcar();
+    if (P.p !== 'otro') cargar();
+    else $('desde').focus();
+  });
+  $('fechas').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (!$('desde').value || !$('hasta').value) return;
+    P.desde = $('desde').value; P.hasta = $('hasta').value;
+    cargar();
+  });
+
+  /* ══ Gráficas (Chart.js) ══ */
+  Chart.defaults.font.family = "'Segoe UI',system-ui,-apple-system,Roboto,sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = C.tinta;
+  Chart.defaults.borderColor = C.rejilla;
+  Chart.defaults.animation = false;
+  Chart.defaults.plugins.legend.labels.boxWidth = 10;
+  Chart.defaults.plugins.legend.labels.boxHeight = 10;
+  Chart.defaults.plugins.legend.labels.padding = 14;
+  Chart.defaults.plugins.tooltip.backgroundColor = '#0b2545';
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 8;
+  Chart.defaults.plugins.tooltip.boxPadding = 4;
+  // Fondo blanco (las imágenes del PDF no quedan transparentes)
+  var FONDO = { id: 'fondo', beforeDraw: function (ch) { var x = ch.ctx; x.save(); x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, ch.width, ch.height); x.restore(); } };
+
+  function ejes(o) {
+    var e = { x: { grid: { display: false }, border: { color: C.eje }, ticks: { color: C.tinta, maxRotation: 0, autoSkip: true } },
+              y: { beginAtZero: true, grid: { color: C.rejilla }, border: { display: false }, ticks: { color: C.tinta, precision: 0 } } };
+    for (var k in o || {}) for (var j in o[k]) e[k][j] = o[k][j];
+    return e;
+  }
+  function opciones(extra) {
+    var o = { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+              plugins: { legend: { display: false } }, scales: ejes() };
+    for (var k in extra || {}) o[k] = extra[k];
+    return o;
+  }
+  function barra(etq, datos, color, extra) {
+    var d = { label: etq, data: datos, backgroundColor: color, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 16, categoryPercentage: 0.8, barPercentage: 0.9 };
+    for (var k in extra || {}) d[k] = extra[k];
+    return d;
+  }
+  var LEYENDA = { display: true, position: 'top', align: 'end' };
+
+  /* Cada gráfica: {sub, cfg, tabla: {cols, filas}} o {vacio: 'texto'} */
+  var DEF = {
+    ocupacion: function (d) {
+      var o = d.ocupacion, pts = o.puntos || [];
+      if (!pts.length || !pts.some(function (x) { return x.n > 0; })) return { vacio: 'Nadie registró entradas en este periodo.' };
+      var porHora = o.nivel === 'hora';
+      var etq = pts.map(function (x) { return x.t; });
+      var corto = function (t) { return porHora ? (t.slice(11, 13) === '00' ? diaCorto(t.slice(0, 10)) : t.slice(11, 16)) : diaCorto(t); };
+      var largo = function (t) { return porHora ? fechaLarga(t.slice(0, 10)) + ', ' + t.slice(11, 13) + ':00 a ' + t.slice(11, 13) + ':59' : fechaLarga(t); };
+      return {
+        sub: porHora ? 'Máximo en cada hora' : 'Máximo de cada día',
+        cfg: { type: 'line', data: { labels: etq, datasets: [{ label: 'Personas dentro', data: pts.map(function (x) { return x.n; }),
+                 borderColor: C.s1, backgroundColor: 'rgba(37,125,224,.12)', fill: true, borderWidth: 2, pointRadius: porHora ? 0 : 3,
+                 pointBackgroundColor: C.s1, pointBorderColor: '#fff', pointBorderWidth: 2, pointHoverRadius: 5, tension: 0.25, stepped: false }] },
+               options: opciones({ scales: ejes({ x: { ticks: { color: C.tinta, maxRotation: 0, autoSkip: true, maxTicksLimit: porHora ? 8 : 10,
+                   callback: function (v) { return corto(this.getLabelForValue(v)); } } } }),
+                 plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (it) { return largo(it[0].label); },
+                   label: function (c) { return ' ' + num(c.raw) + (c.raw === 1 ? ' persona dentro' : ' personas dentro'); } } } } }) },
+        tabla: { cols: [porHora ? 'Hora' : 'Día', 'Máximo de personas dentro'], filas: pts.map(function (x) { return [largo(x.t), num(x.n)]; }) }
+      };
+    },
+    dia: function (d) {
+      if (d.dias < 2) return null;                                   // un solo día: lo cuenta la gráfica por hora
+      var p = d.por_dia;
+      if (!p.some(function (x) { return x.entradas || x.salidas; })) return { vacio: 'Sin entradas ni salidas en este periodo.' };
+      return {
+        sub: d.dias + ' días',
+        cfg: { type: 'bar', data: { labels: p.map(function (x) { return x.fecha; }), datasets: [
+                 barra('Entradas', p.map(function (x) { return x.entradas; }), C.s1), barra('Salidas', p.map(function (x) { return x.salidas; }), C.s2)] },
+               options: opciones({ plugins: { legend: LEYENDA, tooltip: { callbacks: { title: function (it) { return fechaLarga(it[0].label); } } } },
+                 scales: ejes({ x: { ticks: { color: C.tinta, maxRotation: 0, autoSkip: true, maxTicksLimit: 10,
+                   callback: function (v) { return diaCorto(this.getLabelForValue(v)); } } } }) }) },
+        tabla: { cols: ['Día', 'Entradas', 'Salidas', 'Personas', 'Máx. dentro'], num: [1, 2, 3, 4],
+                 filas: p.map(function (x) { return [fechaLarga(x.fecha), num(x.entradas), num(x.salidas), num(x.personas), num(x.max_dentro)]; }) }
+      };
+    },
+    hora: function (d) {
+      var h = d.por_hora;
+      if (!h.some(function (x) { return x.entradas || x.salidas; })) return { vacio: 'Sin entradas ni salidas en este periodo.' };
+      return {
+        sub: d.dias > 1 ? 'Todo el periodo junto' : 'En el día',
+        cfg: { type: 'bar', data: { labels: h.map(function (x) { return dos(x.hora) + 'h'; }), datasets: [
+                 barra('Entradas', h.map(function (x) { return x.entradas; }), C.s1, { maxBarThickness: 10 }),
+                 barra('Salidas', h.map(function (x) { return x.salidas; }), C.s2, { maxBarThickness: 10 })] },
+               options: opciones({ plugins: { legend: LEYENDA, tooltip: { callbacks: { title: function (it) { var x = it[0].label.slice(0, 2); return 'De ' + x + ':00 a ' + x + ':59'; } } } },
+                 scales: ejes({ x: { ticks: { color: C.tinta, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } } }) }) },
+        tabla: { cols: ['Hora', 'Entradas', 'Salidas'], num: [1, 2], filas: h.map(function (x) { return [dos(x.hora) + ':00 a ' + dos(x.hora) + ':59', num(x.entradas), num(x.salidas)]; }) }
+      };
+    },
+    perm: function (d) {
+      var p = d.permanencia, total = p.reduce(function (s, x) { return s + x.n; }, 0);
+      if (!total) return { vacio: 'Sin visitas completas (entrada y salida) en este periodo.' };
+      return {
+        sub: num(total) + ' visitas · promedio ' + hm(d.kpis.promedio_min),
+        cfg: { type: 'bar', data: { labels: p.map(function (x) { return x.rango; }), datasets: [
+                 barra('Visitas', p.map(function (x) { return x.n; }), C.orden, { maxBarThickness: 44 })] },
+               options: opciones({ plugins: { legend: { display: false }, tooltip: { callbacks: {
+                   label: function (c) { return ' ' + num(c.raw) + ' visitas (' + Math.round(c.raw / total * 100) + ' %)'; } } } } }) },
+        tabla: { cols: ['Tiempo dentro', 'Visitas', '%'], num: [1, 2], filas: p.map(function (x) { return [x.rango, num(x.n), Math.round(x.n / total * 100) + ' %']; }) }
+      };
+    },
+    inc: function (d) {
+      var t = d.incidencias_tipo, total = d.kpis.incidencias;
+      if (!total) return { vacio: 'No se reportaron incidencias en este periodo.' };
+      return {
+        sub: num(total) + (total === 1 ? ' incidencia' : ' incidencias'),
+        cfg: { type: 'bar', data: { labels: t.map(function (x) { return x.nombre; }), datasets: [barra('Incidencias', t.map(function (x) { return x.n; }), C.s1, { maxBarThickness: 18, borderSkipped: 'start' })] },
+               options: opciones({ indexAxis: 'y', interaction: { mode: 'index', intersect: false, axis: 'y' }, plugins: { legend: { display: false } },
+                 scales: { x: { beginAtZero: true, grid: { color: C.rejilla }, border: { display: false }, ticks: { color: C.tinta, precision: 0 } },
+                           y: { grid: { display: false }, border: { color: C.eje }, ticks: { color: C.texto } } } }) },
+        tabla: { cols: ['Tipo', 'Incidencias'], num: [1], filas: t.map(function (x) { return [x.nombre, num(x.n)]; }) }
+      };
+    },
+    top: function (d, ancho) {
+      var t = (d.top_personas || []).filter(function (x) { return x.minutos > 0; });
+      if (!t.length) return { vacio: 'Sin visitas completas (entrada y salida) en este periodo.' };
+      var largo = ancho < 450 ? 11 : ancho < 600 ? 18 : 30;         // en el teléfono (y el PDF), nombres cortos: si no, se cortan
+      var nombre = function (x) { var n = x.nombre || 'Sin nombre leído'; return x.id + ' · ' + (n.length > largo ? n.slice(0, largo - 1) + '…' : n); };
+      return {
+        sub: 'Suma de sus visitas en el periodo',
+        cfg: { type: 'bar', data: { labels: t.map(nombre), datasets: [barra('Horas', t.map(function (x) { return Math.round(x.minutos / 6) / 10; }), C.s1, { maxBarThickness: 18 })] },
+               options: opciones({ indexAxis: 'y', interaction: { mode: 'index', intersect: false, axis: 'y' }, plugins: { legend: { display: false }, tooltip: { callbacks: {
+                   label: function (c) { var x = t[c.dataIndex]; return ' ' + hm(x.minutos) + ' en ' + x.visitas + (x.visitas === 1 ? ' visita' : ' visitas') + ' (' + x.dias + (x.dias === 1 ? ' día)' : ' días)'); } } } },
+                 scales: { x: { beginAtZero: true, grid: { color: C.rejilla }, border: { display: false }, ticks: { color: C.tinta, callback: function (v) { return v + ' h'; } } },
+                           y: { grid: { display: false }, border: { color: C.eje }, ticks: { color: C.texto, autoSkip: false, font: { size: ancho < 450 ? 11 : 12 } } } } }) },
+        tabla: { cols: ['ID', 'Nombre', 'Visitas', 'Días', 'Horas'], num: [2, 3, 4], id: 0,
+                 filas: t.map(function (x) { return [x.id, x.nombre || 'Sin nombre leído', num(x.visitas), num(x.dias), (Math.round(x.minutos / 6) / 10).toFixed(1)]; }) }
+      };
+    }
+  };
+
+  var GRAF = {}, ACTUAL = {};
+  function tablaHtml(t) {
+    var n = t.num || [];
+    return '<table class="t"><thead><tr>' + t.cols.map(function (c, i) { return '<th' + (n.indexOf(i) >= 0 ? ' class="n"' : '') + '>' + esc(c) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      t.filas.map(function (f) { return '<tr>' + f.map(function (v, i) { return '<td' + (n.indexOf(i) >= 0 ? ' class="n"' : (t.id === i ? ' class="id"' : '')) + '>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table>';
+  }
+  function dibujar(d) {
+    document.querySelectorAll('.graf[data-g]').forEach(function (card) {
+      var g = card.dataset.g, def = DEF[g](d, window.innerWidth);
+      ACTUAL[g] = def;
+      if (GRAF[g]) { GRAF[g].destroy(); delete GRAF[g]; }
+      card.hidden = !def;
+      if (!def) return;
+      var vacio = card.querySelector('.vacio'), canvas = card.querySelector('canvas'), tabla = card.querySelector('.tabla-env'), ver = card.querySelector('.ver');
+      card.querySelector('[data-sub]').textContent = def.sub || '';
+      vacio.hidden = !def.vacio; vacio.textContent = def.vacio || '';
+      canvas.style.visibility = def.vacio ? 'hidden' : '';
+      ver.hidden = !!def.vacio;
+      if (def.vacio) { tabla.hidden = true; return; }
+      GRAF[g] = new Chart(canvas, def.cfg);
+      tabla.innerHTML = tablaHtml(def.tabla);
+      ver.textContent = tabla.hidden ? 'Ver datos' : 'Ocultar datos';
+    });
+  }
+  document.querySelector('.rejilla').addEventListener('click', function (ev) {
+    var b = ev.target.closest('.ver'); if (!b) return;
+    var t = b.nextElementSibling; t.hidden = !t.hidden; b.textContent = t.hidden ? 'Ver datos' : 'Ocultar datos';
+  });
+
+  /* ══ Cifras y listas ══ */
+  function cifras(d) {
+    var k = d.kpis;
+    var caja = function (l, v, s, hero) { return '<div class="kpi' + (hero ? ' hero' : '') + '"><div class="l">' + l + '</div><div class="v">' + v + '</div><div class="s">' + s + '</div></div>'; };
+    $('kpis').innerHTML =
+      caja('Dentro de la planta ahora', num(k.dentro), k.dentro_revisar ? '<span class="estado">' + ICO_AVISO + num(k.dentro_revisar) + ' con más de 13 h dentro</span>' : 'Al ' + fechaHora(d.generado), true) +
+      caja('Entradas', num(k.entradas), 'Turno de día ' + num(k.entradas_dia) + ' · noche ' + num(k.entradas_noche)) +
+      caja('Salidas', num(k.salidas), k.sin_salida ? num(k.sin_salida) + (k.sin_salida === 1 ? ' entrada sin salida registrada' : ' entradas sin salida registrada') : 'Todas las entradas con su salida') +
+      caja('Personas distintas', num(k.personas), 'Por el ID de su credencial') +
+      caja('Horas en planta', num(Math.round(k.minutos / 60)), k.visitas ? 'Promedio por visita: ' + hm(k.promedio_min) : 'Sin visitas completas') +
+      caja('Incidencias', num(k.incidencias), 'Reportadas en la caseta');
+  }
+  var DENTRO = [];
+  function pintarPlanta() {
+    var q = $('buscar-planta').value.trim().toUpperCase(), qId = q.replace(/^0+/, '');
+    var l = DENTRO.filter(function (x) { return !q || (x.nombre || '').toUpperCase().indexOf(q) >= 0 || String(x.id).replace(/^0+/, '').indexOf(qId) === 0; });
+    $('n-planta').textContent = num(DENTRO.length) + (DENTRO.length === 1 ? ' persona' : ' personas');
+    $('t-planta').innerHTML = !DENTRO.length ? '<p class="pie">Nadie aparece dentro de la planta en este momento.</p>' : !l.length ? '<p class="pie">Nadie coincide con «' + esc(q) + '».</p>' :
+      '<table class="t"><thead><tr><th>ID</th><th>Nombre</th><th>Entrada</th><th class="n">Dentro</th></tr></thead><tbody>' +
+      l.map(function (x) {
+        var hoy = x.entrada.slice(0, 10) === iso(new Date());
+        return '<tr><td class="id">' + esc(x.id) + '</td><td>' + esc(x.nombre || 'Sin nombre leído') + '</td><td style="white-space:nowrap">' +
+          esc(hoy ? x.entrada.slice(11, 16) : fechaHora(x.entrada)) + '</td><td class="n">' +
+          (x.revisar ? '<span class="estado" title="Más de 13 h dentro: ¿salió sin registrar?">' + ICO_AVISO + esc(hm(x.minutos)) + '</span>' : esc(hm(x.minutos))) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  $('buscar-planta').addEventListener('input', pintarPlanta);
+  function pintarIncidencias(d) {
+    var l = d.incidencias || [];
+    $('n-incs').textContent = num(d.kpis.incidencias);
+    $('t-incs').innerHTML = !l.length ? '<p class="pie">No se reportaron incidencias en este periodo.</p>' :
+      '<table class="t"><thead><tr><th>Fecha</th><th>Tipo</th><th>ID</th><th>Nombre</th><th>Qué pasó</th></tr></thead><tbody>' +
+      l.map(function (x) {
+        return '<tr><td style="white-space:nowrap">' + esc(fechaHora(x.capturado)) + '</td><td><span class="etq inc">' + esc(x.nombre_tipo) + '</span></td><td class="id">' + esc(x.id) +
+          '</td><td>' + esc(x.nombre) + '</td><td>' + esc(x.detalle) + '</td></tr>';
+      }).join('') + '</tbody></table>' + (d.kpis.incidencias > l.length ? '<p class="pie">Se muestran las ' + l.length + ' más recientes; todas vienen en el Excel.</p>' : '');
+  }
+
+  /* ══ Cargar ══ */
+  var DATOS = null, pedido = 0;
+  function cargar() {
+    var r = rango(P.p), yo = ++pedido;
+    try { localStorage.setItem(CLAVE_PERIODO, JSON.stringify(P)); } catch (e) {}
+    $('todo').classList.add('cargando');
+    return api('TABLERO&desde=' + r[0] + '&hasta=' + r[1]).then(function (d) {
+      if (yo !== pedido) return;
+      $('todo').classList.remove('cargando');
+      if (!d || d.status !== 'success') { aviso(esc((d && d.message) || 'No se pudo cargar el tablero.'), 'mal'); return; }
+      if ($('msg').classList.contains('mal')) aviso('');
+      DATOS = d;
+      $('periodo-txt').innerHTML = '<b>' + (d.desde === d.hasta ? fechaLarga(d.desde) : 'Del ' + fechaLarga(d.desde) + ' al ' + fechaLarga(d.hasta)) + '</b>' +
+        '<span>' + d.dias + (d.dias === 1 ? ' día' : ' días') + '</span><span>Actualizado ' + d.generado.slice(11, 16) + '</span>';
+      cifras(d); dibujar(d);
+      DENTRO = d.en_planta || []; pintarPlanta(); pintarIncidencias(d);
+    }).catch(function (e) {
+      if (yo !== pedido) return;
+      $('todo').classList.remove('cargando');
+      aviso(esc(e && e.message ? e.message : 'No se pudo conectar con el servidor.'), 'mal');
+    });
+  }
+  // Con el periodo hasta hoy, se actualiza solo cada 5 minutos
+  setInterval(function () { if (!document.hidden && DATOS && DATOS.hasta === iso(new Date())) cargar(); }, 5 * 60 * 1000);
+
+  /* ══ Descargas ══ */
+  function bajar(url, archivo) {
+    var a = document.createElement('a');
+    a.href = url + '&token=' + encodeURIComponent(ses.token); a.download = archivo || '';
+    document.body.appendChild(a); a.click(); a.remove();
+    return a.href;
+  }
+  /** Las gráficas como imágenes para el PDF: se dibujan aparte, a un tamaño fijo (media hoja), con letra
+   *  un poco más grande y fondo blanco. */
+  var PDF_ANCHO = 540, PDF_ALTO = 290;
+  function imagenesPdf() {
+    var out = [], caja = $('fuera-pdf'), letra = Chart.defaults.font.size;
+    Chart.defaults.font.size = 13;
+    try {
+      document.querySelectorAll('.graf[data-g]').forEach(function (card) {
+        var g = card.dataset.g, def = DATOS && DEF[g](DATOS, PDF_ANCHO);
+        if (!def || def.vacio) return;
+        var cv = document.createElement('canvas'); cv.width = PDF_ANCHO; cv.height = PDF_ALTO; caja.appendChild(cv);
+        var cfg = { type: def.cfg.type, data: def.cfg.data, options: Object.assign({}, def.cfg.options, { responsive: false, devicePixelRatio: 2, animation: false }), plugins: [FONDO] };
+        var ch = new Chart(cv, cfg);
+        out.push({ titulo: card.querySelector('h2').textContent, sub: def.sub || '', imagen: ch.toBase64Image('image/png') });
+        ch.destroy(); cv.remove();
+      });
+    } finally { Chart.defaults.font.size = letra; }
+    return out;
+  }
+  function descargar(boton, accion, extra, nombre) {
+    if (!DATOS) return;
+    var antes = boton.textContent;
+    boton.disabled = true; boton.textContent = 'Preparando…';
+    aviso('Preparando el ' + nombre + '…', 'info');
+    var payload = { desde: DATOS.desde, hasta: DATOS.hasta };
+    var mas = extra ? extra() : {};
+    for (var k in mas) payload[k] = mas[k];
+    api(accion, payload).then(function (r) {
+      boton.disabled = false; boton.textContent = antes;
+      if (!r || r.status !== 'success') { aviso(esc((r && r.message) || 'No se pudo preparar el ' + nombre + '.'), 'mal'); return; }
+      var url = bajar(r.url, r.archivo);
+      aviso('Listo: el ' + nombre + ' se está descargando' + (r.paginas ? ' (' + r.paginas + (r.paginas === 1 ? ' página' : ' páginas') + ')' : '') +
+            '. Si no empieza, <a href="' + esc(url) + '" download="' + esc(r.archivo) + '">descárgalo aquí</a>.', 'bien');
+    }).catch(function (e) {
+      boton.disabled = false; boton.textContent = antes;
+      aviso(esc(e && e.message ? e.message : 'No se pudo conectar con el servidor.'), 'mal');
+    });
+  }
+  $('b-excel').addEventListener('click', function () { descargar(this, 'TABLERO_EXCEL', null, 'Excel'); });
+  $('b-pdf').addEventListener('click', function () {
+    var imgs = null;
+    descargar(this, 'TABLERO_PDF', function () { if (!imgs) imgs = imagenesPdf(); return { graficas: imgs }; }, 'PDF');
+  });
+
+  $('b-salir').addEventListener('click', function () {
+    var fuera = function () { try { localStorage.removeItem(CLAVE); } catch (e) {} location.replace('login.html'); };
+    api('LOGOUT', {}).then(fuera, fuera);
+  });
+
+  marcar();
+  cargar();
+})();
+</script>
+</body>
+</html>

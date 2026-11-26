@@ -16,6 +16,9 @@ INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
 INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
   ('noche1', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'CASETA PUNTO 1 NOCHE'),
   ('noche2', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'CASETA PUNTO 2 NOCHE');
+-- El cliente: sólo el tablero (gráficas, Excel y PDF).
+INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
+  ('cliente', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'CLIENTE', 'CLIENTE DE PRUEBA');
 UPDATE usuarios SET turno = 'D' WHERE usuario IN ('punto1', 'punto2', 'punto3', 'punto4');
 UPDATE usuarios SET turno = 'N' WHERE usuario IN ('noche1', 'noche2');
 

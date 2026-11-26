@@ -33,9 +33,10 @@
 class ControlAccesos {
     private PDO $pdo;
 
-    /** Los tres perfiles de la plataforma (ver Auth.php): Administración AVBA,
-     *  administrador de accesos de la planta y guardia de caseta. */
-    public const ROLES = ['ADMIN', 'PLANTA', 'ACCESOS'];
+    /** Los perfiles de la plataforma (ver Auth.php): Administración AVBA, administrador de
+     *  accesos de la planta, guardia de caseta y el cliente (sólo el tablero: el enrutador
+     *  le rechaza todo lo demás y descargar.php sólo le da sus reportes). */
+    public const ROLES = ['ADMIN', 'PLANTA', 'ACCESOS', 'CLIENTE'];
 
     private const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
     private const MESES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
@@ -71,6 +72,11 @@ class ControlAccesos {
      */
     public static function esCaseta(?array $usr): bool {
         return ($usr['rol'] ?? '') === 'ACCESOS';
+    }
+
+    /** El cliente: sólo consulta el tablero y descarga sus reportes (Excel y PDF). */
+    public static function esCliente(?array $usr): bool {
+        return ($usr['rol'] ?? '') === 'CLIENTE';
     }
 
     /* ── Tabla y carpeta ────────────────────────────────────────────────── */
@@ -247,7 +253,7 @@ class ControlAccesos {
     }
 
     /** La carpeta no se sirve directo: sólo por descargar.php, con sesión. */
-    private static function protegerCarpeta(): void {
+    public static function protegerCarpeta(): void {
         $base = self::carpeta();
         if (!is_dir($base)) @mkdir($base, 0755, true);
         $ht = $base . '.htaccess';
