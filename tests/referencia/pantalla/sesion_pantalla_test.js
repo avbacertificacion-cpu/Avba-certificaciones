@@ -52,6 +52,7 @@ async function entrar(p, usuario, password) {
   ok((await p.evaluate(() => localStorage.getItem('avba_session'))) === SESION_PRINCIPAL, 'la sesión del Sistema de Gestión (avba_session) quedó intacta');
   ok(/LUCIA PRUEBA · Administración AVBA/.test(await p.textContent('#saludo')), 'saludo: ' + await p.textContent('#saludo'));
   ok(await p.isVisible('#m-cuentas'), 'ADMIN ve el mosaico «Cuentas»');
+  ok(await p.isVisible('#m-maqueta'), 'ADMIN ve el mosaico «Maqueta»');
   ok(await sinScrollLateral(p), 'inicio sin desplazamiento lateral en teléfono');
   await p.screenshot({ path: D + 'ses_inicio_admin.png' });
 
@@ -111,6 +112,11 @@ async function entrar(p, usuario, password) {
   ({ ctx, p } = await navegador(b, false));
   await entrar(p, 'planta.norte', 'planta-norte-1');
   ok(p.url().endsWith('/index.html') && await p.isHidden('#m-cuentas'), 'planta entra al inicio, sin el mosaico «Cuentas»');
+  ok(await p.isHidden('#m-maqueta') && await p.isVisible('#m-tablero'), 'planta no ve el mosaico «Maqueta» (sí el Tablero)');
+  for (const pag of ['demo/', 'demo/control-accesos.html', 'demo/caseta.html']) {
+    await p.goto(B + pag); await p.waitForURL(u => !/\/demo\//.test(String(u)), { timeout: 5000 }).catch(() => {});
+    ok(/\/index\.html$/.test(p.url()), 'planta abre ' + pag + ' a mano: regresa a su inicio');
+  }
   await p.goto(B + 'cuentas.html'); await p.waitForTimeout(600);
   ok(await p.isVisible('#sin-permiso') && await p.isHidden('#todo'), 'planta en cuentas.html: «Sólo Administración AVBA…»');
   await p.goto(B + 'accesos.html'); await p.waitForTimeout(1800);
@@ -149,6 +155,18 @@ async function entrar(p, usuario, password) {
   await p.reload(); await p.waitForTimeout(1200);
   ok(await p.isVisible('#fuera') && await p.isHidden('#dentro') && !(await p.evaluate(() => localStorage.getItem('ca_sesion'))), 'sesión vencida: el inicio vuelve a «Iniciar sesión»');
   await p.screenshot({ path: D + 'ses_inicio_fuera.png' });
+  await ctx.close();
+
+  // ── La maqueta: Administración sí; sin sesión también (el teléfono que entra con el QR de la portada) ──
+  ({ ctx, p } = await navegador(b, false));
+  await p.goto(B + 'demo/caseta.html'); await p.waitForTimeout(1200);
+  ok(/\/demo\/caseta\.html/.test(p.url()), 'sin sesión, la pantalla del guardia de la demo abre (QR de la portada)');
+  await p.evaluate(() => localStorage.setItem('ca_sesion', JSON.stringify({ token: 'tok-admin', rol: 'ADMIN', usuario: 'admin', nombre: 'ADMINISTRACION' })));
+  await p.goto(B + 'demo/control-accesos.html'); await p.waitForTimeout(1500);
+  ok(/\/demo\/control-accesos\.html/.test(p.url()), 'Administración abre el panel de la maqueta');
+  await p.evaluate(() => localStorage.setItem('ca_sesion', JSON.stringify({ token: 'tok-cliente', rol: 'CLIENTE', usuario: 'cliente', nombre: 'CLIENTE' })));
+  await p.goto(B + 'demo/'); await p.waitForURL(/tablero\.html/, { timeout: 5000 }).catch(() => {});
+  ok(/\/tablero\.html$/.test(p.url()), 'el cliente que abre la maqueta regresa a su tablero');
   await ctx.close();
 
   await b.close();

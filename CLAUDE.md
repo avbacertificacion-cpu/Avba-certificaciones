@@ -38,7 +38,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 
 | Ruta | Qué es |
 |---|---|
-| `index.html` | Entrada: sin sesión, «Iniciar sesión»; con sesión, el menú del perfil (Tablero, Control de accesos, Cuentas, Mi contraseña, Maqueta; el cliente sólo Tablero y Mi contraseña). |
+| `index.html` | Entrada: sin sesión, «Iniciar sesión»; con sesión, el menú del perfil (Tablero, Control de accesos, Cuentas, Mi contraseña, Maqueta; la Maqueta sólo para ADMIN; el cliente sólo Tablero y Mi contraseña). |
 | `login.html` | Inicio de sesión propio. Con la base vacía ofrece crear la primera cuenta ADMIN con la `CLAVE_INSTALACION` de `config.php`. |
 | `cuentas.html` | Cuentas (sólo ADMIN): alta, nombre, perfil, contraseña, desactivar. |
 | `descargar.php` | Fotos de credenciales, PDF y reportes del tablero, sólo con sesión (el guardia, sólo sus fotos; el cliente, sólo los reportes del tablero). |
@@ -52,7 +52,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `api/lib/xlsx.php` | Excel (.xlsx) propio, sin librerías ni extensión zip: hojas con títulos fijos, filtros, fechas y el ID como texto. |
 | `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. |
 | `api/lib/qrcode.php` | Generador de códigos QR (lo usa la portada de la maqueta). |
-| `demo/` | **La maqueta** que hay que volver real: `control-accesos.html` (panel), `caseta.html` (guardia), `demo-datos.js` (datos ficticios y reglas), `index.html` (portada), `sala.php` (sincroniza la demo entre equipos). |
+| `demo/` | **La maqueta** que hay que volver real: `control-accesos.html` (panel), `caseta.html` (guardia), `demo-datos.js` (datos ficticios y reglas), `index.html` (portada), `sala.php` (sincroniza la demo entre equipos). **Sólo Administración:** `solo-admin.js` regresa a su inicio a quien entre con otro perfil (sin sesión sí abre, para el teléfono que entra con el QR de la portada). |
 | `mobile/caseta/` | App Android «AVBA Control de Accesos» (Capacitor): abre `accesos.html` y agrega el lector nativo de la credencial (CameraX + ML Kit sin internet, `AnalizadorTarjeta.java` con sus pruebas). Cámara frontal o trasera según la regla `camara`; el botón «Cambiar cámara» pasa a la otra y el teléfono la recuerda mientras la regla no cambie. |
 | `config/config.example.php` | Plantilla de la configuración (base propia). `config.php` vive sólo en el servidor. |
 | `sql/esquema-inicial.sql` | Tablas de la base propia (cuentas, sesiones, registros, puntos). |

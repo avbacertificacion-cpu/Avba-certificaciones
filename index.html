@@ -9,8 +9,8 @@
 <link rel="stylesheet" href="css/ca.css">
 <!--
   Entrada de la plataforma de Control de Accesos (gestion.avba.com.mx/controlaccesos/).
-  Sin sesión: «Iniciar sesión» y la maqueta. Con sesión: el menú del perfil
-  (el guardia de caseta va directo a accesos.html).
+  Sin sesión: «Iniciar sesión». Con sesión: el menú del perfil (el guardia de
+  caseta va directo a accesos.html; la maqueta sólo la ve Administración AVBA).
 -->
 </head>
 <body>
@@ -49,7 +49,7 @@
       <button class="mosaico" type="button" id="m-pass">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
         <b>Mi contraseña</b><span>Cambiarla. Se cierran tus sesiones en otros equipos.</span></button>
-      <a class="mosaico" href="demo/" id="m-maqueta">
+      <a class="mosaico" href="demo/" id="m-maqueta" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
         <b>Maqueta</b><span>Cómo va a quedar: personas, documentos, reglas, vales y jornadas. Datos ficticios.</span></a>
     </div>
@@ -86,7 +86,8 @@
     $('fuera').hidden = true; $('dentro').hidden = false;
     $('saludo').textContent = (s.nombre || s.usuario) + ' · ' + (NOMBRES[s.rol] || s.rol);
     $('m-cuentas').hidden = s.rol !== 'ADMIN';
-    $('m-accesos').hidden = $('m-maqueta').hidden = s.rol === 'CLIENTE';      // el cliente: tablero y su contraseña
+    $('m-accesos').hidden = s.rol === 'CLIENTE';      // el cliente: tablero y su contraseña
+    $('m-maqueta').hidden = s.rol !== 'ADMIN';        // la maqueta, sólo Administración AVBA
   }
   if (ses && ses.token) {
     mostrar(ses);                                  // al instante con lo guardado; el servidor lo confirma
