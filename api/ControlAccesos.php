@@ -317,7 +317,10 @@ class ControlAccesos {
          · una SALIDA cuenta para el turno que termina: hasta 2 horas después
            de su fin (de 08:30 a 20:30 es el de día).
        Así las entradas de la mañana y las salidas de la tarde del personal de
-       día quedan en el mismo turno, y las de la noche con su mañana. */
+       día quedan en el mismo turno, y las de la noche con su mañana.
+       Además, la SALIDA de quien tiene su ENTRADA abierta (últimas 16 h) va al
+       turno de esa entrada (turnoDeEntradaAbierta): el reloj sólo decide cuando
+       no hay entrada con qué juntarla. */
     public const CAMBIO_DIA   = 390;    // 06:30, en minutos
     public const CAMBIO_NOCHE = 1110;   // 18:30
     public const MARGEN       = 120;    // 2 horas
@@ -344,8 +347,12 @@ class ControlAccesos {
         return 'Turno de noche · ' . self::fechaLarga($fecha) . ' 18:30 al ' . self::fechaLarga($sig) . ' 06:30';
     }
 
+    /** uploads/accesos/ de la plataforma. Una ruta relativa en config.php (p. ej. 'uploads/') se toma
+     *  desde la carpeta de la plataforma: así el registro (api/) y descargar.php (raíz) usan la misma. */
     public static function carpeta(): string {
-        return rtrim(UPLOAD_DIR, '/\\') . '/accesos/';
+        $base = rtrim((string)UPLOAD_DIR, '/\\');
+        if ($base === '' || !preg_match('#^(/|[A-Za-z]:[/\\\\])#', $base)) $base = dirname(__DIR__) . '/' . ($base !== '' ? preg_replace('#^\./#', '', $base) : 'uploads');
+        return $base . '/accesos/';
     }
 
     /** La carpeta no se sirve directo: sólo por descargar.php, con sesión. */
@@ -409,6 +416,11 @@ class ControlAccesos {
 
         try {
             [$turnoFecha, $turno] = self::turnoDe($tipo, $cap);
+            // La SALIDA de alguien que tiene su ENTRADA abierta va al turno de esa entrada:
+            // entrar a las 17:57 (cuenta para la noche) y salir a las 17:58 no debe partirse en dos turnos.
+            if ($tipo === 'salida' && $codigo !== '' && $tarjeta && ($ab = $this->turnoDeEntradaAbierta($codigo, $cap))) {
+                [$turnoFecha, $turno] = $ab;
+            }
             $valores = [
                 $uid, $tipo, $fecha, $cap, date('Y-m-d H:i:s'),
                 mb_substr($eq['punto'] ?: (textoEstandar($p['lugar'] ?? '') ?: 'SIN PUNTO DE CONTROL'), 0, 120),
@@ -469,6 +481,30 @@ class ControlAccesos {
             $foto = $uid . '.' . $ext;
         }
         return [$sub . $foto, $mini ? $sub . $mini : ''];
+    }
+
+    /** Horas hacia atrás en que una ENTRADA sin salida todavía «arrastra» a su turno la salida de esa persona. */
+    public const HORAS_JORNADA_MAX = 16;
+
+    /**
+     * El turno de la entrada abierta de un ID (su última lectura antes de esta salida, de las
+     * últimas HORAS_JORNADA_MAX horas, es una ENTRADA), o null si no tiene una.
+     * Se compara sin ceros a la izquierda: «00287» = «287».
+     */
+    private function turnoDeEntradaAbierta(string $codigo, string $cap): ?array {
+        $clave = self::claveId($codigo);
+        $desde = date('Y-m-d H:i:s', strtotime($cap) - self::HORAS_JORNADA_MAX * 3600);
+        $st = $this->pdo->prepare(
+            "SELECT tipo, codigo, turno_fecha, turno FROM accesos_registros
+              WHERE codigo <> '' AND (codigo = ? OR TRIM(LEADING '0' FROM codigo) = ?) AND capturado <= ? AND capturado >= ?
+              ORDER BY capturado DESC, id DESC LIMIT 10"
+        );
+        $st->execute([$codigo, $clave, $cap, $desde]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) {
+            if (self::claveId((string)$f['codigo']) !== $clave) continue;
+            return $f['tipo'] === 'entrada' && $f['turno_fecha'] ? [(string)$f['turno_fecha'], (string)$f['turno']] : null;
+        }
+        return null;
     }
 
     /* ── Control del día ────────────────────────────────────────────────── */

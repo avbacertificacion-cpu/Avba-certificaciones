@@ -12,6 +12,9 @@
    El token va en «Authorization: Bearer …» (o en token=… para los enlaces).
    ══════════════════════════════════════════════════════════════ */
 
+// Un espacio o salto de línea fuera de las etiquetas de PHP en config.php no debe colarse en las respuestas
+ob_start();
+
 if (!is_file(__DIR__ . '/../config/config.php')) {
     header('Content-Type: application/json; charset=utf-8');
     http_response_code(500);

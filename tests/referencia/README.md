@@ -29,6 +29,8 @@ Las capturas y PDF que dejan las pruebas (`*.png`, `*.pdf`) están en `.gitignor
 | `php/prueba.php` | Migración de la tabla, registro con tarjeta sin foto, reenvío sin duplicar, lista, emparejar entrada/salida por ID, PDF de datos y PDF con fotos. |
 | `php/limitada.php` | Base sin permiso de ALTER: el módulo sigue funcionando con fotos. |
 | `php/en_planta.php` | ID como llave (00316 = 316), «En planta» (quien ya salió por cualquier punto no aparece; más de 13 h se marca), movimientos de un ID, dar salida, reglas del lector. |
+| `php/turnos.php` | El turno de cada lectura: la salida va al turno de la entrada abierta de esa persona (17:57 → 17:58, día que sale tarde, llega muy temprano, sin ceros), y sin entrada decide el reloj. |
+| `pantalla/turnos_pantalla_test.js` | Con el reloj del teléfono a las 17:57: entrada y salida seguidas quedan en el mismo turno, con señal y sin señal (los contadores no brincan al enviarse). |
 | `php/nombre_pdf.php` | El nombre del PDF: una lectura parcial cuenta a favor del nombre completo. |
 | `pantalla/api_plataforma_test.mjs` | Instalación (sólo con base vacía y con la clave), inicio de sesión, espera tras 5 fallos, cerrar sesión, cuentas (alta, validaciones, perfil, contraseña, desactivar), los tres perfiles (ADMIN, PLANTA, ACCESOS) y `descargar.php` sin sesión. |
 | `pantalla/api_incidencias_test.mjs` | Incidencias por la API: validaciones, con foto, sin credencial, reenvío sin duplicar, la cola las confirma, listas por perfil y por punto, no mueven contadores ni «En planta», historial por ID, fotos con permiso, quién puede borrar. |

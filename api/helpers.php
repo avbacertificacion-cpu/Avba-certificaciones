@@ -35,6 +35,7 @@ class Database {
 
 /** Devuelve una respuesta JSON y termina. */
 function respuesta(array $data, int $codigo = 200): void {
+    while (ob_get_level() > 0) ob_end_clean();       // lo que se haya colado antes (ver api/index.php)
     http_response_code($codigo);
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;

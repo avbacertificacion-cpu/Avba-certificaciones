@@ -81,6 +81,9 @@ punto; el enrutador le rechaza todo lo demás).
    abajo «CREDENCIAL DE ACCESO». El lector ya está ajustado a ese formato.
 4. **Turnos:** día 06:30–18:30 y noche 18:30–06:30; una entrada cuenta para el turno
    que empieza (desde 2 h antes) y una salida para el que termina (hasta 2 h después).
+   **Pero** la salida de quien tiene su entrada abierta (su última lectura de las últimas
+   16 h fue ENTRADA) va al turno de esa entrada (`turnoDeEntradaAbierta`, y en la pantalla
+   `turnoLectura`): entrar 17:57 y salir 17:58 no se parte en dos turnos.
 5. **Puntos de control:** 4 fijos («PUNTO DE CONTROL 1…4»); cada uno con su cuenta de
    caseta y **un solo equipo** (el primero que entra queda ligado; Administración lo
    libera).

@@ -12,7 +12,12 @@
    El guardia de caseta sólo ve las fotos que registró él y no baja PDF.
    ══════════════════════════════════════════════════════════════ */
 
+// Cualquier texto que se cuele antes (un espacio o salto de línea fuera de las etiquetas
+// de PHP en config.php) dañaría la foto: se guarda aparte y se tira antes de mandar el archivo.
+ob_start();
+
 function fallo(int $codigo, string $msg): void {
+    while (ob_get_level() > 0) ob_end_clean();
     http_response_code($codigo);
     header('Content-Type: text/plain; charset=utf-8');
     header('Cache-Control: no-store');
@@ -34,7 +39,8 @@ if ($tipo === 'acceso_foto' || $tipo === 'incidencia_foto') {
     $abs = $tipo === 'acceso_foto' ? $ca->rutaFoto((int)($_GET['id'] ?? 0), !empty($_GET['m']), $usr)
                                    : $ca->rutaFotoIncidencia((int)($_GET['id'] ?? 0), !empty($_GET['m']), $usr);
     if (!$abs) fallo(404, 'La foto ya no está disponible.');
-    $mime = @mime_content_type($abs) ?: 'image/jpeg';
+    $mime = function_exists('mime_content_type') ? (@mime_content_type($abs) ?: '') : '';
+    if ($mime === '') $mime = (@getimagesize($abs)['mime'] ?? '') ?: 'image/jpeg';
     header('Content-Type: ' . (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) ? $mime : 'image/jpeg'));
     header('Cache-Control: private, max-age=86400');
 } elseif ($tipo === 'accesos_pdf') {
@@ -48,6 +54,7 @@ if ($tipo === 'acceso_foto' || $tipo === 'incidencia_foto') {
 } else {
     fallo(400, 'Solicitud no válida.');
 }
+while (ob_get_level() > 0) ob_end_clean();
 header('X-Content-Type-Options: nosniff');
 header('Content-Length: ' . filesize($abs));
 readfile($abs);

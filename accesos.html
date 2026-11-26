@@ -592,6 +592,23 @@
     if (m >= fin) return f + '-N';
     return sumarDias(f, -1) + '-N';
   }
+  /* La SALIDA de quien tiene su ENTRADA abierta (últimas 16 h) va al turno de esa entrada, como
+     en el servidor (ControlAccesos::turnoDeEntradaAbierta). Aquí se busca en lo que conoce la
+     pantalla (la cola, lo recién enviado y la lista); el servidor tiene la última palabra. */
+  function turnoLectura(tipo, codigo, cap) {
+    var t = turnoDe(tipo, cap);
+    if (tipo !== 'salida' || !codigo) return t;
+    var k = claveId(codigo), desde = new Date(new Date(cap.replace(' ', 'T')).getTime() - 16 * 3600e3);
+    var desdeTxt = fechaDe(desde) + ' ' + dos(desde.getHours()) + ':' + dos(desde.getMinutes()) + ':' + dos(desde.getSeconds());
+    var conocidos = (typeof cola !== 'undefined' ? cola : []).filter(function (x) { return !esInc(x); })
+      .concat(typeof recienEnviados !== 'undefined' ? recienEnviados : [], (typeof datos !== 'undefined' && datos.registros) || []);
+    var ult = null;
+    conocidos.forEach(function (x) {
+      if (!x.codigo || claveId(x.codigo) !== k || !x.capturado || x.capturado > cap || x.capturado < desdeTxt) return;
+      if (!ult || x.capturado > ult.capturado) ult = x;
+    });
+    return ult && ult.tipo === 'entrada' && ult.turno ? ult.turno : t;
+  }
   function turnoAnterior(k) { return k.slice(-1) === 'N' ? k.slice(0, 10) + '-D' : sumarDias(k.slice(0, 10), -1) + '-N'; }
   function turnoSiguiente(k) { return k.slice(-1) === 'D' ? k.slice(0, 10) + '-N' : sumarDias(k.slice(0, 10), 1) + '-D'; }
   function turnosEnCurso() {
@@ -856,7 +873,7 @@
     var codigo = String(r.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
     if (!codigo) { toast('No se leyó el ID de la credencial. Inténtalo de nuevo o escríbelo.', true); return; }
     var capturado = ahoraLocal();
-    var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoDe(tipo, capturado), lugar: normaLugar($('lugar').value),
+    var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoLectura(tipo, codigo, capturado), lugar: normaLugar($('lugar').value),
                nota: '', mini: '', codigo: codigo, persona: String(r.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 150),
                origen: r.manual ? 'manual' : 'tarjeta', creado: Date.now() };
     // La foto de la credencial que tomó el lector va con el registro como evidencia (también sin señal:
