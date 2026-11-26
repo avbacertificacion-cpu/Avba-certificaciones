@@ -12,5 +12,12 @@ INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
   ('punto3', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'CASETA PUNTO 3'),
   ('punto4', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'CASETA PUNTO 4');
 
+-- Los guardias punto1…4 son del turno de día; noche1 y noche2, del de noche.
+INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
+  ('noche1', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'CASETA PUNTO 1 NOCHE'),
+  ('noche2', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'CASETA PUNTO 2 NOCHE');
+UPDATE usuarios SET turno = 'D' WHERE usuario IN ('punto1', 'punto2', 'punto3', 'punto4');
+UPDATE usuarios SET turno = 'N' WHERE usuario IN ('noche1', 'noche2');
+
 INSERT IGNORE INTO sesiones_usuario (token, usuario_id, origen, creado, expira)
   SELECT CONCAT('tok-', usuario), id, 'prueba', NOW(), NOW() + INTERVAL 30 DAY FROM usuarios;

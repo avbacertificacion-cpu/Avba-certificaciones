@@ -58,7 +58,7 @@ ok(r.status === 'success' && ['PUNTO DE CONTROL 1', 'PUNTO DE CONTROL 2', 'PUNTO
 // Administración: puntos, liberar, mover
 r = await get('ACCESOS_PUNTOS', 'tok-admin');
 const p1 = (r.puntos || []).find(p => p.punto === 'PUNTO DE CONTROL 1');
-ok(r.status === 'success' && r.puntos.length === 4 && p1.usuario === 'punto1' && p1.dispositivo === true && /SM-A145M/.test(p1.dispositivo_desc) && r.cuentas.length === 4 && r.puede_editar, 'admin ve los 4 puntos, cuentas y el equipo ligado');
+ok(r.status === 'success' && r.puntos.length === 4 && p1.usuario === 'punto1' && p1.dispositivo === true && /SM-A145M/.test(p1.dispositivo_desc) && r.cuentas.length === 6 && r.cuentas.filter(c => c.turno === 'N').length === 2 && r.puede_editar, 'admin ve los 4 puntos, las cuentas (con su turno) y el equipo ligado');
 r = await get('ACCESOS_PUNTOS', 'tok-punto1', { dispositivo: EQ_A });
 ok(r.status === 'error', 'la caseta no ve la administración de puntos');
 r = await post('ACCESOS_EQUIPO_LIBERAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1' });

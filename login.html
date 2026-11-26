@@ -85,7 +85,7 @@
     return (window.CA_DESTINOS || {})[rol] || 'index.html';
   }
   function entrar(r) {
-    try { localStorage.setItem(CLAVE, JSON.stringify({ token: r.token, usuario: r.usuario, nombre: r.nombre, rol: r.rol, expira: r.expira })); } catch (e) {}
+    try { localStorage.setItem(CLAVE, JSON.stringify({ token: r.token, usuario: r.usuario, nombre: r.nombre, rol: r.rol, turno: r.turno || '', expira: r.expira })); } catch (e) {}
     location.replace(destino(r.rol));
   }
   function error(id, msg) { $(id).textContent = msg || ''; $(id).hidden = !msg; }

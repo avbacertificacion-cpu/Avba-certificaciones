@@ -58,7 +58,8 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 **Perfiles** (`Auth::ROLES`): **ADMIN** (Administración AVBA: todo, cuentas y asignar
 puntos), **PLANTA** (administrador de accesos de la planta: registros, En planta, PDF,
 dar salida, liberar el equipo de un punto) y **ACCESOS** (guardia: sólo registra en su
-punto; el enrutador le rechaza todo lo demás).
+punto; el enrutador le rechaza todo lo demás). Cada guardia tiene su **turno** (`usuarios.turno`:
+D día | N noche), que se elige en Cuentas.
 
 ## Cuidados importantes
 
@@ -79,14 +80,19 @@ punto; el enrutador le rechaza todo lo demás).
    planta; se compara sin ceros, «00287» = «287»), **NOMBRE** en uno o dos renglones,
    EMPRESA, CARGO, **NSS de 11 dígitos (nunca es el ID)**, TIPO DE SANGRE, ALERGIAS y
    abajo «CREDENCIAL DE ACCESO». El lector ya está ajustado a ese formato.
-4. **Turnos:** día 06:00–18:00 y noche 18:00–06:00 (horario de la planta); una entrada cuenta para el turno
-   que empieza (desde 2 h antes) y una salida para el que termina (hasta 2 h después).
-   **Pero** la salida de quien tiene su entrada abierta (su última lectura de las últimas
-   16 h fue ENTRADA) va al turno de esa entrada (`turnoDeEntradaAbierta`, y en la pantalla
-   `turnoLectura`): entrar 17:57 y salir 17:58 no se parte en dos turnos.
-5. **Puntos de control:** 4 fijos («PUNTO DE CONTROL 1…4»); cada uno con su cuenta de
-   caseta y **un solo equipo** (el primero que entra queda ligado; Administración lo
-   libera).
+4. **Turnos por cuenta:** lo que registra un guardia va a **su** turno (el de su cuenta), a
+   cualquier hora (`turnoDeGuardia`; en la pantalla `turnoGuardia`): el de día con la fecha
+   del día; el de noche con la fecha en que empezó su noche (antes del mediodía es la noche
+   del día anterior). El guardia sólo ve su turno en curso. El reloj (día 06:00–18:00, noche
+   18:00–06:00) queda de respaldo para Administración y para guardias sin turno: una entrada
+   cuenta para el turno que empieza (desde 2 h antes), una salida para el que termina (hasta
+   2 h después), y la salida de quien tiene su entrada abierta (últimas 16 h) va al turno de
+   esa entrada (`turnoDeEntradaAbierta`). Administración ve los turnos en curso por reloj.
+5. **Puntos de control:** 4 fijos («PUNTO DE CONTROL 1…4»); cada uno con la cuenta del
+   guardia de **día** (`accesos_puntos.usuario`) y la del de **noche** (`usuario_noche`), y
+   **un solo equipo** compartido por los dos (el teléfono de la caseta: el primero que entra
+   queda ligado; el administrador de accesos lo libera). Se asignan en Cuentas o en Puntos
+   de control; una cuenta sin turno no se puede asignar.
 6. **Incidencias (botón INCIDENCIA de la caseta):** el guardia lee la credencial como en
    una entrada y dice qué pasó: Alcoholímetro positivo, Mala conducta, Problema con la
    persona u Otro (con descripción). Tabla propia `accesos_incidencias` (no cuentan como

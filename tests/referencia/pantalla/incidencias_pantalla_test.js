@@ -28,6 +28,9 @@ async function equipo(b, sesion, conLector, movil = true) {
   }, [sesion, conLector]);
   const p = await ctx.newPage();
   p.errores = []; p.on('pageerror', e => p.errores.push(e.message)); p.on('dialog', d => d.accept());
+  // Reloj del navegador a las 10:00 de hoy: los guardias de prueba son de día y Administración ve el
+  // turno en curso por reloj; así la prueba no depende de la hora a la que se corre.
+  await p.clock.setFixedTime(new Date(new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' }) + 'T10:00:00-06:00'));
   await p.goto(B + 'accesos.html'); await p.waitForTimeout(1800);
   return { ctx, p };
 }

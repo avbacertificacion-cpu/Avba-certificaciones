@@ -53,19 +53,23 @@ function generarToken(): string {
 function validarToken(PDO $pdo, ?string $token): ?array {
     $token = trim((string)$token);
     if ($token === '' || strlen($token) > 100) return null;
-    try {
-        $st = $pdo->prepare(
-            "SELECT u.id, u.usuario, u.rol, u.nombre
-               FROM sesiones_usuario s
-               INNER JOIN usuarios u ON u.id = s.usuario_id
-              WHERE s.token = ? AND s.expira > ? AND u.activo = 1"
-        );
-        $st->execute([$token, date('Y-m-d H:i:s')]);
-        $usr = $st->fetch(PDO::FETCH_ASSOC);
-    } catch (\Throwable $e) {
-        return null;                                  // tablas todavía no creadas
+    // Con el turno de la cuenta (guardias de día o de noche); sin esa columna todavía, sin él.
+    foreach (['u.turno', 'NULL AS turno'] as $colTurno) {
+        try {
+            $st = $pdo->prepare(
+                "SELECT u.id, u.usuario, u.rol, u.nombre, $colTurno
+                   FROM sesiones_usuario s
+                   INNER JOIN usuarios u ON u.id = s.usuario_id
+                  WHERE s.token = ? AND s.expira > ? AND u.activo = 1"
+            );
+            $st->execute([$token, date('Y-m-d H:i:s')]);
+            $usr = $st->fetch(PDO::FETCH_ASSOC);
+            return $usr ?: null;
+        } catch (\Throwable $e) {
+            // sin la columna turno: se intenta sin ella; sin tablas: no hay sesión
+        }
     }
-    return $usr ?: null;
+    return null;
 }
 
 /** El token que manda la pantalla: Authorization: Bearer, X-Token, cuerpo o URL. */

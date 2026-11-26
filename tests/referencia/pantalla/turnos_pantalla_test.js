@@ -1,5 +1,6 @@
-// Entrada y salida seguidas de la misma persona cerca del cambio de turno (reloj del teléfono a las
-// 17:57): las dos deben quedar en el mismo turno, con señal y sin señal. API real local, datos inventados.
+// Turnos por cuenta en la pantalla del guardia: el de día y el de noche comparten el teléfono del
+// Punto 1; lo que registra cada uno va a SU turno, a cualquier hora (con y sin señal), y cada uno ve
+// sólo su turno. API real local (base de prueba), reloj del teléfono simulado, datos inventados.
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const B = 'http://localhost:8794/';
@@ -13,7 +14,8 @@ const post = async (accion, tok, payload = {}) => (await fetch(API, {
   body: JSON.stringify({ action: accion, payload })
 })).json();
 const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' });
-const a = hora => new Date(`${hoy}T${hora}-06:00`);           // hora de la planta
+const a = hora => new Date(`${hoy}T${hora}-06:00`);           // hora de la planta, hoy
+const ses = (u, t) => ({ token: 'tok-' + u, rol: 'ACCESOS', usuario: u, nombre: u.toUpperCase(), turno: t });
 
 async function leer(p, hora, tipo, codigo, nombre) {
   await p.clock.setFixedTime(a(hora));
@@ -21,10 +23,13 @@ async function leer(p, hora, tipo, codigo, nombre) {
   await p.click('.cap.' + tipo); await p.waitForTimeout(2200);
 }
 const bloques = p => p.$$eval('.bloque-turno', l => l.map(x => x.innerText.replace(/\s+/g, ' ')));
+const turnoBD = cod => sql(`SELECT GROUP_CONCAT(CONCAT(tipo,':',turno_fecha,'-',turno) ORDER BY id) FROM accesos_registros WHERE codigo='${cod}'`);
 
 (async () => {
-  await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });
+  await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });   // día
+  await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'noche1' });   // noche
   const b = await chromium.launch();
+  // El teléfono de la caseta (el mismo para los dos guardias)
   const ctx = await b.newContext({ timezoneId: 'America/Mexico_City', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await ctx.addInitScript((s) => {
     if (!sessionStorage.getItem('ya')) { localStorage.setItem('ca_sesion', JSON.stringify(s)); sessionStorage.setItem('ya', '1'); }
@@ -33,44 +38,52 @@ const bloques = p => p.$$eval('.bloque-turno', l => l.map(x => x.innerText.repla
       leer: () => new Promise(r => setTimeout(() => r(window.__lecturas.shift() || { cancelado: true }), 150)),
       abrir: () => Promise.resolve({})
     } } };
-  }, { token: 'tok-punto1', rol: 'ACCESOS', usuario: 'punto1', nombre: 'CASETA PUNTO 1' });
+  }, ses('punto1', 'D'));
   const p = await ctx.newPage();
   const errores = []; p.on('pageerror', e => errores.push(e.message)); p.on('dialog', d => d.accept());
+
+  // ── Guardia de DÍA a las 17:56 ──
   await p.clock.setFixedTime(a('17:56:00'));
   await p.goto(B + 'accesos.html'); await p.waitForTimeout(1800);
-  ok(/Cambio de turno/.test(await p.textContent('#t-nombre')), 'a las 17:56 la pantalla muestra el cambio de turno (día saliendo, noche entrando)');
-  const rangos = await bloques(p);
-  ok(/06:00 a 18:00/.test(rangos[0]) && /18:00 a .*06:00/.test(rangos[1]), 'horario de la planta en pantalla: día 06:00 a 18:00 y noche 18:00 a 06:00');
-
-  // ── Con señal: entrada 17:57:26 y salida 17:58:02 ──
+  ok(/Punto de control 1 · Turno de día/.test(await p.textContent('#sub-usuario')), 'encabezado: «' + await p.textContent('#sub-usuario') + '»');
+  let t = await bloques(p);
+  ok(t.length === 1 && /Turno de día · en curso/.test(await p.textContent('#t-nombre')), 'sólo ve su turno (sin «cambio de turno»): ' + await p.textContent('#t-nombre'));
   await leer(p, '17:57:26', 'ent', '00601', 'Ramiro Esteban Villarreal Duarte');
   await leer(p, '17:58:02', 'sal', '00601', 'Ramiro Esteban Villarreal Duarte');
-  await p.waitForTimeout(2000);
-  ok(sql("SELECT GROUP_CONCAT(CONCAT(tipo,':',turno_fecha,'-',turno) ORDER BY id) FROM accesos_registros WHERE codigo='00601'") === `entrada:${hoy}-N,salida:${hoy}-N`,
-     'en el servidor: la entrada y la salida quedan en el turno de noche');
-  let t = await bloques(p);
-  ok(/Turno de día.*0 Entradas 0 Salidas 0 Diferencia/.test(t[0]) && /Turno de noche.*1 Entradas 1 Salidas 0 Diferencia/.test(t[1]),
-     'contadores: día 0/0 y noche 1/1 (antes: día 0/1 y noche 1/0)');
-  const lista = await p.$$eval('#lista li.reg', l => l.map(x => x.innerText.replace(/\s+/g, ' ')));
-  ok(lista.length === 2 && lista.every(x => /Turno de noche/.test(x)), 'en la lista, las dos dicen «Turno de noche»');
-  await p.screenshot({ path: D + 'turnos_con_senal.png' });
-
-  // ── Sin señal: el mismo caso con otra persona; mientras está en cola ya se cuenta bien ──
-  await ctx.setOffline(true);
-  await leer(p, '17:59:10', 'ent', '00602', 'Ana Sofia Ruiz Paez');
-  await leer(p, '17:59:40', 'sal', '00602', 'Ana Sofia Ruiz Paez');
+  await p.waitForTimeout(1500);
+  ok(turnoBD('00601') === `entrada:${hoy}-D,salida:${hoy}-D`, 'entrada 17:57 y salida 17:58 del guardia de día: las dos en el turno de día');
   t = await bloques(p);
-  ok(/Turno de día.*0 Entradas 0 Salidas/.test(t[0]) && /Turno de noche.*2 Entradas 2 Salidas/.test(t[1]), 'sin señal (en cola): día 0/0 y noche 2/2');
+  ok(/1 Entradas 1 Salidas 0 Diferencia/.test(t[0]), 'contadores del turno de día: ' + t[0]);
+  await leer(p, '19:10:00', 'sal', '00602', 'Ana Sofia Ruiz Paez');      // se quedó tarde: sigue siendo su turno
+  await p.waitForTimeout(1200);
+  ok(turnoBD('00602') === `salida:${hoy}-D`, 'el guardia de día registra a las 19:10: turno de día');
+  await p.screenshot({ path: D + 'turnos_guardia_dia.png' });
+
+  // ── Cambio de guardia en el MISMO teléfono: entra el de NOCHE a las 17:59 ──
+  await p.evaluate((s) => localStorage.setItem('ca_sesion', JSON.stringify(s)), ses('noche1', 'N'));
+  await p.clock.setFixedTime(a('17:59:00'));
+  await p.reload(); await p.waitForTimeout(2000);
+  ok(/Turno de noche/.test(await p.textContent('#sub-usuario')) && await p.isHidden('#banda-punto'), 'el de noche entra en el mismo teléfono: «' + await p.textContent('#sub-usuario') + '»');
+  ok((await p.$$eval('#lista li.reg', l => l.length)) === 0, 'su lista empieza vacía (lo del de día no es suyo)');
+  // Sin señal
+  await ctx.setOffline(true);
+  await leer(p, '17:59:30', 'ent', '00603', 'Pedro Vega Cruz');
+  t = await bloques(p);
+  const sub = await p.textContent('#t-sub');
+  ok(t.length === 1 && /1 Entradas 0 Salidas/.test(t[0]) && /18:00 a .*06:00/.test(sub), 'sin señal (en cola): cuenta en su noche (' + sub + '): ' + t[0]);
   await ctx.setOffline(false);
   await p.evaluate(() => window.dispatchEvent(new Event('online'))); await p.waitForTimeout(4000);
-  ok(sql("SELECT GROUP_CONCAT(CONCAT(tipo,':',turno) ORDER BY id) FROM accesos_registros WHERE codigo='00602'") === 'entrada:N,salida:N', 'al volver la señal, el servidor las guarda igual: noche y noche');
+  ok(turnoBD('00603') === `entrada:${hoy}-N`, 'al volver la señal: turno de noche de hoy');
   t = await bloques(p);
-  ok(/Turno de noche.*2 Entradas 2 Salidas/.test(t[1]) && /Turno de día.*0 Entradas 0 Salidas/.test(t[0]), 'y los contadores no cambian al enviarse');
+  ok(/1 Entradas 0 Salidas/.test(t[0]), 'y el contador no brinca al enviarse');
+  await p.screenshot({ path: D + 'turnos_guardia_noche.png' });
 
-  // ── Alguien del turno de día que sale a las 18:00 sin entrada leída hoy: cuenta para el día ──
-  await leer(p, '18:00:30', 'sal', '00603', 'Pedro Vega Cruz');
-  await p.waitForTimeout(1500);
-  ok(sql("SELECT turno FROM accesos_registros WHERE codigo='00603'") === 'D', 'salida sin entrada: turno de día (como siempre)');
+  // ── La madrugada siguiente (06:20) sigue siendo la noche de hoy ──
+  const manana = new Date(new Date(hoy + 'T12:00:00Z').getTime() + 86400e3).toISOString().slice(0, 10);
+  await p.clock.setFixedTime(new Date(`${manana}T06:20:00-06:00`));
+  await p.evaluate(() => window.__lecturas.push({ codigo: '00603', nombre: 'Pedro Vega Cruz', ms: 500 }));
+  await p.click('.cap.sal'); await p.waitForTimeout(2500);
+  ok(turnoBD('00603') === `entrada:${hoy}-N,salida:${hoy}-N`, 'salida a las 06:20 del día siguiente: la misma noche (de hoy)');
   ok(!errores.length, 'sin errores de JavaScript' + (errores.length ? ': ' + errores.join(' | ') : ''));
   await b.close();
   console.log(fallas ? fallas + ' FALLAS' : 'TODO BIEN');

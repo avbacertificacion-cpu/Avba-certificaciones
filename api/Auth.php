@@ -74,7 +74,19 @@ class Auth {
                UNIQUE KEY uk_usuario (usuario)
              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
+        // Turno de las cuentas de guardia (D | N), en usuarios.turno
+        if (class_exists('ControlAccesos')) ControlAccesos::asegurarTurnoCuentas($pdo);
         $hecho[$k] = true;
+    }
+
+    /** El turno guardado de una cuenta ('D' | 'N' | ''), tolerando que la columna no exista. */
+    private function turnoDe(int $id): string {
+        try {
+            $st = $this->pdo->prepare("SELECT turno FROM usuarios WHERE id = ?");
+            $st->execute([$id]);
+            $t = (string)$st->fetchColumn();
+            return in_array($t, ['D', 'N'], true) ? $t : '';
+        } catch (\Throwable $e) { return ''; }
     }
 
     /* ── Entrar ─────────────────────────────────────────────────────────── */
@@ -123,7 +135,8 @@ class Auth {
                     mb_substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45), (string)$row['rol'], $ahora, $expira]);
         $this->pdo->prepare("UPDATE usuarios SET ultimo_acceso = ? WHERE id = ?")->execute([$ahora, (int)$row['id']]);
         return ['status' => 'success', 'token' => $token, 'usuario' => (string)$row['usuario'],
-                'nombre' => (string)$row['nombre'], 'rol' => (string)$row['rol'], 'expira' => $expira];
+                'nombre' => (string)$row['nombre'], 'rol' => (string)$row['rol'], 'expira' => $expira,
+                'turno' => $row['rol'] === 'ACCESOS' ? $this->turnoDe((int)$row['id']) : ''];
     }
 
     public function cerrarSesion(?string $token): array {
@@ -197,13 +210,17 @@ class Auth {
     }
 
     public function listar(): array {
+        $conTurno = ControlAccesos::asegurarTurnoCuentas($this->pdo);
         $filas = $this->pdo->query(
-            "SELECT id, usuario, rol, nombre, activo, fecha_alta, ultimo_acceso FROM usuarios ORDER BY FIELD(rol, 'ADMIN', 'PLANTA', 'ACCESOS'), usuario"
+            "SELECT id, usuario, rol, nombre, activo, fecha_alta, ultimo_acceso" . ($conTurno ? ", turno" : ", NULL AS turno") . "
+               FROM usuarios ORDER BY FIELD(rol, 'ADMIN', 'PLANTA', 'ACCESOS'), FIELD(turno, 'D', 'N'), usuario"
         )->fetchAll(PDO::FETCH_ASSOC);
         $puntos = [];
         if (ControlAccesos::asegurarPuntos($this->pdo)) {
-            foreach ($this->pdo->query("SELECT punto, usuario FROM accesos_puntos WHERE usuario IS NOT NULL")->fetchAll(PDO::FETCH_ASSOC) as $f) {
-                $puntos[$f['usuario']] = ControlAccesos::nombrePunto($f['punto']);
+            foreach ($this->pdo->query("SELECT * FROM accesos_puntos")->fetchAll(PDO::FETCH_ASSOC) as $f) {
+                foreach (['usuario', 'usuario_noche'] as $col) {
+                    if (!empty($f[$col])) $puntos[$f[$col]] = (string)$f['punto'];
+                }
             }
         }
         $sesiones = [];
@@ -213,7 +230,10 @@ class Auth {
         return ['status' => 'success', 'roles' => self::NOMBRES_ROL, 'cuentas' => array_map(fn($f) => [
             'id' => (int)$f['id'], 'usuario' => $f['usuario'], 'rol' => $f['rol'], 'nombre' => $f['nombre'],
             'activo' => (bool)$f['activo'], 'fecha_alta' => $f['fecha_alta'], 'ultimo_acceso' => $f['ultimo_acceso'],
-            'punto' => $puntos[$f['usuario']] ?? '', 'sesiones' => $sesiones[(int)$f['id']] ?? 0,
+            'punto' => isset($puntos[$f['usuario']]) ? ControlAccesos::nombrePunto($puntos[$f['usuario']]) : '',
+            'punto_clave' => $puntos[$f['usuario']] ?? '',
+            'turno' => $f['rol'] === 'ACCESOS' && in_array((string)$f['turno'], ['D', 'N'], true) ? (string)$f['turno'] : '',
+            'sesiones' => $sesiones[(int)$f['id']] ?? 0,
         ], $filas)];
     }
 
@@ -226,12 +246,27 @@ class Auth {
         if ($nombre === '') return ['status' => 'error', 'message' => 'Escribe el nombre de la cuenta.'];
         if (!in_array($rol, self::ROLES, true)) return ['status' => 'error', 'message' => 'Elige el perfil de la cuenta.'];
         if (mb_strlen($pass) < self::MIN_CONTRASENA) return ['status' => 'error', 'message' => 'La contraseña debe tener al menos ' . self::MIN_CONTRASENA . ' caracteres.'];
+        // Guardia de caseta: su turno (día o noche) decide el turno de todo lo que registra
+        $turno = strtoupper(trim((string)($p['turno'] ?? '')));
+        if ($rol === 'ACCESOS' && !in_array($turno, ['D', 'N'], true)) return ['status' => 'error', 'message' => 'Elige el turno del guardia: día o noche.'];
+        if ($rol !== 'ACCESOS') $turno = '';
         $st = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ?");
         $st->execute([$usuario]);
         if ($st->fetchColumn()) return ['status' => 'error', 'message' => "Ya existe la cuenta «{$usuario}»."];
         $this->pdo->prepare("INSERT INTO usuarios (usuario, password_hash, rol, nombre, activo) VALUES (?, ?, ?, ?, 1)")
                   ->execute([$usuario, password_hash($pass, PASSWORD_DEFAULT), $rol, $nombre]);
-        return ['status' => 'success', 'id' => (int)$this->pdo->lastInsertId(), 'message' => "Cuenta «{$usuario}» creada."];
+        $id = (int)$this->pdo->lastInsertId();
+        $msg = "Cuenta «{$usuario}» creada.";
+        if ($turno !== '') {
+            if (!ControlAccesos::asegurarTurnoCuentas($this->pdo)) return ['status' => 'success', 'id' => $id, 'message' => $msg . ' El servidor no pudo guardar su turno: avisa a AVBA.'];
+            $this->pdo->prepare("UPDATE usuarios SET turno = ? WHERE id = ?")->execute([$turno, $id]);
+            $punto = textoEstandar($p['punto'] ?? '');
+            if ($punto !== '') {
+                $r = (new ControlAccesos($this->pdo))->colocarCuenta($usuario, $punto);
+                $msg .= ' ' . $r['message'];
+            }
+        }
+        return ['status' => 'success', 'id' => $id, 'message' => $msg];
     }
 
     /** Cambia nombre, perfil, contraseña o si está activa. No deja la plataforma sin Administración. */
@@ -263,7 +298,19 @@ class Auth {
             if (mb_strlen((string)$p['password']) < self::MIN_CONTRASENA) return ['status' => 'error', 'message' => 'La contraseña debe tener al menos ' . self::MIN_CONTRASENA . ' caracteres.'];
             $sets[] = 'password_hash = ?'; $args[] = password_hash((string)$p['password'], PASSWORD_DEFAULT); $cerrar = true;
         }
-        if (!$sets) return ['status' => 'success', 'message' => 'Sin cambios.'];
+        // Turno y punto del guardia
+        $turnoAntes = $this->turnoDe($id);
+        $turno = $rol === 'ACCESOS' ? $turnoAntes : '';
+        if ($rol === 'ACCESOS' && array_key_exists('turno', $p)) {
+            $turno = strtoupper(trim((string)$p['turno']));
+            if (!in_array($turno, ['D', 'N'], true)) return ['status' => 'error', 'message' => 'Elige el turno del guardia: día o noche.'];
+        }
+        $cambiaPunto = $rol === 'ACCESOS' && array_key_exists('punto', $p);
+        if ($turno !== $turnoAntes) {
+            if (!ControlAccesos::asegurarTurnoCuentas($this->pdo)) return ['status' => 'error', 'message' => 'El servidor no pudo guardar el turno: avisa a AVBA.'];
+            $sets[] = 'turno = ?'; $args[] = $turno !== '' ? $turno : null;
+        }
+        if (!$sets && !$cambiaPunto) return ['status' => 'success', 'message' => 'Sin cambios.'];
 
         $esYo = (int)$c['id'] === (int)($yo['id'] ?? 0);
         if ($esYo && ($rol !== 'ADMIN' || !$activo)) return ['status' => 'error', 'message' => 'No puedes quitarte el perfil de Administración ni desactivar tu propia cuenta.'];
@@ -272,18 +319,29 @@ class Auth {
             if ($n <= 1) return ['status' => 'error', 'message' => 'Tiene que quedar al menos una cuenta de Administración activa.'];
         }
 
-        $args[] = $id;
-        $this->pdo->prepare("UPDATE usuarios SET " . implode(', ', $sets) . " WHERE id = ?")->execute($args);
+        if ($sets) {
+            $args[] = $id;
+            $this->pdo->prepare("UPDATE usuarios SET " . implode(', ', $sets) . " WHERE id = ?")->execute($args);
+        }
         // Con contraseña nueva, perfil nuevo o desactivada: se cierran sus sesiones abiertas
         // (las mías, menos la de este equipo).
         if ($cerrar) self::cerrarSesionesDe($this->pdo, $id, $esYo ? ($yo['token'] ?? null) : null);
         if (!empty($p['password'])) $this->pdo->prepare("DELETE FROM login_intentos WHERE usuario = ?")->execute([$c['usuario']]);
-        // Si deja de ser cuenta de caseta, ya no ocupa su punto de control
-        if ($c['rol'] === 'ACCESOS' && $rol !== 'ACCESOS' && ControlAccesos::asegurarPuntos($this->pdo)) {
-            $this->pdo->prepare("UPDATE accesos_puntos SET usuario = NULL, dispositivo = NULL, dispositivo_desc = '', ligado = NULL WHERE usuario = ?")
-                      ->execute([$c['usuario']]);
+        $ca = new ControlAccesos($this->pdo);
+        $msg = "Cuenta «{$c['usuario']}» actualizada.";
+        if ($c['rol'] === 'ACCESOS' && $rol !== 'ACCESOS') {
+            $ca->quitarCuenta($c['usuario']);                       // ya no es guardia: deja su punto
+        } elseif ($rol === 'ACCESOS') {
+            // Punto pedido, o el mismo de antes si cambió de turno (pasa al lugar de su nuevo turno)
+            $punto = $cambiaPunto ? textoEstandar($p['punto']) : ($turno !== $turnoAntes ? $ca->puntoDe($c['usuario']) : null);
+            if ($punto === '') $ca->quitarCuenta($c['usuario']);
+            elseif ($punto !== null) {
+                $r = $ca->colocarCuenta($c['usuario'], $punto);           // sin turno, avisa que falta
+                if ($r['status'] !== 'success') return ['status' => 'error', 'message' => $msg . ' ' . $r['message']];
+                $msg .= ' ' . $r['message'];
+            }
         }
-        return ['status' => 'success', 'message' => "Cuenta «{$c['usuario']}» actualizada."];
+        return ['status' => 'success', 'message' => $msg];
     }
 
     /** Cualquier cuenta cambia su propia contraseña (con la actual). */

@@ -253,6 +253,9 @@
   .punto:last-child{border-bottom:0}
   .punto b{min-width:150px;font-size:14px}
   .punto select{flex:1 1 220px;width:auto}
+  .punto .pt-turno{flex:1 1 220px;display:flex;align-items:center;gap:8px;margin:0}
+  .punto .pt-turno span{font-size:12px;font-weight:800;color:var(--texto-sub);min-width:44px}
+  .punto .pt-turno select{flex:1;min-width:0}
   .punto .eq{flex:1 1 100%;font-size:12.5px;color:var(--texto-sub);display:flex;gap:8px;align-items:center;flex-wrap:wrap;line-height:1.45}
   .punto .eq .btn{min-height:34px;padding:6px 10px;font-size:12.5px}
   h3.sub-pdf{font-size:13.5px;font-weight:800;color:var(--texto);margin:16px 0 4px}
@@ -392,7 +395,7 @@
 
   <div class="tarjeta" id="tarjeta-puntos" hidden>
     <h2>Puntos de control</h2>
-    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:6px">Cada punto tiene su propia cuenta de caseta y trabaja en un solo equipo: el primero que entra con la cuenta queda ligado y cualquier otro queda bloqueado. Administración AVBA crea las cuentas en <a href="cuentas.html">Cuentas</a> (perfil «Guardia de caseta») y aquí elige cuál va en cada punto.</p>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:6px">Cada punto tiene la cuenta del guardia de día y la del guardia de noche, y trabaja en un solo teléfono: el primero que entra con cualquiera de las dos queda ligado y cualquier otro queda bloqueado. Lo que registra cada guardia va a su turno, a cualquier hora. Administración AVBA crea las cuentas en <a href="cuentas.html">Cuentas</a> (perfil «Guardia de caseta», con su turno) y aquí elige cuál va en cada punto.</p>
     <div id="puntos-lista"></div>
   </div>
 </main>
@@ -596,6 +599,7 @@
      en el servidor (ControlAccesos::turnoDeEntradaAbierta). Aquí se busca en lo que conoce la
      pantalla (la cola, lo recién enviado y la lista); el servidor tiene la última palabra. */
   function turnoLectura(tipo, codigo, cap) {
+    if (TURNO_CUENTA) return turnoGuardia(cap);    // guardia con turno: el suyo
     var t = turnoDe(tipo, cap);
     if (tipo !== 'salida' || !codigo) return t;
     var k = claveId(codigo), desde = new Date(new Date(cap.replace(' ', 'T')).getTime() - 16 * 3600e3);
@@ -611,7 +615,24 @@
   }
   function turnoAnterior(k) { return k.slice(-1) === 'N' ? k.slice(0, 10) + '-D' : sumarDias(k.slice(0, 10), -1) + '-N'; }
   function turnoSiguiente(k) { return k.slice(-1) === 'D' ? k.slice(0, 10) + '-N' : sumarDias(k.slice(0, 10), 1) + '-D'; }
+  /* Guardia con turno (día o noche, en Cuentas): todo lo que registra va a SU turno, a cualquier
+     hora, y sólo ve ése (igual que ControlAccesos::turnoDeGuardia). Lo de la madrugada del guardia
+     de noche es de la noche que empezó el día anterior. */
+  var TURNO_CUENTA = CASETA && /^[DN]$/.test(ses.turno || '') ? ses.turno : '';
+  function turnoGuardia(cap) {
+    var f = cap.slice(0, 10);
+    return TURNO_CUENTA === 'N' ? ((+cap.slice(11, 13)) < 12 ? sumarDias(f, -1) : f) + '-N' : f + '-D';
+  }
+  function fijarTurnoCuenta(t) {                   // el servidor dice cuál es (lo puede cambiar Administración)
+    t = /^[DN]$/.test(t || '') ? t : '';
+    if (!CASETA || t === TURNO_CUENTA) return;
+    TURNO_CUENTA = t;
+    try { var sv = sesion(); sv.turno = t; localStorage.setItem('ca_sesion', JSON.stringify(sv)); } catch (e) {}
+    if ($('lugar').value) fijarPunto($('lugar').value);
+    firmaVista = turnosVista().join(','); pintarTurno(); pintarLista();
+  }
   function turnosEnCurso() {
+    if (TURNO_CUENTA) return [turnoGuardia(ahoraLocal())];
     var a = ahoraLocal(), e = turnoDe('entrada', a), s = turnoDe('salida', a);
     return e === s ? [e] : [s, e].sort();           // el que sale primero
   }
@@ -808,7 +829,7 @@
              codigo: it.codigo || '', persona: it.persona || '' };
   }
   function registrar(tipo, blob, mini, capturado, nota) {
-    var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoDe(tipo, capturado), lugar: normaLugar($('lugar').value),
+    var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoLectura(tipo, '', capturado), lugar: normaLugar($('lugar').value),
                nota: nota || '', mini: mini, mime: 'image/jpeg', creado: Date.now() };
     return blob.arrayBuffer().then(function (ab) {
       it.datos = ab;
@@ -958,7 +979,7 @@
     $('inc-guardar').disabled = true;
     var cap = incActual.capturado;
     var it = { uid: nuevoUid(), clase: 'incidencia', tipo: 'incidencia', incidencia: tipo, detalle: detalle, capturado: cap,
-               turno: turnoReloj(cap), lugar: normaLugar($('lugar').value), nota: '', mini: incActual.mini || '',
+               turno: TURNO_CUENTA ? turnoGuardia(cap) : turnoReloj(cap), lugar: normaLugar($('lugar').value), nota: '', mini: incActual.mini || '',
                codigo: codigo, persona: persona, origen: codigo ? incActual.origen : 'manual', creado: Date.now() };
     var b = incActual.blob;
     var listo = !b ? Promise.resolve() : (it.mini ? Promise.resolve() : canvasDeArchivo(b).then(function (c) { it.mini = miniatura(c); }))
@@ -1284,6 +1305,7 @@
         bloquear(r.message); datos = { registros: [], totales: {}, mas: false }; errLista = ''; pintarLista(); return;
       }
       if (!r || r.status !== 'success') throw new Error((r && r.message) || 'El servidor no respondió como se esperaba.');
+      if (CASETA && r.turno_cuenta !== undefined) fijarTurnoCuenta(r.turno_cuenta);
       if (CASETA && r.punto) {                     // Administración asignó el punto o liberó el equipo: se sigue solo
         if (r.punto !== $('lugar').value) fijarPunto(r.punto);
         if (bloqueado) { bloquear(''); enviarCola(); }
@@ -1735,7 +1757,7 @@
   function fijarPunto(p) {
     $('lugar').value = p; $('lugar').readOnly = true;
     guardar(CLAVE_LUGAR, p); guardar(CLAVE_PUNTO, p);
-    $('sub-usuario').textContent = nombrePunto(p) + ' · ' + (ses.nombre || ses.usuario || '');
+    $('sub-usuario').textContent = nombrePunto(p) + (TURNO_CUENTA ? ' · Turno de ' + (TURNO_CUENTA === 'N' ? 'noche' : 'día') : '') + ' · ' + (ses.nombre || ses.usuario || '');
     $('ayuda-lugar').textContent = 'Tu punto de control (lo asigna Administración). ' +
       (LECTOR ? 'Cada registro se guarda con el nombre, el ID y la foto de la credencial (evidencia) y la hora.' : 'Cada registro se guarda con la hora en que se toma la foto.');
   }
@@ -1749,7 +1771,7 @@
     var conocido = leer(CLAVE_PUNTO, '');
     if (conocido) fijarPunto(conocido); else $('lugar').value = '';       // sin señal al abrir: el último conocido
     api('ACCESOS_MI_PUNTO', {}, 'GET').then(function (r) {
-      if (r && r.status === 'success') { if (r.punto) fijarPunto(r.punto); bloquear(''); enviarCola(); cargar(true); }
+      if (r && r.status === 'success') { fijarTurnoCuenta(r.turno_cuenta); if (r.punto) fijarPunto(r.punto); bloquear(''); enviarCola(); cargar(true); }
       else if (r) bloquear(r.message || 'No se pudo revisar tu punto de control.');
     }).catch(function () {});
   }
@@ -1762,20 +1784,29 @@
       if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudieron leer los puntos de control.');
       $('tarjeta-puntos').hidden = false;
       var cuentas = r.cuentas || [];
-      $('puntos-lista').innerHTML = (r.puntos || []).map(function (p) {
-        var ops = '<option value="">Sin cuenta</option>' + cuentas.map(function (c) {
-          return '<option value="' + esc(c.usuario) + '"' + (c.usuario === p.usuario ? ' selected' : '') + '>' +
+      /* Cada punto: la cuenta del guardia de día y la del de noche (cada lista ofrece las de su turno) */
+      var lista = function (p, t) {
+        var actual = t === 'N' ? p.usuario_noche : p.usuario;
+        var ops = '<option value="">Sin cuenta</option>' + cuentas.filter(function (c) { return c.turno === t || c.usuario === actual; }).map(function (c) {
+          return '<option value="' + esc(c.usuario) + '"' + (c.usuario === actual ? ' selected' : '') + '>' +
             esc(c.usuario + (c.nombre ? ' · ' + c.nombre : '') + (c.activo ? '' : ' (inactiva)')) + '</option>';
         }).join('');
+        return '<label class="pt-turno"><span>' + (t === 'N' ? 'Noche' : 'Día') + '</span><select data-punto="' + esc(p.punto) + '" data-turno="' + t + '" aria-label="Guardia del turno de ' +
+          (t === 'N' ? 'noche' : 'día') + ' del ' + esc(p.nombre) + '"' + (r.puede_editar && (t === 'D' || r.con_noche) ? '' : ' disabled') + '>' + ops + '</select></label>';
+      };
+      var sinTurno = cuentas.filter(function (c) { return !c.turno; });
+      $('puntos-lista').innerHTML = (r.puntos || []).map(function (p) {
         var eq = p.dispositivo
           ? '<span>Equipo: <b>' + esc(p.dispositivo_desc || 'sin descripción') + '</b> · desde ' + esc(fechaHoraCorta(p.ligado)) +
             (p.ultimo_uso ? ' · último uso ' + esc(fechaHoraCorta(p.ultimo_uso)) : '') + '</span>' +
             (r.puede_liberar ? '<button class="btn sec" type="button" data-liberar="' + esc(p.punto) + '">Liberar equipo</button>' : '')
-          : '<span>' + (p.usuario ? 'Sin equipo: queda ligado el primero que entre con la cuenta.' : 'Sin cuenta asignada.') + '</span>';
-        // Sólo Administración AVBA cambia la cuenta de un punto; el administrador de la planta la ve y libera el equipo
-        return '<div class="punto"><b>' + esc(p.nombre) + '</b><select data-punto="' + esc(p.punto) + '" aria-label="Cuenta del ' + esc(p.nombre) + '"' + (r.puede_editar ? '' : ' disabled') + '>' + ops + '</select>' +
-          '<div class="eq">' + eq + '</div></div>';
-      }).join('') + (cuentas.length ? '' : '<p class="nota">Todavía no hay cuentas de caseta: ' + (r.puede_editar ? 'créalas en <a href="cuentas.html">Cuentas</a> con el perfil «Guardia de caseta».' : 'pide a Administración AVBA que las cree.') + '</p>');
+          : '<span>' + (p.usuario || p.usuario_noche ? 'Sin equipo: queda ligado el primer teléfono que entre con la cuenta de día o la de noche.' : 'Sin cuentas asignadas.') + '</span>';
+        // Sólo Administración AVBA cambia las cuentas de un punto; el administrador de la planta las ve y libera el equipo
+        return '<div class="punto"><b>' + esc(p.nombre) + '</b>' + lista(p, 'D') + lista(p, 'N') + '<div class="eq">' + eq + '</div></div>';
+      }).join('') +
+        (cuentas.length ? '' : '<p class="nota">Todavía no hay cuentas de caseta: ' + (r.puede_editar ? 'créalas en <a href="cuentas.html">Cuentas</a> con el perfil «Guardia de caseta».' : 'pide a Administración AVBA que las cree.') + '</p>') +
+        (sinTurno.length ? '<p class="nota">Sin turno (no se pueden asignar hasta elegir si son de día o de noche' + (r.puede_editar ? ' en <a href="cuentas.html">Cuentas</a>' : '') + '): ' +
+          esc(sinTurno.map(function (c) { return c.usuario; }).join(', ')) + '.</p>' : '');
     }).catch(function (e) {
       $('tarjeta-puntos').hidden = false;
       $('puntos-lista').innerHTML = '<p class="nota mal">' + esc(e.message) + '</p>';
@@ -1784,7 +1815,7 @@
   $('puntos-lista').addEventListener('change', function (ev) {
     var sel = ev.target.closest('select[data-punto]'); if (!sel) return;
     sel.disabled = true;
-    api('ACCESOS_PUNTO_ASIGNAR', { punto: sel.dataset.punto, usuario: sel.value }).then(function (r) {
+    api('ACCESOS_PUNTO_ASIGNAR', { punto: sel.dataset.punto, usuario: sel.value, turno: sel.dataset.turno }).then(function (r) {
       if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo asignar la cuenta.');
       toast(r.message); cargarPuntos();
     }).catch(function (e) { toast(e.message, true); cargarPuntos(); });

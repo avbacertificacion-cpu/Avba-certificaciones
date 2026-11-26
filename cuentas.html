@@ -27,7 +27,7 @@
     <div class="card">
       <div class="fila" style="align-items:center;justify-content:space-between">
         <div><h2 style="margin:0">Cuentas de la plataforma</h2>
-          <p style="font-size:13px">Una cuenta de caseta por punto de control; su punto se elige en <a href="accesos.html">Control de accesos → Puntos de control</a>.</p></div>
+          <p style="font-size:13px">Cada punto de control lleva un guardia de día y uno de noche, en el mismo teléfono. Al dar de alta a un guardia eliges su turno y su punto (también se cambia en <a href="accesos.html">Control de accesos → Puntos de control</a>).</p></div>
         <button class="btn" type="button" id="b-nueva">+ Nueva cuenta</button>
       </div>
     </div>
@@ -51,6 +51,18 @@
         <div class="campo"><label for="c-pass" id="l-pass">Contraseña</label><input id="c-pass" type="text" autocomplete="new-password" minlength="8">
           <small id="s-pass">Al menos 8 caracteres. Dísela a la persona en persona, no por mensaje.</small></div>
       </div>
+      <div class="fila" id="campos-guardia" hidden>
+        <div class="campo"><label for="c-turno">Turno del guardia</label>
+          <select id="c-turno">
+            <option value="">Elige…</option>
+            <option value="D">Turno de día</option>
+            <option value="N">Turno de noche</option>
+          </select>
+          <small>Todo lo que registre va a este turno, a cualquier hora.</small></div>
+        <div class="campo"><label for="c-punto">Punto de control</label>
+          <select id="c-punto"></select>
+          <small id="s-punto">Cada punto tiene un guardia de día y uno de noche, en el mismo teléfono.</small></div>
+      </div>
       <div class="fila"><button class="btn" type="submit" id="b-guardar">Guardar</button><button class="btn sec" type="button" id="b-cancelar">Cancelar</button></div>
     </form>
 
@@ -72,6 +84,9 @@
   $('todo').hidden = false;
 
   var ROLES = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de la planta', ACCESOS: 'Guardia de caseta' };
+  var PUNTOS = ['PUNTO DE CONTROL 1', 'PUNTO DE CONTROL 2', 'PUNTO DE CONTROL 3', 'PUNTO DE CONTROL 4'];
+  var TURNO = { D: 'Turno de día', N: 'Turno de noche' };
+  function nombrePunto(p) { var m = /^PUNTO DE CONTROL (\d+)$/.exec(p || ''); return m ? 'Punto de control ' + m[1] : (p || ''); }
   var COLOR = { ADMIN: 'azul', PLANTA: 'verde', ACCESOS: '' };
   var cuentas = [], editando = null;
 
@@ -104,7 +119,8 @@
         '<b>' + esc(c.nombre) + '</b>' + (yo ? ' <span class="etq gris">tú</span>' : '') +
         '<div class="u">' + esc(c.usuario) + '</div>' +
         '<div class="m"><span class="etq ' + COLOR[c.rol] + '">' + esc(ROLES[c.rol] || c.rol) + '</span> ' +
-        (c.rol === 'ACCESOS' ? (c.punto ? '<span class="etq verde">' + esc(c.punto) + '</span> ' : '<span class="etq">Sin punto de control</span> ') : '') +
+        (c.rol === 'ACCESOS' ? (c.turno ? '<span class="etq ' + (c.turno === 'N' ? 'noche' : 'dia') + '">' + TURNO[c.turno] + '</span> ' : '<span class="etq">Sin turno</span> ') +
+          (c.punto ? '<span class="etq verde">' + esc(c.punto) + '</span> ' : '<span class="etq">Sin punto de control</span> ') : '') +
         (c.activo ? '' : '<span class="etq gris">Desactivada</span> ') +
         '· último acceso: ' + esc(fecha(c.ultimo_acceso)) + (c.sesiones ? ' · ' + c.sesiones + ' sesión' + (c.sesiones === 1 ? '' : 'es') + ' abierta' + (c.sesiones === 1 ? '' : 's') : '') + '</div></div>' +
         '<div class="acc"><button class="btn sec chico" type="button" data-editar="' + c.id + '">Editar</button>' +
@@ -122,11 +138,35 @@
     $('l-pass').textContent = c ? 'Contraseña nueva (opcional)' : 'Contraseña';
     $('s-pass').textContent = c ? 'Déjala vacía para no cambiarla. Si la cambias, se cierran sus sesiones abiertas.' : 'Al menos 8 caracteres. Dísela a la persona en persona, no por mensaje.';
     if (c) { $('c-nombre').value = c.nombre; $('c-usuario').value = c.usuario; $('c-rol').value = c.rol; }
+    $('c-turno').value = c ? (c.turno || '') : '';
+    opcionesPunto(c ? (c.punto_clave || '') : '');
+    camposGuardia();
     $('c-rol').disabled = !!(c && c.usuario === ses.usuario);      // no te quitas tu propio perfil
     $('c-nombre').focus();
     $('f-cuenta').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function cerrar() { $('f-cuenta').hidden = true; editando = null; }
+  /* Turno y punto: sólo para guardias. Cada opción del punto dice quién lo tiene ya en ese turno. */
+  function camposGuardia() { $('campos-guardia').hidden = $('c-rol').value !== 'ACCESOS'; }
+  function opcionesPunto(elegido) {
+    var t = $('c-turno').value, yo = editando ? editando.usuario : '';
+    elegido = elegido === undefined ? $('c-punto').value : elegido;
+    $('c-punto').innerHTML = '<option value="">Sin punto</option>' + PUNTOS.map(function (p) {
+      var ocupa = t && cuentas.filter(function (c) { return c.rol === 'ACCESOS' && c.punto_clave === p && c.turno === t && c.usuario !== yo; })[0];
+      return '<option value="' + p + '" data-ocupa="' + (ocupa ? esc(ocupa.usuario) : '') + '">' + nombrePunto(p) + (ocupa ? ' (ocupado: ' + esc(ocupa.usuario) + ')' : '') + '</option>';
+    }).join('');
+    $('c-punto').value = elegido || '';
+    avisoPunto();
+  }
+  function avisoPunto() {
+    var o = $('c-punto').selectedOptions[0], ocupa = o ? o.dataset.ocupa : '';
+    $('s-punto').textContent = ocupa ? 'Ese lugar lo tiene «' + ocupa + '»: al guardar, esta cuenta toma su lugar y «' + ocupa + '» queda sin punto.'
+                                     : 'Cada punto tiene un guardia de día y uno de noche, en el mismo teléfono.';
+    $('s-punto').style.color = ocupa ? 'var(--ambar)' : '';
+  }
+  $('c-punto').addEventListener('change', avisoPunto);
+  $('c-rol').addEventListener('change', camposGuardia);
+  $('c-turno').addEventListener('change', function () { opcionesPunto(); });
 
   $('b-nueva').addEventListener('click', function () { abrir(null); });
   $('b-cancelar').addEventListener('click', cerrar);
@@ -134,6 +174,10 @@
     ev.preventDefault();
     var datos = { nombre: $('c-nombre').value };
     if (!$('c-rol').disabled) datos.rol = $('c-rol').value;
+    if ($('c-rol').value === 'ACCESOS') {
+      if (!$('c-turno').value) { $('f-err').textContent = 'Elige el turno del guardia: día o noche.'; $('f-err').hidden = false; $('c-turno').focus(); return; }
+      datos.turno = $('c-turno').value; datos.punto = $('c-punto').value;
+    }
     if ($('c-pass').value) datos.password = $('c-pass').value;
     var accion = 'CUENTA_CREAR';
     if (editando) { accion = 'CUENTA_EDITAR'; datos.id = editando.id; }

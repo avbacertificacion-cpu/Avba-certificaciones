@@ -43,6 +43,8 @@ main.ancho{max-width:900px;margin-top:16px}
 .etq.verde{background:var(--verde-claro);color:var(--verde)}
 .etq.gris{background:#eceff4;color:var(--sub)}
 .etq.azul{background:#E6F1FB;color:var(--azul-dark)}
+.etq.dia{background:#FFF6D6;color:#7A5A00}
+.etq.noche{background:#1F2A4D;color:#fff}
 .mosaicos{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px}
 .mosaico{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:18px 16px;text-decoration:none;color:var(--texto);display:block;
   font-family:inherit;text-align:left;cursor:pointer;font-size:15px}

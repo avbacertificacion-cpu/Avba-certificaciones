@@ -69,9 +69,11 @@ const k = r.turnos.find(t => r.incidencias.some(x => x.turno === t)) || r.turnos
 ok(Object.values(r.totales).every(t => t.entrada === 0 && t.salida === 0), 'los contadores de entradas y salidas no cambian');
 const alc = r.incidencias.find(x => x.tipo === 'ALCOHOLIMETRO');
 ok(alc && alc.tipo_nombre === 'Alcoholímetro positivo' && alc.detalle === 'Prueba positiva 0.4' && alc.con_foto && alc.puede_borrar, 'trae tipo, descripción, foto y se puede borrar');
-r = await get('LISTAR_ACCESOS', 'tok-admin');
+// Los guardias punto1 y punto2 son de día: lo suyo va al turno de día de hoy, a cualquier hora
+const kDia = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' }) + '-D';
+r = await get('LISTAR_ACCESOS', 'tok-admin', { turnos: kDia });
 ok(r.incidencias.length === 3, 'Administración ve las de todos los puntos: ' + r.incidencias.length);
-r = await get('LISTAR_ACCESOS', 'tok-planta', { lugar: 'PUNTO DE CONTROL 2' });
+r = await get('LISTAR_ACCESOS', 'tok-planta', { lugar: 'PUNTO DE CONTROL 2', turnos: kDia });
 ok(r.incidencias.length === 1 && r.incidencias[0].codigo === '412', 'filtradas por punto de control');
 r = await get('ACCESOS_EN_PLANTA', 'tok-admin');
 ok(r.total === 0, 'una incidencia no pone a nadie «en planta»');

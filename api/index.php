@@ -100,6 +100,7 @@ try {
         // ── Sesión y cuentas ──
         case 'SESION':
             respuesta(['status' => 'success', 'usuario' => $usr['usuario'], 'nombre' => $usr['nombre'], 'rol' => $usr['rol'],
+                       'turno' => ControlAccesos::turnoCuenta($usr),
                        'nombre_rol' => Auth::NOMBRES_ROL[$usr['rol']] ?? $usr['rol']]);
         case 'CAMBIAR_MI_CONTRASENA':
             respuesta($auth->cambiarMiContrasena($datos, $usr));

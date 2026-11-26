@@ -77,11 +77,13 @@ r = await get('CUENTA_CREAR', tAdmin, { usuario: 'x', nombre: 'x', rol: 'ACCESOS
 ok(r.http === 405, 'crear cuenta por GET no se permite');
 r = await post('CUENTA_CREAR', tAdmin, { usuario: 'Con Espacio', nombre: 'X', rol: 'ACCESOS', password: 'contrasena-larga' });
 ok(r.status === 'error' && /minúsculas/.test(r.message), 'usuario con espacios: ' + r.message);
-r = await post('CUENTA_CREAR', tAdmin, { usuario: 'punto1', nombre: 'X', rol: 'ACCESOS', password: 'contrasena-larga' });
+r = await post('CUENTA_CREAR', tAdmin, { usuario: 'punto1', nombre: 'X', rol: 'ACCESOS', turno: 'D', password: 'contrasena-larga' });
 ok(r.status === 'error' && /Ya existe/.test(r.message), 'usuario repetido: ' + r.message);
 r = await post('CUENTA_CREAR', tAdmin, { usuario: 'otro', nombre: 'X', rol: 'INSPECTOR', password: 'contrasena-larga' });
 ok(r.status === 'error', 'perfil que no existe en esta plataforma: ' + r.message);
 r = await post('CUENTA_CREAR', tAdmin, { usuario: 'caseta.norte', nombre: 'Caseta Norte', rol: 'ACCESOS', password: 'contrasena-larga' });
+ok(r.status === 'error' && /turno del guardia/.test(r.message), 'un guardia necesita su turno: ' + r.message);
+r = await post('CUENTA_CREAR', tAdmin, { usuario: 'caseta.norte', nombre: 'Caseta Norte', rol: 'ACCESOS', turno: 'D', password: 'contrasena-larga' });
 ok(r.status === 'success', 'crear guardia de caseta: ' + r.message);
 const idNorte = r.id;
 const tNorte = await entrar('caseta.norte', 'contrasena-larga');

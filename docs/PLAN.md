@@ -61,6 +61,10 @@ Lo que se construye:
 - Activar el `push` de `deploy-control-accesos.yml` y de `app-caseta.yml`, publicar y
   probar de punta a punta con la app nueva en un teléfono.
 
+**Después de la fase 1 (a pedido del usuario):** botón INCIDENCIA en la caseta y turnos por
+cuenta (cada guardia es de día o de noche; cada punto tiene uno de cada turno en el mismo
+teléfono; lo que registra va a su turno, a cualquier hora).
+
 ## Fase 2 — Padrón: empresas y personas
 
 Lo que muestra la maqueta (panel → Personas, perfil de la persona, Contratistas):

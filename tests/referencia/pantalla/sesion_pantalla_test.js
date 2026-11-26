@@ -58,17 +58,24 @@ async function entrar(p, usuario, password) {
   // ── 2) Cuentas: dar de alta al administrador de la planta y a un guardia ──
   await p.click('#m-cuentas'); await p.waitForTimeout(1200);
   ok(p.url().endsWith('/cuentas.html') && (await p.$$('#lista .cuenta')).length === 1, 'cuentas: sólo la mía');
-  const alta = async (nombre, usuario, rol, pass) => {
+  const alta = async (nombre, usuario, rol, pass, turno, punto) => {
     await p.click('#b-nueva'); await p.fill('#c-nombre', nombre); await p.fill('#c-usuario', usuario);
-    await p.selectOption('#c-rol', rol); await p.fill('#c-pass', pass); await p.click('#b-guardar'); await p.waitForTimeout(1000);
+    await p.selectOption('#c-rol', rol); await p.fill('#c-pass', pass);
+    if (turno) { await p.selectOption('#c-turno', turno); await p.selectOption('#c-punto', punto || ''); }
+    await p.click('#b-guardar'); await p.waitForTimeout(1000);
   };
   await alta('Administrador Planta Norte', 'planta.norte', 'PLANTA', 'planta-norte-1');
+  ok(await p.isHidden('#campos-guardia'), 'turno y punto sólo aparecen para el perfil «Guardia de caseta»');
+  // Guardia sin elegir turno: no se guarda
   await alta('Caseta punto 1', 'punto1', 'ACCESOS', 'caseta-punto-1');
-  await alta('Repetida', 'punto1', 'ACCESOS', 'caseta-punto-1');
+  ok(await p.isVisible('#campos-guardia') && /turno del guardia/.test(await p.textContent('#f-err')), 'guardia sin turno: «' + await p.textContent('#f-err') + '»');
+  await p.click('#b-cancelar');
+  await alta('Caseta punto 1', 'punto1', 'ACCESOS', 'caseta-punto-1', 'D', '');
+  await alta('Repetida', 'punto1', 'ACCESOS', 'caseta-punto-1', 'D', '');
   ok(/Ya existe/.test(await p.textContent('#f-err')), 'usuario repetido: «' + await p.textContent('#f-err') + '»');
   await p.click('#b-cancelar');
   let filas = await p.$$eval('#lista .cuenta', l => l.map(x => x.innerText.replace(/\s+/g, ' ')));
-  ok(filas.length === 3 && filas.some(t => /CASETA PUNTO 1 punto1 Guardia de caseta Sin punto de control/.test(t)) && filas.some(t => /ADMINISTRADOR PLANTA NORTE planta.norte Administrador de la planta/.test(t)),
+  ok(filas.length === 3 && filas.some(t => /CASETA PUNTO 1 punto1 Guardia de caseta Turno de día Sin punto de control/.test(t)) && filas.some(t => /ADMINISTRADOR PLANTA NORTE planta.norte Administrador de la planta/.test(t)),
      'lista con las 3 cuentas y sus perfiles');
   ok(await sinScrollLateral(p), 'cuentas sin desplazamiento lateral en teléfono');
   await p.screenshot({ path: D + 'ses_cuentas.png', fullPage: true });
@@ -107,8 +114,9 @@ async function entrar(p, usuario, password) {
   await p.goto(B + 'cuentas.html'); await p.waitForTimeout(600);
   ok(await p.isVisible('#sin-permiso') && await p.isHidden('#todo'), 'planta en cuentas.html: «Sólo Administración AVBA…»');
   await p.goto(B + 'accesos.html'); await p.waitForTimeout(1800);
-  ok(await p.isVisible('#tarjeta-puntos') && (await p.$$('#puntos-lista select')).length === 4 && await p.$$eval('#puntos-lista select', l => l.every(s => s.disabled)),
-     'planta ve los 4 puntos, con la cuenta de cada uno sin poder cambiarla');
+  ok(await p.isVisible('#tarjeta-puntos') && (await p.$$('#puntos-lista select[data-turno="D"]')).length === 4 && (await p.$$('#puntos-lista select[data-turno="N"]')).length === 4 &&
+     await p.$$eval('#puntos-lista select', l => l.every(s => s.disabled)),
+     'planta ve los 4 puntos, con su guardia de día y de noche, sin poder cambiarlos');
   ok(await p.isVisible('#f-planta'), 'planta tiene el filtro «En planta»');
   ok((await p.getAttribute('#atras', 'href')) === 'index.html', 'el botón de regresar lleva al inicio');
   await p.screenshot({ path: D + 'ses_planta_accesos.png' });

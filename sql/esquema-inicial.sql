@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   rol            VARCHAR(30)  NOT NULL,
   nombre         VARCHAR(150) NOT NULL,
   activo         TINYINT(1)   NOT NULL DEFAULT 1,
+  turno          CHAR(1)      NULL,          -- guardias: D (día) | N (noche); decide el turno de lo que registran
   fecha_alta     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   ultimo_acceso  DATETIME     NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -108,15 +109,18 @@ CREATE TABLE IF NOT EXISTS accesos_incidencias (
   KEY idx_fecha (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ── Puntos de control: una cuenta y un solo equipo por punto ────────
+-- ── Puntos de control: cuenta de día, cuenta de noche y un solo equipo ─
+-- usuario = guardia del turno de día; usuario_noche = guardia del turno de noche.
 CREATE TABLE IF NOT EXISTS accesos_puntos (
   punto            VARCHAR(40)  NOT NULL PRIMARY KEY,
   usuario          VARCHAR(50)  NULL,
+  usuario_noche    VARCHAR(50)  NULL,
   dispositivo      VARCHAR(80)  NULL,
   dispositivo_desc VARCHAR(150) NOT NULL DEFAULT '',
   ligado           DATETIME     NULL,
   ultimo_uso       DATETIME     NULL,
-  UNIQUE KEY uk_usuario (usuario)
+  UNIQUE KEY uk_usuario (usuario),
+  UNIQUE KEY uk_usuario_noche (usuario_noche)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT IGNORE INTO accesos_puntos (punto) VALUES
