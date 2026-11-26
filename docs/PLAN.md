@@ -90,6 +90,11 @@ Lo que el guardia ve al leer la credencial (como en `demo/caseta.html`): **autor
 
 ## Fase 4 — Jornadas e incidencias
 
+**Adelantado:** el botón INCIDENCIA de la caseta ya existe (tabla `accesos_incidencias`:
+alcoholímetro positivo, mala conducta, problema con la persona u otro; con la credencial
+leída y su foto; aviso a Administración e historial por ID). Falta la gravedad, los
+reportes por empresa y mes, y ligarlas a los vetos.
+
 - Topes de la Ley Federal del Trabajo por año (la maqueta trae la tabla 2026–2030:
   48 h ordinarias + 9 dobles en 2026 … 40 + 12 en 2030), tope de permanencia continua
   (política de la planta, p. ej. 12 h) y días seguidos antes de exigir descanso.

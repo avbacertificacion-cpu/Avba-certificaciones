@@ -393,40 +393,18 @@ class ControlAccesos {
         if ($codigo !== '' && !$tarjeta && !$conFoto) {
             return ['status' => 'error', 'message' => 'El servidor todavía no puede guardar tarjetas: avisa a AVBA.'];
         }
-        $info = null;
-        if ($conFoto) {
-            if ((int)($archivo['size'] ?? 0) > 15 * 1048576) return ['status' => 'error', 'message' => 'La foto pesa demasiado (máximo 15 MB).'];
-            $info = @getimagesize($archivo['tmp_name']);
-            if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
-                return ['status' => 'error', 'message' => 'El archivo no es una foto válida (JPG, PNG o WEBP).'];
-            }
-        }
+        if ($conFoto && ($mal = self::fotoInvalida($archivo))) return ['status' => 'error', 'message' => $mal];
 
         // La hora es la del dispositivo al tomar la foto o leer la tarjeta (puede llegar después, sin señal)
         $cap = (string)($p['capturado'] ?? '');
         if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $cap) || strtotime($cap) === false) $cap = date('Y-m-d H:i:s');
         $fecha = substr($cap, 0, 10);
 
-        $sub = ''; $foto = ''; $mini = '';
+        $foto = ''; $mini = '';
         if ($conFoto) {
-            self::protegerCarpeta();
-            $sub = 'fotos/' . substr($fecha, 0, 4) . '/' . substr($fecha, 5, 2) . '/';
-            $dir = self::carpeta() . $sub;
-            if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
-
-            // Miles de fotos al día: 1400 px es de sobra para leer el número de
-            // una credencial que llena la foto, y cada una queda en ~150 KB.
-            $foto = comprimirImagen($archivo['tmp_name'], $dir . $uid . '.jpg', 1400, 1400, 76);
-            $mini = comprimirImagen($archivo['tmp_name'], $dir . $uid . '_m.jpg', 300, 300, 68);
-            if (!$foto) {
-                // Sin GD: se guarda tal cual llegó
-                $ext = $info[2] === IMAGETYPE_PNG ? 'png' : ($info[2] === IMAGETYPE_WEBP ? 'webp' : 'jpg');
-                if (!@move_uploaded_file($archivo['tmp_name'], $dir . $uid . '.' . $ext)
-                    && !@copy($archivo['tmp_name'], $dir . $uid . '.' . $ext)) {
-                    return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
-                }
-                $foto = $uid . '.' . $ext;
-            }
+            $g = self::guardarFoto($archivo, $uid, $fecha);
+            if (!$g) return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
+            [$foto, $mini] = $g;
         }
 
         try {
@@ -435,7 +413,7 @@ class ControlAccesos {
                 $uid, $tipo, $fecha, $cap, date('Y-m-d H:i:s'),
                 mb_substr($eq['punto'] ?: (textoEstandar($p['lugar'] ?? '') ?: 'SIN PUNTO DE CONTROL'), 0, 120),
                 mb_substr(textoEstandar($p['nota'] ?? ''), 0, 255),
-                $foto !== '' ? $sub . $foto : '', $mini ? $sub . $mini : '',
+                $foto, $mini,
                 mb_substr((string)($usr['usuario'] ?? ''), 0, 50), mb_substr((string)($usr['nombre'] ?? ''), 0, 150),
                 $turnoFecha, $turno,
             ];
@@ -459,6 +437,38 @@ class ControlAccesos {
         return ['status' => 'success', 'id' => (int)$this->pdo->lastInsertId(), 'turno' => "$turnoFecha-$turno",
                 'message' => ($tipo === 'entrada' ? 'Entrada' : 'Salida') . ' registrada a las ' . substr($cap, 11, 5) . '.'
                              . ($persona !== '' ? ' ' . $persona . '.' : '')];
+    }
+
+    /** Mensaje si el archivo subido no es una foto aceptable, o '' si sí lo es. */
+    private static function fotoInvalida(array $archivo): string {
+        if ((int)($archivo['size'] ?? 0) > 15 * 1048576) return 'La foto pesa demasiado (máximo 15 MB).';
+        $info = @getimagesize($archivo['tmp_name']);
+        if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) return 'El archivo no es una foto válida (JPG, PNG o WEBP).';
+        return '';
+    }
+
+    /**
+     * Guarda la foto (y su miniatura) en uploads/accesos/fotos/AAAA/MM/.
+     * Regresa [ruta de la foto, ruta de la miniatura] dentro de la carpeta, o null.
+     * Miles de fotos al día: 1400 px es de sobra para leer el número de una
+     * credencial que llena la foto, y cada una queda en ~150 KB.
+     */
+    private static function guardarFoto(array $archivo, string $uid, string $fecha): ?array {
+        self::protegerCarpeta();
+        $sub = 'fotos/' . substr($fecha, 0, 4) . '/' . substr($fecha, 5, 2) . '/';
+        $dir = self::carpeta() . $sub;
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return null;
+        $foto = comprimirImagen($archivo['tmp_name'], $dir . $uid . '.jpg', 1400, 1400, 76);
+        $mini = comprimirImagen($archivo['tmp_name'], $dir . $uid . '_m.jpg', 300, 300, 68);
+        if (!$foto) {
+            // Sin GD: se guarda tal cual llegó
+            $info = @getimagesize($archivo['tmp_name']);
+            $ext = ($info[2] ?? 0) === IMAGETYPE_PNG ? 'png' : (($info[2] ?? 0) === IMAGETYPE_WEBP ? 'webp' : 'jpg');
+            if (!@move_uploaded_file($archivo['tmp_name'], $dir . $uid . '.' . $ext)
+                && !@copy($archivo['tmp_name'], $dir . $uid . '.' . $ext)) return null;
+            $foto = $uid . '.' . $ext;
+        }
+        return [$sub . $foto, $mini ? $sub . $mini : ''];
     }
 
     /* ── Control del día ────────────────────────────────────────────────── */
@@ -512,7 +522,7 @@ class ControlAccesos {
             // La caseta sólo ve los turnos de ahora (con un día de margen por la zona horaria)
             $hoy = strtotime(date('Y-m-d') . ' 12:00:00');
             $turnos = array_values(array_filter($turnos, fn($t) => abs(strtotime($t[0] . ' 12:00:00') - $hoy) <= 2 * 86400));
-            if (!$turnos) return ['status' => 'success', 'registros' => [], 'totales' => (object)[], 'lugares' => [], 'mas' => false];
+            if (!$turnos) return ['status' => 'success', 'registros' => [], 'totales' => (object)[], 'lugares' => [], 'mas' => false, 'incidencias' => []];
         }
 
         $condT = implode(' OR ', array_fill(0, count($turnos), '(turno_fecha = ? AND turno = ?)'));
@@ -579,7 +589,8 @@ class ControlAccesos {
             ];
         }
         return ['status' => 'success', 'turnos' => array_keys($tot), 'registros' => $out, 'totales' => $tot,
-                'lugares' => $lugares, 'mas' => $hayMas, 'punto' => $eq['punto']];
+                'lugares' => $lugares, 'mas' => $hayMas, 'punto' => $eq['punto'],
+                'incidencias' => $this->incidenciasDeTurnos($turnos, $lugar, $usr)];
     }
 
     /** ¿Ya llegaron al servidor? (la pantalla pregunta por lo que tiene en cola) */
@@ -587,9 +598,15 @@ class ControlAccesos {
         self::asegurarTabla($this->pdo);
         $uids = array_values(array_filter(array_slice($uids, 0, 500), fn($u) => is_string($u) && preg_match('/^[A-Za-z0-9-]{8,64}$/', $u)));
         if (!$uids) return ['status' => 'success', 'existen' => []];
-        $st = $this->pdo->prepare("SELECT uid, id FROM accesos_registros WHERE uid IN (" . implode(',', array_fill(0, count($uids), '?')) . ")");
+        $marcas = implode(',', array_fill(0, count($uids), '?'));
+        $st = $this->pdo->prepare("SELECT uid, id FROM accesos_registros WHERE uid IN ($marcas)");
         $st->execute($uids);
         $r = $st->fetchAll(PDO::FETCH_KEY_PAIR);
+        // Las incidencias van por la misma cola del teléfono
+        self::asegurarIncidencias($this->pdo);
+        $st = $this->pdo->prepare("SELECT uid, id FROM accesos_incidencias WHERE uid IN ($marcas)");
+        $st->execute($uids);
+        $r += $st->fetchAll(PDO::FETCH_KEY_PAIR);
         return ['status' => 'success', 'existen' => $r ?: (object)[]];
     }
 
@@ -624,6 +641,167 @@ class ControlAccesos {
     public function rutaFoto(int $id, bool $mini, ?array $usr = null): ?string {
         self::asegurarTabla($this->pdo);
         $st = $this->pdo->prepare("SELECT foto, foto_mini, usuario FROM accesos_registros WHERE id = ?");
+        $st->execute([$id]);
+        $f = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$f) return null;
+        if (self::esCaseta($usr) && $f['usuario'] !== ($usr['usuario'] ?? null)) return null;   // sólo las suyas
+        $rel = ($mini && $f['foto_mini'] !== '') ? $f['foto_mini'] : $f['foto'];
+        if ($rel === '' || strpos($rel, '..') !== false) return null;
+        $abs = self::carpeta() . $rel;
+        return is_file($abs) ? $abs : null;
+    }
+
+    /* ── Incidencias ─────────────────────────────────────────────────────────
+       El botón INCIDENCIA de la caseta: el guardia lee la credencial (como en
+       una entrada) y reporta qué pasó con esa persona. Van en su propia tabla
+       para no mover los contadores, «En planta» ni los PDF de entradas y
+       salidas. Llegan por la misma cola del teléfono (también sin señal) y con
+       la foto de la credencial como evidencia. */
+    public const INCIDENCIAS = [
+        'ALCOHOLIMETRO' => 'Alcoholímetro positivo',
+        'CONDUCTA'      => 'Mala conducta',
+        'PERSONA'       => 'Problema con la persona',
+        'OTRO'          => 'Otro',
+    ];
+
+    public static function asegurarIncidencias(PDO $pdo): void {
+        static $hecho = [];
+        $k = spl_object_id($pdo);
+        if (isset($hecho[$k])) return;
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS accesos_incidencias (
+               id             INT AUTO_INCREMENT PRIMARY KEY,
+               uid            VARCHAR(64)  NOT NULL,
+               tipo           VARCHAR(20)  NOT NULL,
+               detalle        VARCHAR(500) NOT NULL DEFAULT '',
+               fecha          DATE         NOT NULL,
+               capturado      DATETIME     NOT NULL,
+               recibido       DATETIME     NOT NULL,
+               turno_fecha    DATE         NOT NULL,
+               turno          CHAR(1)      NOT NULL,
+               lugar          VARCHAR(120) NOT NULL DEFAULT '',
+               codigo         VARCHAR(32)  NOT NULL DEFAULT '',
+               nombre         VARCHAR(150) NOT NULL DEFAULT '',
+               origen         VARCHAR(12)  NOT NULL DEFAULT 'tarjeta',
+               foto           VARCHAR(255) NOT NULL DEFAULT '',
+               foto_mini      VARCHAR(255) NOT NULL DEFAULT '',
+               usuario        VARCHAR(50)  NOT NULL DEFAULT '',
+               usuario_nombre VARCHAR(150) NOT NULL DEFAULT '',
+               UNIQUE KEY uk_uid (uid),
+               KEY idx_turno (turno_fecha, turno),
+               KEY idx_codigo (codigo),
+               KEY idx_fecha (fecha)
+             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+        $hecho[$k] = true;
+    }
+
+    /** El turno de una incidencia es el del reloj (día 06:30–18:30, noche 18:30–06:30), sin margen. */
+    public static function turnoReloj(string $capturado): array {
+        $d = substr($capturado, 0, 10);
+        $m = (int)substr($capturado, 11, 2) * 60 + (int)substr($capturado, 14, 2);
+        if ($m >= self::CAMBIO_DIA && $m < self::CAMBIO_NOCHE) return [$d, 'D'];
+        if ($m >= self::CAMBIO_NOCHE) return [$d, 'N'];
+        return [date('Y-m-d', strtotime($d . ' 12:00:00 -1 day')), 'N'];
+    }
+
+    public function registrarIncidencia(array $p, array $archivo, array $usr): array {
+        self::asegurarIncidencias($this->pdo);
+        $uid = (string)($p['uid'] ?? '');
+        if (!preg_match('/^[A-Za-z0-9-]{8,64}$/', $uid)) return ['status' => 'error', 'message' => 'Incidencia sin identificador.'];
+        $ya = $this->pdo->prepare("SELECT id FROM accesos_incidencias WHERE uid = ?");
+        $ya->execute([$uid]);
+        if ($idYa = $ya->fetchColumn()) return ['status' => 'success', 'id' => (int)$idYa, 'duplicado' => true];
+
+        $tipo = strtoupper(trim((string)($p['incidencia'] ?? '')));
+        if (!isset(self::INCIDENCIAS[$tipo])) return ['status' => 'error', 'message' => 'Elige qué tipo de incidencia es.'];
+        $detalle = mb_substr(trim((string)preg_replace('/[\x00-\x09\x0B-\x1F\x7F]/u', ' ', (string)($p['detalle'] ?? ''))), 0, 500);
+        if ($tipo === 'OTRO' && $detalle === '') return ['status' => 'error', 'message' => 'Describe qué pasó.'];
+        $codigo = strtoupper(substr((string)preg_replace('/[^0-9A-Za-z-]/', '', (string)($p['codigo'] ?? '')), 0, 32));
+        $persona = mb_substr(textoEstandar($p['persona'] ?? ''), 0, 150);
+        $conFoto = !empty($archivo['tmp_name']) && (int)($archivo['error'] ?? 1) === UPLOAD_ERR_OK;
+        if ($codigo === '' && !$conFoto && $persona === '') {
+            return ['status' => 'error', 'message' => 'Falta saber quién es: lee su credencial, escribe su ID o su nombre.'];
+        }
+        $eq = $this->equipoDeCaseta($p, $usr);
+        if (!$eq['ok']) return $eq['error'];
+        if ($conFoto && ($mal = self::fotoInvalida($archivo))) return ['status' => 'error', 'message' => $mal];
+
+        $cap = (string)($p['capturado'] ?? '');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $cap) || strtotime($cap) === false) $cap = date('Y-m-d H:i:s');
+        $fecha = substr($cap, 0, 10);
+        $foto = ''; $mini = '';
+        if ($conFoto) {
+            $g = self::guardarFoto($archivo, 'inc-' . $uid, $fecha);
+            if (!$g) return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
+            [$foto, $mini] = $g;
+        }
+        $origenPedido = (string)($p['origen'] ?? '');
+        $origen = $codigo === '' ? 'sin_id' : ($origenPedido === 'manual' ? 'manual' : 'tarjeta');
+        [$tf, $t] = self::turnoReloj($cap);
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO accesos_incidencias (uid, tipo, detalle, fecha, capturado, recibido, turno_fecha, turno, lugar, codigo, nombre, origen, foto, foto_mini, usuario, usuario_nombre)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            )->execute([$uid, $tipo, $detalle, $fecha, $cap, date('Y-m-d H:i:s'), $tf, $t,
+                        mb_substr($eq['punto'] ?: (textoEstandar($p['lugar'] ?? '') ?: 'SIN PUNTO DE CONTROL'), 0, 120),
+                        $codigo, $persona, $origen, $foto, $mini,
+                        mb_substr((string)($usr['usuario'] ?? ''), 0, 50), mb_substr((string)($usr['nombre'] ?? ''), 0, 150)]);
+        } catch (\PDOException $e) {
+            $ya->execute([$uid]);
+            if ($idYa = $ya->fetchColumn()) return ['status' => 'success', 'id' => (int)$idYa, 'duplicado' => true];
+            throw $e;
+        }
+        return ['status' => 'success', 'id' => (int)$this->pdo->lastInsertId(),
+                'message' => 'Incidencia registrada: ' . self::INCIDENCIAS[$tipo] . ($persona !== '' ? ' · ' . $persona : ($codigo !== '' ? ' · ID ' . $codigo : '')) . '.'];
+    }
+
+    /** Una incidencia como la ve la pantalla */
+    private function filaIncidencia(array $f, ?array $usr): array {
+        $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
+        return [
+            'id' => (int)$f['id'], 'uid' => $f['uid'], 'tipo' => $f['tipo'], 'tipo_nombre' => self::INCIDENCIAS[$f['tipo']] ?? $f['tipo'],
+            'detalle' => (string)$f['detalle'], 'capturado' => $f['capturado'], 'hora' => substr((string)$f['capturado'], 11, 8),
+            'turno' => $f['turno_fecha'] . '-' . $f['turno'], 'lugar' => $f['lugar'], 'codigo' => (string)$f['codigo'],
+            'persona' => (string)$f['nombre'], 'origen' => (string)$f['origen'], 'con_foto' => (string)$f['foto'] !== '',
+            'usuario' => $f['usuario'], 'nombre' => $f['usuario_nombre'] ?: $f['usuario'],
+            'puede_borrar' => $esAdmin || ($f['usuario'] === ($usr['usuario'] ?? null) && self::reciente((string)$f['recibido'])),
+        ];
+    }
+
+    /** Incidencias de los turnos que muestra la pantalla (la caseta, sólo las suyas) */
+    private function incidenciasDeTurnos(array $turnos, string $lugar, array $usr): array {
+        self::asegurarIncidencias($this->pdo);
+        $condT = implode(' OR ', array_fill(0, count($turnos), '(turno_fecha = ? AND turno = ?)'));
+        $args = array_merge(...array_map(fn($t) => [$t[0], $t[1]], $turnos));
+        $sql = "SELECT * FROM accesos_incidencias WHERE ($condT)";
+        if ($lugar !== '') { $sql .= " AND lugar = ?"; $args[] = $lugar; }
+        if (self::esCaseta($usr)) { $sql .= " AND usuario = ?"; $args[] = (string)$usr['usuario']; }
+        $st = $this->pdo->prepare($sql . " ORDER BY capturado DESC, id DESC LIMIT 200");
+        $st->execute($args);
+        return array_map(fn($f) => $this->filaIncidencia($f, $usr), $st->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function eliminarIncidencia(int $id, array $usr): array {
+        self::asegurarIncidencias($this->pdo);
+        $st = $this->pdo->prepare("SELECT * FROM accesos_incidencias WHERE id = ?");
+        $st->execute([$id]);
+        $f = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$f) return ['status' => 'success', 'message' => 'La incidencia ya no existía.'];
+        if (!$this->filaIncidencia($f, $usr)['puede_borrar']) {
+            return ['status' => 'error', 'message' => 'Sólo quien la registró (en las primeras ' . self::HORAS_PARA_BORRAR . ' horas) o Administración puede eliminarla.'];
+        }
+        foreach (['foto', 'foto_mini'] as $c) {
+            if ($f[$c] !== '' && strpos($f[$c], '..') === false) @unlink(self::carpeta() . $f[$c]);
+        }
+        $this->pdo->prepare("DELETE FROM accesos_incidencias WHERE id = ?")->execute([$id]);
+        return ['status' => 'success', 'message' => 'Incidencia eliminada.'];
+    }
+
+    /** Ruta en disco de la foto de una incidencia (para descargar.php) */
+    public function rutaFotoIncidencia(int $id, bool $mini, ?array $usr = null): ?string {
+        self::asegurarIncidencias($this->pdo);
+        $st = $this->pdo->prepare("SELECT foto, foto_mini, usuario FROM accesos_incidencias WHERE id = ?");
         $st->execute([$id]);
         $f = $st->fetch(PDO::FETCH_ASSOC);
         if (!$f) return null;
@@ -863,10 +1041,18 @@ class ControlAccesos {
         $raw = strtoupper(substr((string)preg_replace('/[^0-9A-Za-z-]/', '', (string)($p['id'] ?? '')), 0, 32));
         if ($raw === '') return ['status' => 'error', 'message' => 'Escribe el número del ID.'];
         $dias = max(1, min(180, (int)($p['dias'] ?? 30)));
-        $base = ['status' => 'success', 'id' => $raw, 'nombre' => '', 'movimientos' => [], 'en_planta' => false,
-                 'dias' => $dias, 'registros' => 0];
-        if (!self::conTarjeta($this->pdo)) return $base;
         $clave = self::claveId($raw);
+        // Sus incidencias (mismo ID, con o sin ceros a la izquierda)
+        self::asegurarIncidencias($this->pdo);
+        $st = $this->pdo->prepare(
+            "SELECT * FROM accesos_incidencias WHERE fecha >= ? AND codigo <> '' AND (codigo = ? OR TRIM(LEADING '0' FROM codigo) = ?)
+              ORDER BY capturado DESC, id DESC LIMIT 100");
+        $st->execute([date('Y-m-d', time() - $dias * 86400), $raw, $clave]);
+        $incidencias = array_values(array_map(fn($f) => $this->filaIncidencia($f, $usr),
+            array_filter($st->fetchAll(PDO::FETCH_ASSOC), fn($f) => self::claveId((string)$f['codigo']) === $clave)));
+        $base = ['status' => 'success', 'id' => $raw, 'nombre' => '', 'movimientos' => [], 'en_planta' => false,
+                 'dias' => $dias, 'registros' => 0, 'incidencias' => $incidencias];
+        if (!self::conTarjeta($this->pdo)) return $base;
         $st = $this->pdo->prepare(
             "SELECT id, uid, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre, (foto <> '') AS con_foto
                FROM accesos_registros
@@ -875,7 +1061,7 @@ class ControlAccesos {
         );
         $st->execute([date('Y-m-d', time() - $dias * 86400), $raw, $clave]);
         $filas = array_values(array_filter($st->fetchAll(PDO::FETCH_ASSOC), fn($f) => self::claveId((string)$f['codigo']) === $clave));
-        if (!$filas) return $base;
+        if (!$filas) return ['nombre' => (string)($incidencias[0]['persona'] ?? '')] + $base;   // sólo incidencias
         $movs = self::emparejar($filas);
         usort($movs, fn($a, $b) => strcmp(($b['entrada'] ?: $b['salida']), ($a['entrada'] ?: $a['salida'])));   // lo más reciente primero
         $ult = $filas[count($filas) - 1];

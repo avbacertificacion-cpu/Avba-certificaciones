@@ -84,7 +84,13 @@ punto; el enrutador le rechaza todo lo demás).
 5. **Puntos de control:** 4 fijos («PUNTO DE CONTROL 1…4»); cada uno con su cuenta de
    caseta y **un solo equipo** (el primero que entra queda ligado; Administración lo
    libera).
-6. **Foto de evidencia:** cada lectura guarda la foto de la credencial (sale de la misma
+6. **Incidencias (botón INCIDENCIA de la caseta):** el guardia lee la credencial como en
+   una entrada y dice qué pasó: Alcoholímetro positivo, Mala conducta, Problema con la
+   persona u Otro (con descripción). Tabla propia `accesos_incidencias` (no cuentan como
+   entrada ni salida, ni en «En planta» ni en los PDF), misma cola sin señal, foto como
+   evidencia, turno del reloj (sin el margen de 2 h). Sin credencial se reporta con el
+   nombre. Administración ve una franja naranja con las nuevas y el historial por ID.
+7. **Foto de evidencia:** cada lectura guarda la foto de la credencial (sale de la misma
    imagen en la que se leyó el ID). Las fotos viven en `uploads/accesos/` (protegida) y
    se sirven sólo con sesión.
 

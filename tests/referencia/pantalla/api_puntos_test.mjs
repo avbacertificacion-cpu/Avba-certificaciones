@@ -18,7 +18,8 @@ const registrar = async (tok, campos) => {
 };
 const EQ_A = 'eq-11111111-aaaa', EQ_B = 'eq-22222222-bbbb';
 const dosDig = n => String(n).padStart(2, '0');
-const d = new Date(); const hoy = d.getFullYear() + '-' + dosDig(d.getMonth() + 1) + '-' + dosDig(d.getDate());
+// La fecha de hoy en la planta (no la del equipo donde corre la prueba, que puede estar en UTC)
+const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' });
 const hora = h => hoy + ' ' + h;
 
 let r = await get('ACCESOS_MI_PUNTO', 'tok-punto1', { dispositivo: EQ_A });

@@ -45,6 +45,10 @@ r = await post('LOGIN', null, { usuario: 'admin', password: 'mala' });
 ok(r.status === 'error' && r.message === 'Usuario o contraseña incorrectos.', 'contraseña equivocada: ' + r.message);
 r = await post('LOGIN', null, { usuario: 'nadie', password: 'mala' });
 ok(r.status === 'error' && r.message === 'Usuario o contraseña incorrectos.', 'cuenta que no existe: el mismo mensaje (no delata cuáles existen)');
+// Con una cuenta que no existe, el servidor compara contra una contraseña de relleno al azar; antes,
+// a veces (~5 %) traía un carácter nulo y respondía «error del servidor». 40 intentos lo detectan.
+const respuestas = await Promise.all(Array.from({ length: 40 }, (_, i) => post('LOGIN', null, { usuario: 'no-existe-' + i, password: 'x' })));
+ok(respuestas.every(x => x.http === 200 && x.message === 'Usuario o contraseña incorrectos.'), '40 cuentas inexistentes: siempre «incorrectos», nunca error del servidor');
 r = await get('LOGIN', null, { usuario: 'admin', password: 'prueba-local' });
 ok(r.http === 405, 'iniciar sesión por GET (en la URL) no se permite');
 const tAdmin = await entrar('ADMIN', 'prueba-local');

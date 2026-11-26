@@ -81,6 +81,33 @@ CREATE TABLE IF NOT EXISTS accesos_registros (
   KEY idx_codigo (codigo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── Incidencias (botón INCIDENCIA de la caseta) ─────────────────────
+-- tipo: ALCOHOLIMETRO | CONDUCTA | PERSONA | OTRO. Aparte de las entradas y
+-- salidas para no mover contadores, «En planta» ni PDF. Turno del reloj.
+CREATE TABLE IF NOT EXISTS accesos_incidencias (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  uid            VARCHAR(64)  NOT NULL,
+  tipo           VARCHAR(20)  NOT NULL,
+  detalle        VARCHAR(500) NOT NULL DEFAULT '',
+  fecha          DATE         NOT NULL,
+  capturado      DATETIME     NOT NULL,
+  recibido       DATETIME     NOT NULL,
+  turno_fecha    DATE         NOT NULL,
+  turno          CHAR(1)      NOT NULL,
+  lugar          VARCHAR(120) NOT NULL DEFAULT '',
+  codigo         VARCHAR(32)  NOT NULL DEFAULT '',
+  nombre         VARCHAR(150) NOT NULL DEFAULT '',
+  origen         VARCHAR(12)  NOT NULL DEFAULT 'tarjeta',
+  foto           VARCHAR(255) NOT NULL DEFAULT '',
+  foto_mini      VARCHAR(255) NOT NULL DEFAULT '',
+  usuario        VARCHAR(50)  NOT NULL DEFAULT '',
+  usuario_nombre VARCHAR(150) NOT NULL DEFAULT '',
+  UNIQUE KEY uk_uid (uid),
+  KEY idx_turno (turno_fecha, turno),
+  KEY idx_codigo (codigo),
+  KEY idx_fecha (fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── Puntos de control: una cuenta y un solo equipo por punto ────────
 CREATE TABLE IF NOT EXISTS accesos_puntos (
   punto            VARCHAR(40)  NOT NULL PRIMARY KEY,

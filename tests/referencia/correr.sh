@@ -82,11 +82,13 @@ correr sigue php/nombre_pdf      "php $T/php/nombre_pdf.php"
 correr sigue php/limitada        "php $T/php/limitada.php"
 correr nueva api/plataforma      "node $T/pantalla/api_plataforma_test.mjs"
 correr nueva api/puntos          "node $T/pantalla/api_puntos_test.mjs"
+correr nueva api/incidencias     "node $T/pantalla/api_incidencias_test.mjs"
 correr nueva pantalla/sesion     "node $T/pantalla/sesion_pantalla_test.js"
 correr nueva pantalla/puntos     "node $T/pantalla/puntos_pantalla_test.js"
 correr nueva pantalla/pendientes "node $T/pantalla/pendientes_test.js"
 correr nueva pantalla/planta     "php $T/php/sembrar_planta.php && node $T/pantalla/planta_pantalla_test.js"
 correr nueva pantalla/evidencia  "node $T/pantalla/evidencia_test.js"
+correr nueva pantalla/incidencias "node $T/pantalla/incidencias_pantalla_test.js"
 correr sigue pantalla/tarjeta    "node $T/pantalla/accesos_tarjeta_test.js"
 
 echo

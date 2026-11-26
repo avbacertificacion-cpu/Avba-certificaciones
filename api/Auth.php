@@ -96,7 +96,7 @@ class Auth {
         $st->execute([$usuario]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
         // Siempre se verifica (aunque no exista la cuenta) para no delatar cuáles existen por el tiempo
-        $hash = $row['password_hash'] ?? password_hash(random_bytes(12), PASSWORD_DEFAULT);
+        $hash = $row['password_hash'] ?? password_hash(bin2hex(random_bytes(12)), PASSWORD_DEFAULT);   // en hexadecimal: bcrypt no acepta el carácter nulo
         $valido = password_verify($pass, $hash) && $row && (int)$row['activo'] === 1;
         if (!$valido) {
             $espera = $this->anotarFallo($usuario);

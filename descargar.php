@@ -6,6 +6,7 @@
    lo que guarda se entrega aquí, a una cuenta con sesión vigente.
 
      descargar.php?tipo=acceso_foto&id=<registro>[&m=1]&token=<sesión>
+     descargar.php?tipo=incidencia_foto&id=<incidencia>[&m=1]&token=<sesión>
      descargar.php?tipo=accesos_pdf&f=<archivo>&token=<sesión>
 
    El guardia de caseta sólo ve las fotos que registró él y no baja PDF.
@@ -28,8 +29,10 @@ $pdo = Database::conexion();
 $usr = validarToken($pdo, tokenDePeticion());
 if (!$usr || !ControlAccesos::permitido($usr)) fallo(401, 'Tu sesión venció. Vuelve a iniciar sesión.');
 
-if ($tipo === 'acceso_foto') {
-    $abs = (new ControlAccesos($pdo))->rutaFoto((int)($_GET['id'] ?? 0), !empty($_GET['m']), $usr);
+if ($tipo === 'acceso_foto' || $tipo === 'incidencia_foto') {
+    $ca = new ControlAccesos($pdo);
+    $abs = $tipo === 'acceso_foto' ? $ca->rutaFoto((int)($_GET['id'] ?? 0), !empty($_GET['m']), $usr)
+                                   : $ca->rutaFotoIncidencia((int)($_GET['id'] ?? 0), !empty($_GET['m']), $usr);
     if (!$abs) fallo(404, 'La foto ya no está disponible.');
     $mime = @mime_content_type($abs) ?: 'image/jpeg';
     header('Content-Type: ' . (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) ? $mime : 'image/jpeg'));

@@ -73,6 +73,36 @@
   .cap span{font-size:12px;opacity:.9}
   .cap.ent{background:linear-gradient(160deg,#3d8a27,var(--verde))}
   .cap.sal{background:linear-gradient(160deg,#c0392b,var(--rojo))}
+  /* Botón INCIDENCIA: a lo ancho, debajo de ENTRADA y SALIDA */
+  .cap.inc{grid-column:1/-1;min-height:70px;flex-direction:row;gap:12px;background:linear-gradient(160deg,#f08c00,#b45309)}
+  .cap.inc svg{width:30px;height:30px}
+  .cap.inc .t{display:flex;flex-direction:column;align-items:flex-start;text-align:left}
+  .badge.incidencia{background:#FDEBD3;color:#9A4A00}
+  .banda-inc{display:flex;gap:10px;align-items:center;width:100%;text-align:left;border:0;cursor:pointer;font-family:inherit;
+    background:#b45309;color:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:14px;line-height:1.4;box-shadow:0 4px 14px rgba(180,83,9,.35)}
+  .banda-inc svg{width:28px;height:28px;flex-shrink:0}
+  .banda-inc small{display:block;opacity:.85;font-size:12px}
+  .hecho.incidencia{background:#b45309}
+  .hecho .t-inc{font-size:19px;font-weight:800;margin-top:6px;background:rgba(0,0,0,.18);border-radius:10px;padding:4px 12px}
+  /* Ventana para reportar */
+  .inc-quien{display:flex;gap:12px;align-items:flex-start;margin-bottom:6px}
+  .inc-quien img{width:84px;height:112px;object-fit:cover;border-radius:10px;border:1px solid var(--borde);background:#e8edf4;flex-shrink:0}
+  .inc-quien .campos{flex:1;min-width:0}
+  .inc-quien .campo{margin-bottom:8px}
+  .inc-tipos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 10px}
+  .inc-tipos button{border:2px solid var(--borde);background:#fff;border-radius:12px;padding:12px 8px;font-size:14px;font-weight:800;color:var(--texto);
+    cursor:pointer;font-family:inherit;min-height:56px;line-height:1.2}
+  .inc-tipos button[aria-pressed=true]{border-color:#b45309;background:#FDEBD3;color:#7A3A00}
+  .btn.naranja{background:#b45309;color:#fff}
+  .btn.naranja:disabled{opacity:.55;cursor:default}
+  /* Tarjeta de incidencias del turno */
+  #tarjeta-inc{border:2px solid #F5C58A}
+  #tarjeta-inc h2{color:#9A4A00;display:flex;align-items:center;gap:8px}
+  #tarjeta-inc h2 em{font-style:normal;background:#b45309;color:#fff;border-radius:999px;font-size:12px;padding:2px 9px}
+  .reg .det{font-size:13px;color:var(--texto);margin-top:3px;overflow-wrap:anywhere}
+  .per-inc{margin-top:12px}
+  .per-inc h3{font-size:13.5px;font-weight:800;color:#9A4A00;margin-bottom:6px}
+  .per-inc li{list-style:none;border-left:4px solid #f08c00;background:#FFF7EC;border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:13px;line-height:1.45}
   .aviso-dia{font-size:13px;color:var(--ambar);background:var(--ambar-light);border-radius:10px;padding:10px 12px;margin-bottom:12px}
 
   /* Totales */
@@ -243,6 +273,9 @@
 
 <main>
   <div class="banda" id="banda-punto" hidden role="alert"></div>
+  <button type="button" class="banda-inc" id="banda-inc" hidden role="alert">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+    <span><b id="banda-inc-txt"></b><small>Toca para verla</small></span></button>
   <div class="banda" id="banda-sesion" hidden>
     <b>Tu sesión venció.</b> Lo capturado sigue guardado en este equipo y se enviará en cuanto vuelvas a entrar.
     <br><a class="btn prim" href="login.html?volver=accesos.html">Iniciar sesión</a>
@@ -284,6 +317,9 @@
       <button class="cap sal" type="button" data-tipo="salida">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         <b>SALIDA</b><span id="lbl-sal">Foto de la identificación</span></button>
+      <button class="cap inc" type="button" data-tipo="incidencia">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        <span class="t"><b>INCIDENCIA</b><span id="lbl-inc">Alcoholímetro, mala conducta o un problema con la persona</span></span></button>
     </div>
   </div>
   <input type="file" id="archivo" accept="image/*" capture="environment" hidden>
@@ -294,6 +330,11 @@
     <button type="button" class="flecha" id="t-sig" aria-label="Turno siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
   </div>
   <div id="totales"></div>
+
+  <div class="tarjeta" id="tarjeta-inc" hidden>
+    <h2 id="tit-inc">Incidencias</h2>
+    <ul class="lista" id="lista-inc"></ul>
+  </div>
 
   <div class="tarjeta" id="tarjeta-lista">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -372,6 +413,34 @@
   </div>
 </div>
 
+<!-- Reportar una incidencia (botón INCIDENCIA) -->
+<div class="fondo" id="v-inc" hidden>
+  <div class="ventana" role="dialog" aria-modal="true" aria-labelledby="inc-tit">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="badge incidencia">INCIDENCIA</span><b id="inc-tit" style="font-size:15px"></b></div>
+    <div class="inc-quien">
+      <img id="inc-img" alt="Foto de la credencial" hidden>
+      <div class="campos">
+        <div class="campo"><label for="inc-id">ID de la credencial</label><input type="text" id="inc-id" inputmode="numeric" maxlength="32" autocomplete="off" placeholder="Ej. 00287"></div>
+        <div class="campo"><label for="inc-nombre">Nombre</label><input type="text" id="inc-nombre" maxlength="150" autocomplete="off" placeholder="Si no trae credencial"></div>
+      </div>
+    </div>
+    <span class="lbl" style="font-size:12.5px;font-weight:700;color:var(--texto-sub)">¿Qué pasó?</span>
+    <div class="inc-tipos" id="inc-tipos" role="radiogroup" aria-label="Tipo de incidencia">
+      <button type="button" data-v="ALCOHOLIMETRO" aria-pressed="false">Alcoholímetro positivo</button>
+      <button type="button" data-v="CONDUCTA" aria-pressed="false">Mala conducta</button>
+      <button type="button" data-v="PERSONA" aria-pressed="false">Problema con la persona</button>
+      <button type="button" data-v="OTRO" aria-pressed="false">Otro</button>
+    </div>
+    <div class="campo"><label for="inc-detalle" id="inc-detalle-lbl">Qué pasó (opcional)</label>
+      <textarea id="inc-detalle" maxlength="500" placeholder="Ej. Se negó a la prueba, llegó con aliento alcohólico, se le negó el acceso…"></textarea></div>
+    <p class="nota mal" id="inc-err" hidden></p>
+    <div class="botones">
+      <button class="btn sec" type="button" id="inc-cancelar">Cancelar</button>
+      <button class="btn naranja" type="button" id="inc-guardar">Guardar incidencia</button>
+    </div>
+  </div>
+</div>
+
 <!-- Foto en grande -->
 <div class="fondo" id="v-foto" hidden><div class="ventana" style="max-width:760px;padding:10px">
   <img class="grande-img" id="foto-grande" alt="Identificación"><div id="foto-pie" style="font-size:13px;color:var(--texto-sub);margin-top:8px;text-align:center"></div>
@@ -383,6 +452,7 @@
     <div class="per-cab"><span class="id-azul" id="per-id"></span><div><b id="per-nombre"></b><span id="per-estado"></span></div></div>
     <p class="ayuda" id="per-sub" style="font-size:12.5px;color:var(--texto-sub)"></p>
     <ul class="movs" id="per-movs"></ul>
+    <div class="per-inc" id="per-inc" hidden></div>
     <div class="botones">
       <button class="btn rojo" type="button" id="per-salida" hidden>Dar salida ahora</button>
       <button class="btn sec" type="button" id="per-cerrar">Cerrar</button>
@@ -569,6 +639,9 @@
     return r.json();
   }
   function sesionVencida() { $('banda-sesion').hidden = false; }
+  var TIPOS_INC = { ALCOHOLIMETRO: 'Alcoholímetro positivo', CONDUCTA: 'Mala conducta', PERSONA: 'Problema con la persona', OTRO: 'Otro' };
+  function esInc(x) { return x && x.clase === 'incidencia'; }
+  function urlFotoInc(id, mini) { return 'descargar.php?tipo=incidencia_foto&id=' + encodeURIComponent(id) + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(token()); }
   function urlFoto(id, mini) { return 'descargar.php?tipo=acceso_foto&id=' + encodeURIComponent(id) + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(token()); }
 
   /* ══ Cola en el equipo ═══════════════════════════════════════════════
@@ -632,7 +705,11 @@
     if (it.codigo) { fd.append('codigo', it.codigo); fd.append('persona', it.persona || ''); fd.append('origen', it.origen || 'tarjeta'); }
     fd.append('dispositivo', EQUIPO.id); fd.append('dispositivo_desc', EQUIPO.desc);
     if (it.datos) fd.append('foto', new Blob([it.datos], { type: it.mime || 'image/jpeg' }), it.uid + '.jpg');
-    fd.append('action', 'ACCESO_REGISTRAR'); fd.append('token', token());
+    if (esInc(it)) {                               // botón INCIDENCIA: misma cola, su propia acción
+      fd.append('incidencia', it.incidencia); fd.append('detalle', it.detalle || '');
+      if (!it.codigo) fd.append('persona', it.persona || '');
+    }
+    fd.append('action', esInc(it) ? 'ACCESO_INCIDENCIA' : 'ACCESO_REGISTRAR'); fd.append('token', token());
     return fd;
   }
   /* Envía uno. Devuelve 'ok' | 'red' (reintentar después) | 'sesion' | 'rechazo' */
@@ -670,7 +747,7 @@
                 }
                 hubo++;
                 enviados[it.uid] = ya[it.uid];
-                recienEnviados.push(resumen(it, ya[it.uid]));
+                if (!esInc(it)) recienEnviados.push(resumen(it, ya[it.uid]));
                 recienEnviados = recienEnviados.slice(-50);
                 return quitarDeCola(it.uid).then(function () { return true; });
               }, function () { return false; });                             // sin confirmar: se queda y se reintenta (no duplica)
@@ -727,14 +804,15 @@
       if (cola.some(function (x) { return x.uid === it.uid; })) { quitarDeCola(it.uid).then(pintarLista); toast('Registro descartado.'); return; }
       var id = enviados[it.uid];
       if (!id) { toast('Ya no se puede deshacer desde aquí: búscalo en la lista.', true); return; }
-      api('ACCESO_ELIMINAR', { id: id }).then(function (r) { toast(r.message || 'Eliminado.'); cargar(true); });
+      api(esInc(it) ? 'INCIDENCIA_ELIMINAR' : 'ACCESO_ELIMINAR', { id: id }).then(function (r) { toast(r.message || 'Eliminado.'); cargar(true); });
     };
-    var txt = (it.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + it.capturado.slice(11, 16) + ' guardada' + (it.persona ? ': ' + it.persona : '');
+    var txt = esInc(it) ? 'Incidencia ' + it.capturado.slice(11, 16) + ' guardada (' + TIPOS_INC[it.incidencia] + ')'
+            : (it.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + it.capturado.slice(11, 16) + ' guardada' + (it.persona ? ': ' + it.persona : '');
     it.cuenta = cuentaActual();
     if (sinCola) {                                 // sin almacenamiento local: se envía y se espera
       return enviarUno(it).then(function (r) {
         enviando = null;
-        if (r === 'ok') { recienEnviados.push(resumen(it, enviados[it.uid])); toast(txt + '.', false, deshacer); cargar(true); }
+        if (r === 'ok') { if (!esInc(it)) recienEnviados.push(resumen(it, enviados[it.uid])); toast(txt + '.', false, deshacer); cargar(true); }
         else toast(r === 'sesion' ? 'Tu sesión venció.' : r === 'bloqueo' ? 'No se guardó: ' + $('banda-punto').textContent
                  : (it.error || 'Sin conexión: no se guardó. Inténtalo de nuevo.'), true);
       });
@@ -752,12 +830,17 @@
     leyendoTarjeta = true;
     var o = {};
     for (var k in REGLAS_TARJETA) o[k] = REGLAS_TARJETA[k];
-    o.titulo = (tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + ' · ' + normaLugar($('lugar').value);
+    o.titulo = (tipo === 'entrada' ? 'ENTRADA' : tipo === 'salida' ? 'SALIDA' : 'INCIDENCIA') + ' · ' + normaLugar($('lugar').value);
     o.subtitulo = 'Acomoda la credencial dentro del recuadro, sin reflejos. Se lee en este teléfono, sin internet.';
     o.simular = false;
     LECTOR.leer(o).then(function (r) {
       leyendoTarjeta = false;
-      if (!r || r.cancelado) { if (r && r.error) toast(r.error, true); return; }
+      if (!r || r.cancelado) {
+        if (r && r.error) toast(r.error, true);
+        // Incidencia de alguien sin credencial: se reporta igual, con su nombre escrito a mano
+        else if (tipo === 'incidencia') abrirIncidencia({});
+        return;
+      }
       registrarTarjeta(tipo, r);
     }, function (e) {
       leyendoTarjeta = false;
@@ -765,6 +848,11 @@
     });
   }
   function registrarTarjeta(tipo, r) {
+    if (tipo === 'incidencia') {                   // primero se dice qué pasó; luego se guarda
+      var f = fotoDeLectura(r);
+      abrirIncidencia({ codigo: r.codigo, persona: r.nombre, origen: r.manual ? 'manual' : 'tarjeta', blob: f });
+      return;
+    }
     var codigo = String(r.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
     if (!codigo) { toast('No se leyó el ID de la credencial. Inténtalo de nuevo o escríbelo.', true); return; }
     var capturado = ahoraLocal();
@@ -795,17 +883,159 @@
   }
   var tHecho = null;
   function mostrarHecho(it) {
-    var el = $('hecho'), ent = it.tipo === 'entrada';
+    var el = $('hecho'), ent = it.tipo === 'entrada', inc = esInc(it);
     el.className = 'hecho ' + it.tipo;
     el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' +
-      '<b>' + (ent ? 'ENTRADA' : 'SALIDA') + ' REGISTRADA</b><div class="n">' + esc(it.persona || 'Nombre no leído') + '</div>' +
-      '<div class="c">ID ' + esc(it.codigo) + ' · ' + esc(it.capturado.slice(11, 16)) + '</div>' +
+      '<b>' + (inc ? 'INCIDENCIA' : ent ? 'ENTRADA' : 'SALIDA') + ' REGISTRADA</b>' + (inc ? '<div class="t-inc">' + esc(TIPOS_INC[it.incidencia]) + '</div>' : '') +
+      '<div class="n">' + esc(it.persona || (inc && !it.codigo ? 'Sin credencial' : 'Nombre no leído')) + '</div>' +
+      '<div class="c">' + (it.codigo ? 'ID ' + esc(it.codigo) + ' · ' : '') + esc(it.capturado.slice(11, 16)) + '</div>' +
       (it.mini ? '<img class="foto" alt="Foto de la credencial" src="' + esc(it.mini) + '"><div class="ev">Foto guardada como evidencia</div>' : '');
     el.hidden = false;
     if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
     clearTimeout(tHecho); tHecho = setTimeout(function () { el.hidden = true; }, 1500);
   }
   $('hecho').onclick = function () { clearTimeout(tHecho); $('hecho').hidden = true; };
+
+  /* ══ Incidencias (botón INCIDENCIA) ══════════════════════════════════
+     Se lee la credencial como en una entrada (ID, nombre y foto de evidencia)
+     y en esta ventana el guardia dice qué pasó. Se guarda en la misma cola
+     (sin señal se envía después) y no cuenta como entrada ni salida. */
+  var incActual = null;
+  function abrirIncidencia(d) {
+    incActual = { blob: d.blob || null, mini: d.mini || '', capturado: d.capturado || ahoraLocal(), origen: d.origen || 'manual' };
+    $('inc-tit').textContent = incActual.capturado.slice(11, 16) + ' · ' + nombrePunto(normaLugar($('lugar').value));
+    $('inc-id').value = String(d.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
+    $('inc-nombre').value = String(d.persona || '').replace(/\s+/g, ' ').trim().slice(0, 150);
+    $('inc-detalle').value = ''; $('inc-err').hidden = true;
+    $('inc-tipos').querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+    $('inc-detalle-lbl').textContent = 'Qué pasó (opcional)';
+    var img = $('inc-img');
+    if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); delete img.dataset.url; }
+    if (incActual.blob) { img.dataset.url = URL.createObjectURL(incActual.blob); img.src = img.dataset.url; img.hidden = false; }
+    else if (incActual.mini) { img.src = incActual.mini; img.hidden = false; }
+    else { img.removeAttribute('src'); img.hidden = true; }
+    $('inc-guardar').disabled = false;
+    $('v-inc').hidden = false;
+    if (navigator.vibrate) try { navigator.vibrate([60, 60, 60]); } catch (e) {}
+  }
+  function tipoInc() { var b = $('inc-tipos').querySelector('button[aria-pressed=true]'); return b ? b.dataset.v : ''; }
+  $('inc-tipos').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    $('inc-tipos').querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    $('inc-detalle-lbl').textContent = b.dataset.v === 'OTRO' ? 'Qué pasó (obligatorio)' : 'Qué pasó (opcional)';
+    $('inc-err').hidden = true;
+  });
+  function errorInc(m) { $('inc-err').textContent = m; $('inc-err').hidden = false; }
+  $('inc-cancelar').onclick = function () {
+    if (!confirm('¿Descartar esta incidencia sin guardarla?')) return;
+    $('v-inc').hidden = true; incActual = null;
+  };
+  $('inc-guardar').onclick = function () {
+    if (!incActual) return;
+    var tipo = tipoInc(), detalle = $('inc-detalle').value.trim();
+    var codigo = $('inc-id').value.replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
+    var persona = $('inc-nombre').value.replace(/\s+/g, ' ').trim().slice(0, 150);
+    if (!codigo && !persona && !incActual.blob) { errorInc('Falta saber quién es: escribe su ID o su nombre.'); $('inc-id').focus(); return; }
+    if (!tipo) { errorInc('Elige qué pasó.'); return; }
+    if (tipo === 'OTRO' && !detalle) { errorInc('Describe qué pasó.'); $('inc-detalle').focus(); return; }
+    $('inc-guardar').disabled = true;
+    var cap = incActual.capturado;
+    var it = { uid: nuevoUid(), clase: 'incidencia', tipo: 'incidencia', incidencia: tipo, detalle: detalle, capturado: cap,
+               turno: turnoReloj(cap), lugar: normaLugar($('lugar').value), nota: '', mini: incActual.mini || '',
+               codigo: codigo, persona: persona, origen: codigo ? incActual.origen : 'manual', creado: Date.now() };
+    var b = incActual.blob;
+    var listo = !b ? Promise.resolve() : (it.mini ? Promise.resolve() : canvasDeArchivo(b).then(function (c) { it.mini = miniatura(c); }))
+      .then(function () { return b.arrayBuffer(); }).then(function (ab) { it.datos = ab; it.mime = 'image/jpeg'; })
+      .catch(function () { delete it.datos; });    // sin la foto, la incidencia se guarda igual
+    listo.then(function () {
+      $('v-inc').hidden = true; incActual = null;
+      mostrarHecho(it);
+      return guardarRegistro(it);
+    }).catch(function (e) { $('inc-guardar').disabled = false; errorInc('No se pudo guardar: ' + (e.message || e)); });
+  };
+  /* El turno de una incidencia es el del reloj (como ControlAccesos::turnoReloj) */
+  function turnoReloj(cap) {
+    var f = cap.slice(0, 10), m = (+cap.slice(11, 13)) * 60 + (+cap.slice(14, 16));
+    if (m >= CAMBIO_DIA && m < CAMBIO_NOCHE) return f + '-D';
+    if (m >= CAMBIO_NOCHE) return f + '-N';
+    return sumarDias(f, -1) + '-N';
+  }
+  /* Tarjeta «Incidencias» de los turnos a la vista: lo que está en cola y lo del servidor */
+  function filaInc(x, pendiente) {
+    var foto = x.mini ? '<img alt="" src="' + esc(x.mini) + '">'
+             : (x.con_foto ? '<img loading="lazy" alt="" data-inc="' + x.id + '" src="' + esc(urlFotoInc(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">' : '');
+    var estado = pendiente ? (x.error ? ' <span class="badge rech">No se aceptó</span>' : enviando === x.uid ? ' <span class="badge pend">Enviando…</span>' : ' <span class="badge cola">En cola</span>') : '';
+    var id = !x.codigo ? '' : CASETA ? ' · <span>' + esc(x.codigo) + '</span>'
+           : ' · <button type="button" class="ver-id" data-persona="' + esc(x.codigo) + '" title="Ver sus entradas, salidas e incidencias">' + esc(x.codigo) + '</button>';
+    var nombreTipo = x.tipo_nombre || TIPOS_INC[x.incidencia] || 'Incidencia';
+    return '<li class="reg">' + (foto || '<div class="tarj">' + 'Sin foto' + '</div>') +
+      '<div class="info"><div class="l1"><span class="badge incidencia">' + esc(nombreTipo.toUpperCase()) + '</span>' + esc((x.capturado || '').slice(11, 19)) + estado + '</div>' +
+      '<div class="persona' + (x.persona ? '' : ' sin') + '">' + esc(x.persona || (x.codigo ? 'Nombre no leído' : 'Sin credencial')) + id + '</div>' +
+      (x.detalle ? '<div class="det">' + esc(x.detalle) + '</div>' : '') +
+      '<div class="l2">' + esc(nombrePunto(x.lugar)) + (x.nombre ? ' · ' + esc(x.nombre) : '') + (x.error ? '<br><span style="color:var(--rojo)">' + esc(x.error) + '</span>' : '') + '</div>' +
+      (pendiente && x.error ? '<div class="mini-acc"><button type="button" data-reintentar="' + esc(x.uid) + '">Reintentar</button><button type="button" data-descartar="' + esc(x.uid) + '">Descartar</button></div>' : '') +
+      '</div>' +
+      (!pendiente && x.puede_borrar ? '<button class="borrar" type="button" data-borrar-inc="' + x.id + '" aria-label="Eliminar incidencia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>' : '') +
+      '</li>';
+  }
+  function pintarIncidencias() {
+    var ks = turnosVista();
+    var pend = cola.filter(function (x) { return esInc(x) && (x.error || ks.indexOf(x.turno) >= 0); });
+    var srv = (datos.incidencias || []).filter(function (x) { return !pend.some(function (p) { return p.uid === x.uid; }); });
+    var n = pend.length + srv.length;
+    $('tarjeta-inc').hidden = !n || modoPlanta;
+    $('tit-inc').innerHTML = (CASETA ? 'Tus incidencias' : 'Incidencias') + (ks.length > 1 ? ' de los dos turnos' : ' del turno') + ' <em>' + n + '</em>';
+    $('lista-inc').innerHTML = pend.slice().reverse().map(function (x) { return filaInc(x, true); }).join('') +
+                               srv.map(function (x) { return filaInc(x, false); }).join('');
+  }
+  /* Administración: aviso cuando llega una incidencia nueva (la lista se actualiza cada 30 s) */
+  var incVistas = null;
+  function avisarIncidenciasNuevas(lista) {
+    if (CASETA) return;
+    var nuevas = [];
+    if (incVistas) lista.forEach(function (x) { if (!incVistas[x.uid]) nuevas.push(x); });
+    incVistas = incVistas || {};
+    lista.forEach(function (x) { incVistas[x.uid] = 1; });
+    if (!nuevas.length) return;
+    // Franja fija arriba: se queda hasta que la tocan (no se pierde como un aviso de 3 segundos)
+    var x = nuevas[0];
+    $('banda-inc-txt').textContent = (nuevas.length > 1 ? nuevas.length + ' incidencias nuevas. La última: ' : 'Nueva incidencia: ') +
+      (x.tipo_nombre || '') + ' · ' + (x.persona || (x.codigo ? 'ID ' + x.codigo : 'sin credencial')) + ' · ' + nombrePunto(x.lugar) + ' · ' + (x.capturado || '').slice(11, 16);
+    $('banda-inc').hidden = false;
+    if (navigator.vibrate) try { navigator.vibrate([200, 100, 200]); } catch (e) {}
+  }
+  $('banda-inc').onclick = function () {
+    $('banda-inc').hidden = true;
+    if (modoPlanta) document.querySelector('#filtro [data-v="todos"]').click();
+    $('tarjeta-inc').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  $('lista-inc').addEventListener('click', function (ev) {
+    var t;
+    if ((t = ev.target.closest('[data-persona]'))) { abrirPersona(t.dataset.persona); return; }
+    if ((t = ev.target.closest('[data-reintentar]'))) {
+      var it = cola.filter(function (x) { return x.uid === t.dataset.reintentar; })[0];
+      if (it) { delete it.error; ponerEnCola(it).then(function () { espera = 0; enviarCola(); }); }
+      return;
+    }
+    if ((t = ev.target.closest('[data-descartar]'))) {
+      if (confirm('¿Descartar esta incidencia? Su foto se borra de este equipo.')) quitarDeCola(t.dataset.descartar).then(pintarLista);
+      return;
+    }
+    if ((t = ev.target.closest('[data-borrar-inc]'))) {
+      if (!enLinea()) { toast('Para eliminar se necesita señal.', true); return; }
+      if (!confirm('¿Eliminar esta incidencia y su foto?')) return;
+      api('INCIDENCIA_ELIMINAR', { id: +t.dataset.borrarInc }).then(function (r) {
+        if (r.status !== 'success') throw new Error(r.message); toast(r.message); cargar(true);
+      }).catch(function (e) { toast(e.message || 'No se pudo eliminar.', true); });
+      return;
+    }
+    if ((t = ev.target.closest('img[data-inc]'))) {
+      var x = (datos.incidencias || []).filter(function (r) { return String(r.id) === t.dataset.inc; })[0] || {};
+      $('foto-grande').src = urlFotoInc(t.dataset.inc, false);
+      $('foto-pie').textContent = 'INCIDENCIA · ' + (x.tipo_nombre || '') + ' · ' + (x.hora || '') + ' · ' + nombrePunto(x.lugar || '');
+      $('v-foto').hidden = false;
+    }
+  });
 
   /* ── Punto de control y turno ── */
   var PUNTOS_FIJOS = ['PUNTO DE CONTROL 1', 'PUNTO DE CONTROL 2', 'PUNTO DE CONTROL 3', 'PUNTO DE CONTROL 4'];
@@ -963,7 +1193,8 @@
       destello();
       var cuando = ahoraLocal();
       aBlob(c, 0.8).then(function (b) {
-        if ($('revisar').checked) mostrarPrevia(b, miniatura(c), cuando, false);
+        if (tipo === 'incidencia') abrirIncidencia({ blob: b, mini: miniatura(c), capturado: cuando });
+        else if ($('revisar').checked) mostrarPrevia(b, miniatura(c), cuando, false);
         else registrar(tipo, b, miniatura(c), cuando, '');
       }).catch(function (e) { toast(e.message, true); });
       return;
@@ -980,7 +1211,10 @@
   function desArchivo(blob) {
     var cuando = ahoraLocal();
     return canvasDeArchivo(blob).then(function (c) {
-      return aBlob(c, 0.8).then(function (b) { mostrarPrevia(b, miniatura(c), cuando, true); });
+      return aBlob(c, 0.8).then(function (b) {
+        if (tipoActual === 'incidencia') abrirIncidencia({ blob: b, mini: miniatura(c), capturado: cuando });
+        else mostrarPrevia(b, miniatura(c), cuando, true);
+      });
     }).catch(function (e) { toast(e.message, true); });
   }
   $('archivo').addEventListener('change', function () { var f = $('archivo').files[0]; if (f) desArchivo(f); });
@@ -1037,7 +1271,9 @@
         if (r.punto !== $('lugar').value) fijarPunto(r.punto);
         if (bloqueado) { bloquear(''); enviarCola(); }
       }
-      datos = { registros: previos.concat(r.registros || []), totales: r.totales || {}, mas: !!r.mas };
+      datos = { registros: previos.concat(r.registros || []), totales: r.totales || {}, mas: !!r.mas,
+                incidencias: reset ? (r.incidencias || []) : (datos.incidencias || []) };
+      if (reset && !vista) avisarIncidenciasNuevas(datos.incidencias);
       errLista = '';
       pintarLista();
     }).catch(function (e) {
@@ -1053,7 +1289,7 @@
     return ks.indexOf(x.turno) >= 0 && (!solo || x.lugar === l);
   }
   function enColaVisible() {
-    return cola.filter(function (x) { return x.error || visible(x); });     // lo rechazado siempre a la vista
+    return cola.filter(function (x) { return !esInc(x) && (x.error || visible(x)); });     // lo rechazado siempre a la vista
   }
   function enviadosSinListar() {
     var enLista = {}; (datos.registros || []).forEach(function (x) { enLista[x.uid] = 1; });
@@ -1113,6 +1349,7 @@
     }).join('');
     $('lista').innerHTML = html || '<li class="vacio">Sin registros' + (filtro !== 'todos' ? ' de este tipo' : '') + ' en ' + (ks.length > 1 ? 'estos turnos' : 'este turno') + '.</li>';
     $('btn-mas').hidden = !datos.mas;
+    pintarIncidencias();
   }
   $('lista').addEventListener('click', function (ev) {
     var t;
@@ -1154,7 +1391,7 @@
   if (!CASETA) $('f-planta').hidden = false;
   function entrarPlanta() {
     modoPlanta = true;
-    ['nav-turno', 'totales', 'btn-mas', 'aviso-dia'].forEach(function (id) { $(id).hidden = true; });
+    ['nav-turno', 'totales', 'btn-mas', 'aviso-dia', 'tarjeta-inc'].forEach(function (id) { $(id).hidden = true; });
     $('planta-cab').hidden = false;
     $('tit-lista').textContent = 'En planta ahora';
     pintarPlanta(); cargarPlanta();
@@ -1262,7 +1499,7 @@
     personaAbierta = String(id);
     $('per-id').textContent = id; $('per-nombre').textContent = 'Buscando…';
     $('per-estado').textContent = ''; $('per-estado').className = '';
-    $('per-sub').textContent = ''; $('per-movs').innerHTML = ''; $('per-salida').hidden = true;
+    $('per-sub').textContent = ''; $('per-movs').innerHTML = ''; $('per-salida').hidden = true; $('per-inc').hidden = true;
     $('v-persona').hidden = false;
     api('ACCESOS_PERSONA', { id: id }, 'GET').then(function (r) {
       if (personaAbierta !== String(id)) return;
@@ -1282,6 +1519,16 @@
           fotosMov(m) + '</li>';
       }).join('');
       $('per-salida').hidden = !(r.en_planta && ES_GESTOR);
+      var inc = r.incidencias || [];
+      $('per-inc').hidden = !inc.length;
+      $('per-inc').innerHTML = inc.length ? '<h3>Incidencias (' + inc.length + ')</h3><ul>' + inc.map(function (x) {
+        return '<li><span class="badge incidencia">' + esc(x.tipo_nombre.toUpperCase()) + '</span> ' + esc(cuando(x.capturado)) + ' · ' + esc(nombrePunto(x.lugar)) +
+          (x.detalle ? '<br>' + esc(x.detalle) : '') + '<br><small style="color:var(--texto-sub)">Reportó: ' + esc(x.nombre) + '</small>' +
+          (x.con_foto ? '<div class="mov-fotos"><figure><img loading="lazy" alt="Foto de la credencial (incidencia)" data-foto-inc="' + x.id + '" data-pie="' +
+            esc('INCIDENCIA · ' + x.tipo_nombre + ' · ' + cuando(x.capturado)) + '" src="' + esc(urlFotoInc(x.id, true)) + '" onerror="this.parentNode.remove()"></figure></div>' : '') +
+          '</li>';
+      }).join('') + '</ul>' : '';
+      if (!r.registros && inc.length) $('per-sub').textContent = 'Sin entradas ni salidas en los últimos ' + r.dias + ' días; tiene incidencias.';
     }).catch(function (e) {
       if (personaAbierta !== String(id)) return;
       $('per-nombre').textContent = 'No se pudo consultar'; $('per-sub').textContent = (e && e.message) || '';
@@ -1301,6 +1548,13 @@
     var t = ev.target.closest('img[data-foto]');
     if (!t) return;
     $('foto-grande').src = urlFoto(t.dataset.foto, false);
+    $('foto-pie').textContent = ($('per-id').textContent ? 'ID ' + $('per-id').textContent + ' · ' : '') + t.dataset.pie;
+    $('v-foto').hidden = false;
+  });
+  $('per-inc').addEventListener('click', function (ev) {
+    var t = ev.target.closest('img[data-foto-inc]');
+    if (!t) return;
+    $('foto-grande').src = urlFotoInc(t.dataset.fotoInc, false);
     $('foto-pie').textContent = ($('per-id').textContent ? 'ID ' + $('per-id').textContent + ' · ' : '') + t.dataset.pie;
     $('v-foto').hidden = false;
   });

@@ -31,6 +31,8 @@ Las capturas y PDF que dejan las pruebas (`*.png`, `*.pdf`) están en `.gitignor
 | `php/en_planta.php` | ID como llave (00316 = 316), «En planta» (quien ya salió por cualquier punto no aparece; más de 13 h se marca), movimientos de un ID, dar salida, reglas del lector. |
 | `php/nombre_pdf.php` | El nombre del PDF: una lectura parcial cuenta a favor del nombre completo. |
 | `pantalla/api_plataforma_test.mjs` | Instalación (sólo con base vacía y con la clave), inicio de sesión, espera tras 5 fallos, cerrar sesión, cuentas (alta, validaciones, perfil, contraseña, desactivar), los tres perfiles (ADMIN, PLANTA, ACCESOS) y `descargar.php` sin sesión. |
+| `pantalla/api_incidencias_test.mjs` | Incidencias por la API: validaciones, con foto, sin credencial, reenvío sin duplicar, la cola las confirma, listas por perfil y por punto, no mueven contadores ni «En planta», historial por ID, fotos con permiso, quién puede borrar. |
+| `pantalla/incidencias_pantalla_test.js` | Botón INCIDENCIA: lector → ventana «¿Qué pasó?» con ID, nombre y foto; sin señal queda en cola y sale al volver; sin credencial; franja de aviso a Administración; historial de la persona; en el navegador sin la app. |
 | `pantalla/api_puntos_test.mjs` | API de puntos de control: cuenta sin punto, un solo equipo por punto, liberar, mover la cuenta de punto. |
 | `pantalla/sesion_pantalla_test.js` | Pantallas: crear la primera cuenta, inicio por perfil, cuentas, cuenta regresiva, planta sin «Cuentas», el guardia directo a registrar, «Salir», claves `ca_` y que la sesión del Sistema de Gestión (`avba_session`) no se toca. |
 | `pantalla/puntos_pantalla_test.js` | La caseta entra a su punto y ve su avance; otro equipo queda bloqueado; Administración libera y asigna. |
