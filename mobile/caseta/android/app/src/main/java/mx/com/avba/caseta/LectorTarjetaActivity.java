@@ -3,6 +3,7 @@ package mx.com.avba.caseta;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -81,23 +82,37 @@ import java.util.concurrent.TimeUnit;
  * cuando se lee igual en varias imágenes seguidas.
  *
  * Regresa a la app: codigo, nombre, texto (lo que se leyó), manual (si se
- * escribió a mano), simulado (botón de la demo) y ms (tiempo de lectura).
+ * escribió a mano), simulado (botón de la demo), ms (tiempo de lectura) y
+ * camara (la que se usó: frontal o trasera).
+ *
+ * Cámara: la regla «camara» del servidor dice con cuál empieza (frontal o
+ * trasera). El botón «Cambiar cámara» pasa a la otra y este teléfono la
+ * recuerda mientras la regla del servidor no cambie.
  */
 public class LectorTarjetaActivity extends AppCompatActivity {
 
     public static final String EXTRA_TITULO = "titulo", EXTRA_SUBTITULO = "subtitulo", EXTRA_SIMULAR = "simular",
             EXTRA_MIN = "minDigitos", EXTRA_MAX = "maxDigitos", EXTRA_LONGITUD = "longitud", EXTRA_PATRON = "patron",
             EXTRA_CLAVES = "claves", EXTRA_NO_NOMBRE = "noNombre", EXTRA_NO_CODIGO = "noCodigo", EXTRA_CONFIRMAR = "confirmar",
-            EXTRA_VERTICAL = "vertical", EXTRA_FOTO = "foto";
+            EXTRA_VERTICAL = "vertical", EXTRA_FOTO = "foto", EXTRA_CAMARA = "camara";
 
     private static final int VERDE = Color.rgb(76, 175, 80), AMARILLO = Color.rgb(255, 202, 40), BLANCO = Color.WHITE;
 
     private PreviewView vista;
     private Marco marco;
     private TextView tEstado, tTexto;
-    private Button bLinterna;
+    private Button bLinterna, bCambiar;
     private Camera camara;
     private boolean linterna = false;
+
+    /* Cámara frontal o trasera. La pedida es la regla del servidor; la elegida, la que el guardia
+       dejó con «Cambiar cámara» en este teléfono (vale mientras la regla no cambie). */
+    private ProcessCameraProvider proveedor;
+    private Preview preview;
+    private ImageAnalysis analisis;
+    private boolean frontal = false;
+    private String camaraPedida = "trasera";
+    private static final String PREFS = "ca_lector", PREF_PEDIDA = "camara_pedida", PREF_ELEGIDA = "camara_elegida";
     private ExecutorService hilo;
     private TextRecognizer lector;
     private final AnalizadorTarjeta.Reglas reglas = new AnalizadorTarjeta.Reglas();
@@ -152,6 +167,10 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         String[] noCodigo = i.getStringArrayExtra(EXTRA_NO_CODIGO);
         if (noCodigo != null && noCodigo.length > 0) reglas.noCodigo.addAll(AnalizadorTarjeta.Reglas.conjunto(noCodigo));
         conFoto = i.getBooleanExtra(EXTRA_FOTO, true);
+        camaraPedida = "frontal".equalsIgnoreCase(i.getStringExtra(EXTRA_CAMARA)) ? "frontal" : "trasera";
+        SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String elegida = camaraPedida.equals(sp.getString(PREF_PEDIDA, "")) ? sp.getString(PREF_ELEGIDA, camaraPedida) : camaraPedida;
+        frontal = "frontal".equals(elegida);
         int confirmar = Math.max(1, Math.min(6, i.getIntExtra(EXTRA_CONFIRMAR, 3)));
         estab = new AnalizadorTarjeta.Estabilizador(confirmar, Math.max(6, confirmar * 2));
     }
@@ -170,11 +189,14 @@ public class LectorTarjetaActivity extends AppCompatActivity {
 
         marco = new Marco(this);
         marco.vertical = getIntent().getBooleanExtra(EXTRA_VERTICAL, true);     // la credencial de acceso va de pie
+        marco.frontal = frontal;
         raiz.addView(marco, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         marco.setOnTouchListener((v, ev) -> {                       // tocar para enfocar
             if (ev.getAction() == MotionEvent.ACTION_UP && camara != null) {
-                MeteringPoint p = vista.getMeteringPointFactory().createPoint(ev.getX(), ev.getY());
-                camara.getCameraControl().startFocusAndMetering(new FocusMeteringAction.Builder(p).setAutoCancelDuration(3, TimeUnit.SECONDS).build());
+                try {                                               // la frontal muchas veces no enfoca: se ignora
+                    MeteringPoint p = vista.getMeteringPointFactory().createPoint(ev.getX(), ev.getY());
+                    camara.getCameraControl().startFocusAndMetering(new FocusMeteringAction.Builder(p).setAutoCancelDuration(3, TimeUnit.SECONDS).build());
+                } catch (Exception ignorada) { }
             }
             return true;
         });
@@ -216,9 +238,13 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             camara.getCameraControl().enableTorch(linterna);
             bLinterna.setText(linterna ? "Apagar luz" : "Linterna");
         });
+        bCambiar = boton("Cambiar cámara", Color.argb(60, 255, 255, 255));
+        bCambiar.setVisibility(View.GONE);                          // sólo si el teléfono tiene las dos
+        bCambiar.setOnClickListener(v -> cambiarCamara());
         fila.addView(bCancelar, peso());
         fila.addView(bEscribir, peso());
         fila.addView(bLinterna, peso());
+        fila.addView(bCambiar, peso());
         abajo.addView(fila);
         if (getIntent().getBooleanExtra(EXTRA_SIMULAR, false)) {
             Button bSimular = boton("Simular lectura (demo)", Color.argb(40, 255, 202, 40));
@@ -260,10 +286,14 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         g.setCornerRadius(dp(12));
         b.setBackground(g);
         b.setMinHeight(dp(46));
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setPadding(dp(6), dp(2), dp(6), dp(2));
+        b.setMaxLines(2);
         return b;
     }
     private LinearLayout.LayoutParams peso() {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(46), 1f);
+        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, dp(52), 1f);
         p.setMargins(dp(4), 0, dp(4), 0);
         return p;
     }
@@ -273,24 +303,62 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         ListenableFuture<ProcessCameraProvider> futuro = ProcessCameraProvider.getInstance(this);
         futuro.addListener(() -> {
             try {
-                ProcessCameraProvider proveedor = futuro.get();
-                Preview preview = new Preview.Builder().build();
+                proveedor = futuro.get();
+                preview = new Preview.Builder().build();
                 preview.setSurfaceProvider(vista.getSurfaceProvider());
                 ResolutionSelector resolucion = new ResolutionSelector.Builder()
                         .setResolutionStrategy(new ResolutionStrategy(new Size(1920, 1080), ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER))
                         .build();
-                ImageAnalysis analisis = new ImageAnalysis.Builder()
+                analisis = new ImageAnalysis.Builder()
                         .setResolutionSelector(resolucion)
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build();
                 analisis.setAnalyzer(hilo, this::analizar);
-                proveedor.unbindAll();
-                camara = proveedor.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analisis);
-                if (camara.getCameraInfo().hasFlashUnit()) bLinterna.setVisibility(View.VISIBLE);
+                enlazarCamara();
             } catch (Exception e) {
                 terminarConError("No se pudo abrir la cámara: " + e.getMessage());
             }
         }, ContextCompat.getMainExecutor(this));
+    }
+
+    private boolean hayCamara(CameraSelector s) {
+        try { return proveedor != null && proveedor.hasCamera(s); } catch (Exception e) { return false; }
+    }
+
+    /** Abre la cámara elegida (frontal o trasera); si el teléfono no la tiene, la otra. */
+    private void enlazarCamara() {
+        boolean hayFrontal = hayCamara(CameraSelector.DEFAULT_FRONT_CAMERA), hayTrasera = hayCamara(CameraSelector.DEFAULT_BACK_CAMERA);
+        if (frontal && !hayFrontal) frontal = false;
+        else if (!frontal && !hayTrasera && hayFrontal) frontal = true;
+        bCambiar.setVisibility(hayFrontal && hayTrasera ? View.VISIBLE : View.GONE);
+        if (linterna && camara != null) { try { camara.getCameraControl().enableTorch(false); } catch (Exception ignorada) { } }
+        linterna = false;
+        bLinterna.setText("Linterna");
+        proveedor.unbindAll();
+        camara = proveedor.bindToLifecycle(this, frontal ? CameraSelector.DEFAULT_FRONT_CAMERA : CameraSelector.DEFAULT_BACK_CAMERA, preview, analisis);
+        bLinterna.setVisibility(camara.getCameraInfo().hasFlashUnit() ? View.VISIBLE : View.GONE);   // la frontal no suele tener
+        marco.frontal = frontal;
+        marco.invalidate();
+    }
+
+    /** Botón «Cambiar cámara»: pasa a la otra y este teléfono la recuerda. */
+    private void cambiarCamara() {
+        if (proveedor == null || entregado) return;
+        boolean antes = frontal;
+        frontal = !frontal;
+        try {
+            enlazarCamara();
+        } catch (Exception e) {                                    // si la otra no abre, se queda con la que estaba
+            frontal = antes;
+            try { enlazarCamara(); } catch (Exception e2) { terminarConError("No se pudo abrir la cámara: " + e2.getMessage()); return; }
+        }
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString(PREF_PEDIDA, camaraPedida)
+                .putString(PREF_ELEGIDA, frontal ? "frontal" : "trasera")
+                .apply();
+        tEstado.setText(frontal ? "Cámara frontal: muestra la credencial a la pantalla" : "Cámara trasera");
+        tEstado.setTextColor(BLANCO);
+        marco.color(BLANCO);
     }
 
     @OptIn(markerClass = ExperimentalGetImage.class)
@@ -353,11 +421,12 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             tEstado.setTextColor(AMARILLO);
             marco.color(AMARILLO);
         } else if (l.nombre != null) {
-            tEstado.setText(l.nombre + " — falta el ID; acércala o enfoca");
+            tEstado.setText(l.nombre + (frontal ? " — falta el ID; mantenla quieta, sin reflejos" : " — falta el ID; acércala o enfoca"));
             tEstado.setTextColor(BLANCO);
             marco.color(BLANCO);
         } else {
-            tEstado.setText(lineas.isEmpty() ? "Buscando el nombre y el ID…" : "Acerca la credencial y mantenla quieta");
+            tEstado.setText(lineas.isEmpty() ? "Buscando el nombre y el ID…"
+                    : (frontal ? "Mantén la credencial quieta dentro del recuadro" : "Acerca la credencial y mantenla quieta"));
             tEstado.setTextColor(BLANCO);
             marco.color(BLANCO);
         }
@@ -398,6 +467,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         datos.putExtra("simulado", simulado);
         datos.putExtra("lecturas", lecturas);
         datos.putExtra("ms", SystemClock.elapsedRealtime() - inicio);
+        datos.putExtra("camara", frontal ? "frontal" : "trasera");
         if (conFoto && !simulado) {
             String ruta = guardarFoto(fotoDe(codigo));
             if (ruta != null) datos.putExtra("foto", ruta);
@@ -478,12 +548,14 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         if (hilo != null) hilo.shutdown();
     }
 
-    /** Sombra alrededor de un recuadro del tamaño de una tarjeta (85.6 × 54 mm), de pie o acostada. */
+    /** Sombra alrededor de un recuadro del tamaño de una tarjeta (85.6 × 54 mm), de pie o acostada.
+     *  Con la cámara frontal el recuadro es más chico: la credencial se pone un poco más lejos, donde
+     *  esa cámara (casi siempre de foco fijo y más abierta) la ve nítida. */
     static final class Marco extends View {
         private final Paint sombra = new Paint(), borde = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF hueco = new RectF();
         private int arriba = 0, abajo = 0;
-        boolean vertical = true;
+        boolean vertical = true, frontal = false;
         Marco(android.content.Context c) {
             super(c);
             sombra.setColor(Color.argb(120, 0, 0, 0));
@@ -499,10 +571,10 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             float libreArriba = arriba, libreAbajo = h - abajo, libre = libreAbajo - libreArriba;
             float ancho, alto;
             if (vertical) {                    // credencial de pie: llena el espacio entre los textos y los botones
-                alto = Math.min(w * 0.64f * 1.586f, libre > 0 ? libre * 0.94f : h * 0.6f);   // ~11 cm: enfoca bien
+                alto = Math.min(w * (frontal ? 0.46f : 0.64f) * 1.586f, libre > 0 ? libre * 0.94f : h * 0.6f);   // trasera ~11 cm: enfoca bien
                 ancho = alto / 1.586f;
             } else {
-                ancho = w * 0.88f; alto = ancho / 1.586f;
+                ancho = w * (frontal ? 0.66f : 0.88f); alto = ancho / 1.586f;
             }
             float centro = libre > alto ? (libreArriba + libreAbajo) / 2f : h / 2f;
             hueco.set((w - ancho) / 2f, centro - alto / 2f, (w + ancho) / 2f, centro + alto / 2f);

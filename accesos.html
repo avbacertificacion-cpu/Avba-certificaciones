@@ -309,6 +309,7 @@
       </div>
       <div class="cam-ctrl">
         <button class="btn sec" type="button" id="btn-linterna" hidden>Linterna</button>
+        <button class="btn sec" type="button" id="btn-voltear" hidden>Cambiar cámara</button>
         <label class="check" style="margin:0"><input type="checkbox" id="revisar"> Revisar cada foto antes de guardar</label>
         <button class="btn" type="button" id="btn-cam-off" style="margin-left:auto;color:var(--texto-sub);background:none">Cerrar cámara</button>
       </div>
@@ -491,10 +492,10 @@
      internet (la imagen no sale del equipo) y el registro queda guardado al
      instante, sin foto. En el navegador sigue la foto de la identificación. */
   var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
-  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true };
+  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal' };
   function mezclarReglas(g) {
     if (!g || typeof g !== 'object') return;
-    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
   }
   /* Equipo: identificador propio de este teléfono o navegador (no cambia al cerrar sesión). Se
      sigue mandando con cada petición, pero el servidor ya no liga cuentas a teléfonos: varios
@@ -1144,15 +1145,28 @@
   if (!hayCamara) $('cam-apagada').hidden = true;
   $('revisar').checked = !!leer(CLAVE_REVISAR, false);
   $('revisar').onchange = function () { guardar(CLAVE_REVISAR, $('revisar').checked); };
+  /* Frontal o trasera: la regla «camara» (frontal), salvo que en este equipo se haya elegido la otra
+     con «Cambiar cámara». */
+  var CLAVE_CAMARA = 'ca_accesos_camara';
+  function camaraElegida() {
+    var c = leer(CLAVE_CAMARA, '');
+    return c === 'frontal' || c === 'trasera' ? c : (REGLAS_TARJETA.camara === 'trasera' ? 'trasera' : 'frontal');
+  }
   function abrirCamara() {
-    navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } })
+    var frente = camaraElegida() === 'frontal';
+    navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: frente ? 'user' : 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } })
       .then(function (st) {
-        cam.stream = st; cam.track = st.getVideoTracks()[0];
+        if (cam.stream) cam.stream.getTracks().forEach(function (t) { t.stop(); });
+        cam.stream = st; cam.track = st.getVideoTracks()[0]; cam.torch = false;
         $('video').srcObject = st; $('video').play().catch(function () {});
         $('cam-apagada').hidden = true; $('cam-encendida').hidden = false;
         $('lbl-ent').textContent = $('lbl-sal').textContent = 'Tomar foto ahora';
         var cap = cam.track.getCapabilities ? cam.track.getCapabilities() : {};
-        $('btn-linterna').hidden = !cap.torch;
+        $('btn-linterna').hidden = !cap.torch; $('btn-linterna').textContent = 'Linterna';
+        // «Cambiar cámara» sólo si el equipo tiene más de una
+        if (navigator.mediaDevices.enumerateDevices) navigator.mediaDevices.enumerateDevices().then(function (l) {
+          $('btn-voltear').hidden = l.filter(function (d) { return d.kind === 'videoinput'; }).length < 2;
+        }).catch(function () {});
       })
       .catch(function (e) {
         toast(e && e.name === 'NotAllowedError' ? 'No se dio permiso de usar la cámara. Revisa los permisos del navegador.' : 'No se pudo abrir la cámara.', true);
@@ -1165,6 +1179,10 @@
     $('lbl-ent').textContent = $('lbl-sal').textContent = 'Foto de la identificación';
   }
   $('btn-cam').onclick = abrirCamara;
+  $('btn-voltear').onclick = function () {
+    guardar(CLAVE_CAMARA, camaraElegida() === 'frontal' ? 'trasera' : 'frontal');
+    abrirCamara();
+  };
   $('btn-cam-off').onclick = cerrarCamara;
   $('btn-linterna').onclick = function () {
     if (!cam.track) return;

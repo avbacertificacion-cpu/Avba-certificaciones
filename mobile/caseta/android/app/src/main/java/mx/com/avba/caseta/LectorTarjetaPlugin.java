@@ -29,8 +29,9 @@ import java.io.InputStream;
  *
  * Desde la página: Capacitor.Plugins.LectorTarjeta.leer({ titulo, subtitulo,
  * simular, minDigitos, maxDigitos, longitud, patron, claves, noNombre,
- * noCodigo, confirmar }) → { codigo, nombre, texto, manual, simulado, ms } o
- * { cancelado: true }. La lectura se hace en el teléfono (LectorTarjetaActivity).
+ * noCodigo, confirmar, camara }) → { codigo, nombre, texto, manual, simulado,
+ * ms, camara } o { cancelado: true }. camara: "frontal" o "trasera" (con cuál
+ * empieza el lector). La lectura se hace en el teléfono (LectorTarjetaActivity).
  *
  * Capacitor.Plugins.LectorTarjeta.abrir({ url }) abre una dirección https fuera
  * de la app (por ejemplo, el PDF de entradas y salidas en el visor del teléfono).
@@ -85,6 +86,7 @@ public class LectorTarjetaPlugin extends Plugin {
         i.putExtra(LectorTarjetaActivity.EXTRA_VERTICAL, !"horizontal".equalsIgnoreCase(call.getString("orientacion", "vertical")));
         i.putExtra(LectorTarjetaActivity.EXTRA_FOTO, !Boolean.FALSE.equals(call.getBoolean("foto", true)));   // evidencia
         i.putExtra(LectorTarjetaActivity.EXTRA_SIMULAR, Boolean.TRUE.equals(call.getBoolean("simular", false)));
+        i.putExtra(LectorTarjetaActivity.EXTRA_CAMARA, "frontal".equalsIgnoreCase(call.getString("camara", "trasera")) ? "frontal" : "trasera");
         i.putExtra(LectorTarjetaActivity.EXTRA_MIN, entero(call, "minDigitos", 4));
         i.putExtra(LectorTarjetaActivity.EXTRA_MAX, entero(call, "maxDigitos", 12));
         i.putExtra(LectorTarjetaActivity.EXTRA_LONGITUD, entero(call, "longitud", 0));
@@ -110,6 +112,7 @@ public class LectorTarjetaPlugin extends Plugin {
             r.put("simulado", d.getBooleanExtra("simulado", false));
             r.put("lecturas", d.getIntExtra("lecturas", 0));
             r.put("ms", d.getLongExtra("ms", 0));
+            r.put("camara", texto(d.getStringExtra("camara")));
             r.put("local", true);
             String foto = fotoEnBase64(d.getStringExtra("foto"));             // foto de la credencial (evidencia)
             if (foto != null) r.put("foto", foto);

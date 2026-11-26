@@ -41,7 +41,7 @@ Las capturas y PDF que dejan las pruebas (`*.png`, `*.pdf`) están en `.gitignor
 | `pantalla/pendientes_test.js` | Lo pendiente sin señal va con su cuenta (no se manda a nombre de otra que entra en el mismo teléfono); dos teléfonos sin señal a la vez mandan cada uno lo suyo al volver. |
 | `pantalla/planta_pantalla_test.js` | Vista «En planta»: buscar por ID o nombre, movimientos, dar salida, por punto, Excel. |
 | `pantalla/evidencia_test.js` | Foto de la credencial como evidencia: con foto, ID a mano, sin señal, verla en la administración y en el PDF. |
-| `pantalla/accesos_tarjeta_test.js` | Pantalla con API simulada: lectura de la credencial, confirmación, PDF, navegador sin app. |
+| `pantalla/accesos_tarjeta_test.js` | Pantalla con API simulada: lectura de la credencial, confirmación, PDF, navegador sin app; la cámara frontal (el lector la recibe de la regla del servidor y en el navegador «Cambiar cámara» pasa a la trasera y se recuerda). |
 
 Lo que no se puede probar aquí: la cámara real y el lector nativo (sólo en el teléfono;
 `AnalizadorTarjetaTest.java` corre en cada compilación de la app en GitHub).

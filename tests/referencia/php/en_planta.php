@@ -95,6 +95,7 @@ ok($pdo->query("SELECT origen FROM accesos_registros WHERE uid='falso-00000001'"
 // Reglas del lector desde la API
 $rg = ControlAccesos::reglasTarjeta();
 ok($rg['status'] === 'success' && ($rg['reglas']['orientacion'] ?? '') === 'vertical' && in_array('AYUDANTE', $rg['reglas']['noNombre']), 'reglas del lector desde la API (no de la demo)');
+ok(($rg['reglas']['camara'] ?? '') === 'frontal', 'el lector empieza con la cámara frontal (regla «camara»)');
 
 $pdo->exec("DELETE FROM accesos_registros");
 echo $fallas ? "$fallas FALLAS\n" : "TODO BIEN\n";

@@ -30,6 +30,7 @@ function api(estado) {
       const ex = {}; uids.forEach(u => { if (estado.ids[u]) ex[u] = estado.ids[u]; });
       return json({ status: 'success', existen: ex });
     }
+    if (accion === 'ACCESOS_TARJETA_REGLAS' && estado.reglas) return json({ status: 'success', reglas: estado.reglas });
     if (accion === 'LISTAR_ACCESOS_LUGARES') return json({ status: 'success', lugares: ['PUNTO DE CONTROL 1', 'PUNTO DE CONTROL 2', 'PUNTO DE CONTROL 3', 'PUNTO DE CONTROL 4'] });
     if (accion === 'ACCESOS_MI_PUNTO') return json({ status: 'success', punto: 'PUNTO DE CONTROL 1', nombre_punto: 'Punto de control 1' });
     if (accion === 'ACCESOS_PUNTOS') return json({ status: 'success', puntos: [], cuentas: [], puede_editar: true });
@@ -49,8 +50,8 @@ function api(estado) {
   };
 }
 
-async function pantalla(b, rol, conLector) {
-  const estado = { acciones: [], registrados: [], ids: {}, abiertos: [] };
+async function pantalla(b, rol, conLector, reglas, camaraNavegador) {
+  const estado = { acciones: [], registrados: [], ids: {}, abiertos: [], reglas };
   const ctx = await b.newContext({ timezoneId: 'America/Mexico_City', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await ctx.addInitScript(([rol, conLector]) => {
     localStorage.setItem('ca_sesion', JSON.stringify({ token: 'prueba', rol, usuario: rol === 'ACCESOS' ? 'caseta1' : 'admin', nombre: rol === 'ACCESOS' ? 'Caseta 1' : 'Administración' }));
@@ -61,6 +62,18 @@ async function pantalla(b, rol, conLector) {
         leer: (o) => { window.__opciones.push(o); return new Promise(r => setTimeout(() => r(window.__lecturas.shift() || { cancelado: true }), 250)); },
         abrir: (o) => { window.__abiertos.push(o.url); return Promise.resolve({}); }
       } } };
+    } else {
+      // Cámara del navegador simulada: anota con qué cámara se pidió (frontal = 'user')
+      window.__pedidas = [];
+      const md = navigator.mediaDevices || {};
+      md.getUserMedia = (c) => {
+        window.__pedidas.push(c.video && c.video.facingMode && c.video.facingMode.ideal);
+        const cv = document.createElement('canvas'); cv.width = 640; cv.height = 480;
+        cv.getContext('2d').fillRect(0, 0, 10, 10);
+        return Promise.resolve(cv.captureStream(5));
+      };
+      md.enumerateDevices = () => Promise.resolve([{ kind: 'videoinput', deviceId: 'a' }, { kind: 'videoinput', deviceId: 'b' }]);
+      if (!navigator.mediaDevices) Object.defineProperty(navigator, 'mediaDevices', { value: md });
     }
   }, [rol, conLector]);
   const p = await ctx.newPage();
@@ -94,6 +107,7 @@ async function pantalla(b, rol, conLector) {
   { const rs = (await (await fetch('http://localhost:8794/demo/sala.php?tarjeta=1')).json()).reglas || {};
     ok(rs.orientacion === 'vertical' && rs.noNombre.includes('SOLUCIONES') && rs.noNombre.includes('AYUDANTE') && rs.noNombre.includes('THE'), 'el servidor entrega las reglas de la credencial (vertical; empresa, oficios y logotipos no son nombre)'); }
   ok(op && /ENTRADA · PUNTO DE CONTROL 1/.test(op.titulo) && op.simular === false && op.minDigitos === 4, 'opciones del lector: ' + op.titulo);
+  ok(op && op.camara === 'frontal', 'el lector se abre con la cámara frontal (camara: ' + (op && op.camara) + ')');
   // Salida con código escrito a mano
   await p.evaluate(() => window.__lecturas.push({ codigo: '004512', nombre: '', manual: true, ms: 5000 }));
   await p.click('.cap.sal'); await p.waitForTimeout(400);
@@ -116,6 +130,13 @@ async function pantalla(b, rol, conLector) {
   ok(!estado.errores, 'sin errores de JavaScript' + (estado.errores ? ': ' + estado.errores.join(' | ') : ''));
   await ctx.close();
 
+  // ── 1b) La regla «camara» del servidor decide con cuál empieza el lector ──
+  ({ ctx, p, estado } = await pantalla(b, 'ACCESOS', true, { camara: 'trasera' }));
+  await p.evaluate(() => window.__lecturas.push({ cancelado: true }));
+  await p.click('.cap.ent'); await p.waitForTimeout(600);
+  ok((await p.evaluate(() => window.__opciones[0] && window.__opciones[0].camara)) === 'trasera', 'con la regla del servidor en «trasera», el lector abre la trasera');
+  await ctx.close();
+
   // ── 2) Administración en la app: PDF de datos ──
   ({ ctx, p, estado } = await pantalla(b, 'ADMIN', true));
   ok(await p.isVisible('#btn-pdf-datos'), 'administración ve «Descargar PDF de entradas y salidas»');
@@ -134,6 +155,15 @@ async function pantalla(b, rol, conLector) {
   ({ ctx, p, estado } = await pantalla(b, 'ACCESOS', false));
   ok((await p.textContent('#lbl-ent')) === 'Foto de la identificación', 'navegador: ENTRADA sigue con foto');
   ok(await p.isVisible('#cam-apagada'), 'navegador: la cámara continua sigue disponible');
+  // Cámara continua del navegador: empieza con la frontal y «Cambiar cámara» pasa a la trasera (y se recuerda)
+  await p.click('#btn-cam'); await p.waitForTimeout(500);
+  ok((await p.evaluate(() => window.__pedidas.join(','))) === 'user' && await p.isVisible('#cam-encendida'), 'navegador: la cámara continua abre la frontal');
+  ok(await p.isVisible('#btn-voltear'), 'navegador: botón «Cambiar cámara» (hay dos cámaras)');
+  await p.click('#btn-voltear'); await p.waitForTimeout(500);
+  ok((await p.evaluate(() => window.__pedidas.join(','))) === 'user,environment' && (await p.evaluate(() => localStorage.getItem('ca_accesos_camara'))) === '"trasera"', 'navegador: «Cambiar cámara» abre la trasera y este equipo la recuerda');
+  await p.reload(); await p.waitForTimeout(900);
+  await p.click('#btn-cam'); await p.waitForTimeout(500);
+  ok((await p.evaluate(() => window.__pedidas.join(','))) === 'environment', 'navegador: al volver a entrar sigue con la trasera');
   ok(!estado.errores, 'sin errores de JavaScript (navegador)' + (estado.errores ? ': ' + estado.errores.join(' | ') : ''));
   await ctx.close();
   await b.close();
