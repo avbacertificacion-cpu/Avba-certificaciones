@@ -37,7 +37,8 @@ class Inspecciones {
     private const PRECARGAS = [self::PRECARGA_GRUA_AC18, self::PRECARGA_GRUA_TC4792,
                                 self::PRECARGA_CAN_260523, self::PRECARGA_CAN_120320,
                                 self::PRECARGA_TORRE_21LC1050, self::PRECARGA_TORRE_21LC660,
-                                self::PRECARGA_TORRE_21LC550, self::PRECARGA_EXC_DX220LCA];
+                                self::PRECARGA_TORRE_21LC550, self::PRECARGA_EXC_DX220LCA,
+                               self::PRECARGA_EXC_DX220LCA_030335];
 
     private const PRECARGA_GRUA_AC18 = [
         'clave'      => 'precarga_grua_ac18_michel',
@@ -249,6 +250,40 @@ class Inspecciones {
                        . 'Las excavadoras NO llevan prueba de carga, sólo PRUEBAS FUNCIONALES, en la sección F '
                        . '(todos los movimientos, la prensa incluida, freno de giro, traslación y deriva de cilindros). '
                        . 'La placa QR de AVBA ya está pegada en el equipo: 4352617908 (va en los comentarios para Calidad). '
+                       . 'Faltan y los pones tú: CLIENTE, dirección, número económico y CAPACIDAD '
+                       . '(peso operativo o capacidad del cucharón, según la placa o el manual).',
+    ];
+
+    /* Segunda excavadora DEVELON DX220LCA-2M con prensa hidráulica, para Marcos,
+       del mismo lote (inspección del 25/11/2026). Las fotos no traen la placa de
+       número de serie, sólo la etiqueta de emisiones con el PIN
+       DXCCEBGAHR0030335; la serie sale de él con el mismo formato de la otra
+       (PIN …CEBGA…0031389 ↔ serie CEBGA-031389) y Marcos la confirma. En las
+       fotos se difuminaron la placa y el teléfono de un remolque del fondo y el
+       reflejo de quien tomó la foto en el vidrio de la cabina. */
+    private const PRECARGA_EXC_DX220LCA_030335 = [
+        'clave'       => 'precarga_exc_dx220lca_030335_marcos',
+        'busca'       => 'MARCOS',
+        'fotos'       => 'assets/precarga/excavadora_dx220lca_030335/',
+        'maquinaria'  => 'EXCAVADORA',
+        'cliente'     => '',
+        'marca'       => 'DEVELON',
+        'modelo'      => 'DX220LCA-2M',
+        'serie'       => 'CEBGA-030335',
+        'id_equipo'   => '',
+        'capacidad'   => '',
+        'fecha'       => '2026-11-25',
+        'comentarios' => 'Placa QR de AVBA ya colocada en el equipo: 4352617907. '
+                       . 'PIN del fabricante: DXCCEBGAHR0030335 (fabricada 2024.04, motor DB58TIS).',
+        'nota'        => 'Excavadora hidráulica sobre orugas DEVELON DX220LCA-2M, PIN DXCCEBGAHR0030335 '
+                       . '(etiqueta del fabricante, 2024.04, motor DB58TIS). '
+                       . 'CONFIRMA LA SERIE: en las fotos no viene la placa de número de serie; se puso CEBGA-030335 '
+                       . 'sacada del PIN (mismo formato que la otra DX220LCA-2M). Si la placa dice otra cosa, corrígela. '
+                       . 'Trae PRENSA HIDRÁULICA (pulgar) montada en el brazo: va en la sección D del checklist. '
+                       . 'Inspección realizada el 25/11/2026: esa fecha se conserva al enviarla. '
+                       . 'Las excavadoras NO llevan prueba de carga, sólo PRUEBAS FUNCIONALES, en la sección F '
+                       . '(todos los movimientos, la prensa incluida, freno de giro, traslación y deriva de cilindros). '
+                       . 'La placa QR de AVBA ya está pegada en el equipo: 4352617907 (va en los comentarios para Calidad). '
                        . 'Faltan y los pones tú: CLIENTE, dirección, número económico y CAPACIDAD '
                        . '(peso operativo o capacidad del cucharón, según la placa o el manual).',
     ];
