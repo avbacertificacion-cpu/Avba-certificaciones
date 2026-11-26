@@ -2563,7 +2563,8 @@ SVG;
         $archivos = glob($localPath . '*.{jpg,jpeg,png,JPG,JPEG,PNG,webp,WEBP}', GLOB_BRACE);
         if (empty($archivos)) return $html;
 
-        sort($archivos);
+        // Orden natural: «Evidencia_10» va después de «Evidencia_9», no después de la 1
+        sort($archivos, SORT_NATURAL | SORT_FLAG_CASE);
         $tope   = $conPruebaCarga ? 9   : 12;
         $altura = $conPruebaCarga ? 102 : 155;
         $archivos = array_slice($archivos, 0, $tope);

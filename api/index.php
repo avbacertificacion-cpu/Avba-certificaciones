@@ -390,7 +390,7 @@ if ($method === 'GET') {
             }
 
             $archivos = glob($localPath . '*.{jpg,jpeg,png,JPG,JPEG,PNG,webp,WEBP}', GLOB_BRACE) ?: [];
-            sort($archivos);
+            sort($archivos, SORT_NATURAL | SORT_FLAG_CASE);   // Evidencia_10 después de la 9
             $imagenes = array_map(fn($f) => str_replace(
                 rtrim(UPLOAD_DIR, '/'),
                 rtrim(UPLOAD_URL, '/'),
@@ -632,7 +632,7 @@ if ($method === 'GET') {
         case 'MI_INSPECCION_PREPARADA':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($insp->inspeccionPreparada($usr['usuario']));
+            respuesta($insp->inspeccionPreparada($usr['usuario'], (int)($_GET['id'] ?? 0)));
 
         case 'GET_MIS_ACCESORIOS':
             $usr = validarToken($pdo, $token);

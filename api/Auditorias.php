@@ -624,7 +624,7 @@ class Auditorias {
         foreach (glob($dir . '*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}', GLOB_BRACE) ?: [] as $f) {
             $fotos[] = rtrim(UPLOAD_URL, '/') . '/' . $rel . '/' . basename($f);
         }
-        sort($fotos);
+        sort($fotos, SORT_NATURAL | SORT_FLAG_CASE);   // Evidencia_10 después de la 9
         return [$fotos, ''];
     }
 

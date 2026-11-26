@@ -676,6 +676,15 @@
     /* Sesión de accesorios preparada de antemano, por enviar a Calidad. */
     .offline-banner.preparada { background: #E6F1FB; color: #0C447C; border: 1px solid #85B7EB; }
     .offline-banner.preparada button { background: #185FA5; color: #fff; }
+    /* Varias inspecciones preparadas: el inspector elige cuál abrir. */
+    .offline-banner .prep-lista { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .offline-banner .prep-fila {
+      display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 10px;
+      background: #fff; border: 1px solid #A9CCEE; border-radius: 8px;
+    }
+    .offline-banner .prep-fila span { flex: 1; min-width: 0; font-size: 12.5px; }
+    .offline-banner .prep-fila small { display: block; opacity: .75; }
+    .offline-banner .prep-fila button { min-height: 36px; }
     .offline-banner.borrador  { background: #E6F1FB; color: #0C447C; border: 1px solid #A9CCEE; }
     .offline-banner.borrador button.ob-continuar { background: #185FA5; color: #fff; }
     .offline-banner.borrador button.ob-descartar { background: transparent; color: #0C447C; border: 1px solid #A9CCEE; margin-left: 6px; }
@@ -1489,9 +1498,10 @@
     <div class="ob-ico">📋</div>
     <div class="ob-txt">
       <b id="banner-insp-preparada-txt">Tienes una inspección preparada</b>
-      Los datos del equipo y las fotos ya están cargados: confirma el cliente, levanta el checklist y la prueba de carga.
+      Los datos del equipo y las fotos ya están cargados: confirma el cliente, levanta el checklist y, si aplica, la prueba de carga.
+      <div class="prep-lista" id="banner-insp-lista"></div>
     </div>
-    <button onclick="abrirInspeccionPreparada()">Abrir</button>
+    <button id="banner-insp-abrir" onclick="abrirInspeccionPreparada()">Abrir</button>
   </div>
 
   <div class="offline-banner preparada" id="banner-preparadas">
@@ -4269,6 +4279,18 @@ function pcAttr(v) {
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+/* Tipos de equipo que por diseño NO llevan prueba de carga: sólo pruebas
+   funcionales, que van en su checklist. Se dice así, en vez del aviso genérico
+   de «sin plantilla». */
+const SIN_PRUEBA_CARGA = {
+  'dictamen_excavadora.html': 'Las excavadoras no llevan prueba de carga: sólo pruebas funcionales, que van en la sección F del checklist (todos los movimientos, el aditamento incluido). Continúa al siguiente paso.',
+};
+
+function ponerFechaDeHoy() {
+  const hoy = new Date(), el = document.getElementById('fecha');
+  if (el) el.value = String(hoy.getDate()).padStart(2,'0') + '/' + String(hoy.getMonth()+1).padStart(2,'0') + '/' + hoy.getFullYear();
+}
+
 function renderPruebaCarga() {
   const sel    = document.getElementById("maquinaria");
   const opt    = sel.options[sel.selectedIndex];
@@ -4281,8 +4303,9 @@ function renderPruebaCarga() {
   const tpl  = PC_TEMPLATES[dictHtml];
 
   if (!equipo || !tpl) {
+    const sinPrueba = equipo && SIN_PRUEBA_CARGA[dictHtml];
     cont.innerHTML = `<div style="color:var(--texto-hint);font-size:13px;text-align:center;padding:24px 0">
-      ${!equipo ? 'Selecciona un tipo de maquinaria en el Paso 1.' : 'Este tipo de equipo no tiene plantilla de prueba de carga asignada. Puedes continuar sin ella.'}
+      ${!equipo ? 'Selecciona un tipo de maquinaria en el Paso 1.' : (sinPrueba || 'Este tipo de equipo no tiene plantilla de prueba de carga asignada. Puedes continuar sin ella.')}
     </div>`;
     return;
   }
@@ -5159,6 +5182,7 @@ async function enviarFormulario() {
       // La preparada ya se mandó: el servidor borró su borrador.
       inspeccionPreparadaId = null;
       inspeccionPreparadaNota = '';
+      ponerFechaDeHoy();   // una preparada pudo traer la fecha en que se hizo
       revisarInspeccionPreparada();
     } else {
       throw new Error(resultado.message || "Error desconocido del servidor");
@@ -5170,6 +5194,7 @@ async function enviarFormulario() {
     if (payload && esFalloDeRed(err)) {
       await AvbaOffline.encolar('inspeccion', WEB_APP_URL, payload);
       await AvbaOffline.borrarBorrador('inspeccion'); // ya está a salvo en la cola
+      ponerFechaDeHoy();
       // Va en la cola con su borrador_id: cuando salga, el servidor cierra el
       // borrador. Aquí ya no se vuelve a usar.
       inspeccionPreparadaId = null;
@@ -5400,15 +5425,19 @@ async function restaurarBorradorInspeccion(draft, mensaje) {
    al guardarse nace su folio y el borrador desaparece.
 ════════════════════════════════════════ */
 let inspPreparada = null;   // la que está esperando, tal como la manda el servidor
+let inspPreparadasLista = [];   // todas las que esperan (id, equipo, serie, fecha)
 
-async function leerInspeccionPreparada() {
+/** Lee una inspección preparada: la indicada por id o, sin id, la primera. */
+async function leerInspeccionPreparada(id) {
   try {
     const s    = JSON.parse(localStorage.getItem('avba_session') || '{}');
-    const res  = await fetch(`${WEB_APP_URL}?action=MI_INSPECCION_PREPARADA`, { headers: { 'X-Token': s.token || '' } });
+    const res  = await fetch(`${WEB_APP_URL}?action=MI_INSPECCION_PREPARADA` + (id ? '&id=' + encodeURIComponent(id) : ''),
+                             { headers: { 'X-Token': s.token || '' } });
     const data = await res.json();
     inspPreparada = (data.status === 'success' && data.data) ? data.data : null;
+    inspPreparadasLista = (data.status === 'success' && Array.isArray(data.lista)) ? data.lista : [];
     if (inspPreparada) inspPreparada.pendientes = data.pendientes || 1;
-  } catch (e) { inspPreparada = null; }
+  } catch (e) { inspPreparada = null; inspPreparadasLista = []; }
   return inspPreparada;
 }
 
@@ -5418,10 +5447,21 @@ async function revisarInspeccionPreparada() {
   const prep = await leerInspeccionPreparada();
   if (!prep) { banner.classList.remove('show'); return; }
   const equipo = [prep.maquinaria, prep.marca, prep.modelo].filter(Boolean).join(' · ');
-  const n = prep.pendientes || 1;
-  document.getElementById('banner-insp-preparada-txt').textContent = n > 1
-    ? `Tienes ${n} inspecciones preparadas` + (equipo ? ' · empiezas por ' + equipo : '')
+  const varias = inspPreparadasLista.length > 1;
+  document.getElementById('banner-insp-preparada-txt').textContent = varias
+    ? `Tienes ${inspPreparadasLista.length} inspecciones preparadas · elige cuál abrir`
     : 'Tienes una inspección preparada' + (equipo ? ' · ' + equipo : '');
+  // Con varias, cada una con su botón: no tiene que enviarlas en orden.
+  const lista = document.getElementById('banner-insp-lista');
+  if (lista) {
+    lista.innerHTML = varias ? inspPreparadasLista.map(x => {
+      const eq = [x.maquinaria, x.marca, x.modelo].filter(Boolean).join(' · ') || 'Equipo';
+      const det = [x.serie ? 'Serie ' + x.serie : '', x.fecha ? 'Inspección del ' + x.fecha : ''].filter(Boolean).join(' · ');
+      return `<div class="prep-fila"><span><b>${escIns(eq)}</b>${det ? '<small>' + escIns(det) + '</small>' : ''}</span>`
+           + `<button type="button" onclick="abrirInspeccionPreparada(${parseInt(x.id)})">Abrir</button></div>`;
+    }).join('') : '';
+  }
+  document.getElementById('banner-insp-abrir').style.display = varias ? 'none' : '';
   banner.classList.add('show');
 }
 
@@ -5447,8 +5487,8 @@ function fotoDesdeUrl(url) {
   });
 }
 
-async function abrirInspeccionPreparada() {
-  const prep = inspPreparada || await leerInspeccionPreparada();
+async function abrirInspeccionPreparada(id) {
+  const prep = (inspPreparada && (!id || +inspPreparada.id === +id)) ? inspPreparada : await leerInspeccionPreparada(id);
   if (!prep) { mostrarToast('Ya no hay ninguna inspección preparada.', 'err'); return; }
 
   abrirModulo('inspeccion');
@@ -5470,6 +5510,10 @@ async function abrirInspeccionPreparada() {
       capacidad:  prep.capacidad  || '',
       emails:     prep.correo ? [prep.correo] : [],
       dir_insp:   prep.direccion  || '',
+      // La fecha en que se hizo la inspección (el servidor la conserva al
+      // enviarla) y los comentarios internos que ya trae para Calidad.
+      fecha:       prep.fecha       || '',
+      comentarios: prep.comentarios || '',
     },
     // La prueba de carga puede venir llena desde la precarga; si no, vacía.
     checklist: {}, prueba_carga: prep.prueba_carga || {}, recomendaciones: [], fotos,
@@ -5489,7 +5533,7 @@ async function abrirInspeccionPreparada() {
 function mostrarAvisoPreparada(nota, nFotos, pendientes) {
   const aviso = document.getElementById('insp-preparada-aviso');
   if (!aviso) return;
-  const masTarde = pendientes > 1 ? ' <strong>Al enviarla te aparecerá la siguiente.</strong>' : '';
+  const masTarde = pendientes > 1 ? ' <strong>Te ' + (pendientes === 2 ? 'queda otra preparada' : 'quedan ' + (pendientes - 1) + ' más preparadas') + ' en el menú.</strong>' : '';
   aviso.innerHTML = '<strong>Inspección preparada.</strong> '
     + escIns(nota || 'Revisa los datos del equipo, confirma el cliente y el lugar, y levanta el checklist y la prueba de carga.')
     + (nFotos ? ' <strong>' + nFotos + (nFotos === 1 ? ' foto ya cargada' : ' fotos ya cargadas') + '</strong> en el paso 6.' : '')

@@ -207,7 +207,7 @@ class ReporteInspeccion {
         $archivos = glob($localPath . '*.{jpg,jpeg,png,JPG,JPEG,PNG}', GLOB_BRACE);
         if (!$archivos) return [];
 
-        sort($archivos);
+        sort($archivos, SORT_NATURAL | SORT_FLAG_CASE);   // Evidencia_10 después de la 9
         return array_slice($archivos, 0, 9);
     }
 

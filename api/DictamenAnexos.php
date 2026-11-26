@@ -34,6 +34,7 @@ class DictamenAnexos {
         'dictamen_canastilla.html'            => 'canastilla',
         'dictamen_canastilla_sin_puerta.html' => 'canastilla_sp',
         'dictamen_oreja_carga.html'           => 'oreja',
+        'dictamen_excavadora.html'            => 'excavadora',
     ];
 
     /** Inserta las páginas en el HTML ya rellenado del dictamen. */
@@ -330,6 +331,8 @@ class DictamenAnexos {
             'NMX-GR-9927-1' => 'Grúas — Inspecciones — Parte 1: Generalidades (ISO 9927-1).',
             'ISO 9927-1'   => 'Grúas — Inspecciones — Parte 1: Generalidades.',
             'ISO 9927-3'   => 'Grúas — Inspecciones — Parte 3: Grúas torre.',
+            'ISO 20474-1'  => 'Maquinaria para movimiento de tierras — Seguridad — Parte 1: Requisitos generales.',
+            'ISO 20474-5'  => 'Maquinaria para movimiento de tierras — Seguridad — Parte 5: Excavadoras hidráulicas.',
             'EN 14439'     => 'Grúas — Grúas torre — Requisitos de seguridad.',
             'NOM-031-STPS' => 'Construcción — Condiciones de seguridad y salud en el trabajo.',
             'ASME BTH-1'   => 'Diseño de dispositivos de izaje bajo el gancho.',
@@ -639,6 +642,50 @@ class DictamenAnexos {
                 ['ROPS / FOPS', 'Protección contra volcadura y contra caída de objetos.'],
                 ['Nivelación del chasis', 'Ajuste lateral del bastidor para trabajar en terreno con pendiente.'],
                 ['Accesorio', 'Horquillas, plumín, cucharón o plataforma acoplada a la pluma.'],
+            ],
+        ];
+
+        /* Excavadora: no es equipo de izaje. Su inspección es la revisión de la
+           estructura y las pruebas funcionales de todos sus movimientos; no
+           lleva prueba de carga. */
+        $p['excavadora'] = [
+            'descripcion' => 'Excavadora hidráulica, sobre orugas o neumáticos, con superestructura giratoria y un equipo de trabajo de pluma, '
+                . 'brazo y cucharón para excavar, cargar y mover material. Puede llevar aditamentos —prensa hidráulica (pulgar), martillo, '
+                . 'acoplador rápido— alimentados por un circuito hidráulico auxiliar. No es un equipo de izaje: su inspección se basa en la '
+                . 'revisión de la estructura y en pruebas funcionales de todos sus movimientos, sin prueba de carga.',
+            'refs' => [
+                ['ISO 20474-1', 'Maquinaria para movimiento de tierras — Seguridad — Parte 1: Requisitos generales.'],
+                ['ISO 20474-5', 'Maquinaria para movimiento de tierras — Seguridad — Parte 5: Excavadoras hidráulicas.'],
+                ['ISO 6165', 'Maquinaria para movimiento de tierras — Tipos básicos — Identificación, términos y definiciones.'],
+                ['OSHA 29 CFR 1926 Subparte O', 'Vehículos motorizados y equipo mecanizado en la construcción.'],
+            ],
+            'criterios' => [
+                ['Equipo de trabajo', 'Pluma, brazo, cucharón, varillaje, pernos y bujes.', 'Fisura, deformación, soldadura no original, perno sin seguro u holgura excesiva.'],
+                ['Tren de rodaje', 'Cadenas, zapatas, rodillos, rueda guía, rueda motriz y motores de traslación.', 'Zapata fisurada, tensado fuera de especificación o fuga en el mando final.'],
+                ['Giro', 'Corona, tornillería, motor y freno de giro.', 'Holgura excesiva o freno de giro que no retiene.'],
+                ['Sistema hidráulico', 'Cilindros, vástagos, mangueras, tubos y bomba.', 'Fuga activa, vástago rayado o picado, manguera dañada o deriva apreciable de los cilindros.'],
+                ['Aditamento', 'Prensa hidráulica (pulgar) u otro: estructura, cilindro, montaje y circuito auxiliar.', 'Fisura, montaje flojo, fuga o un movimiento que no sostiene.'],
+                ['Cabina y seguridad', 'Estructura de protección, cinturón, palanca de bloqueo, alarmas, espejos y extintor.', 'Palanca de bloqueo inoperante, cinturón faltante o alarma de traslación sin funcionar.'],
+            ],
+            'riesgos' => [
+                ['Golpe o atropellamiento', 'Delimitar el radio de giro y la zona de trabajo; alarma de traslación y señalero.'],
+                ['Volcadura', 'Trabajar sobre terreno firme y nivelado; no girar con el cucharón cargado en pendiente.'],
+                ['Contacto con instalaciones', 'Localizar líneas subterráneas antes de excavar y respetar la distancia a líneas aéreas.'],
+                ['Derrumbe de zanja o talud', 'Mantener la máquina alejada del borde y ademar o taludar según el terreno.'],
+                ['Caída de material', 'No pasar el cucharón ni la prensa cargados sobre personas ni sobre cabinas ocupadas.'],
+            ],
+            'preuso' => ['Fugas hidráulicas y de motor.', 'Niveles de aceite, refrigerante y combustible.', 'Cadenas y tensado.', 'Pernos y seguros del equipo de trabajo.',
+                'Aditamento bien montado y sin fugas.', 'Palanca de bloqueo de mandos.', 'Cinturón, espejos y alarma de traslación.', 'Extintor vigente.'],
+            'paro' => ['Fuga hidráulica activa.', 'Palanca de bloqueo o freno de giro inoperantes.', 'Fisura en pluma, brazo o cucharón.', 'Deriva apreciable de los cilindros.',
+                'Terreno inestable o cercanía a líneas energizadas.'],
+            'epp' => ['Casco', 'Calzado de seguridad', 'Chaleco de alta visibilidad', 'Lentes de seguridad', 'Protección auditiva', 'Guantes'],
+            'glosario' => [
+                ['Pluma', 'Primer elemento del equipo de trabajo, articulado a la superestructura.'],
+                ['Brazo', 'Elemento del equipo de trabajo entre la pluma y el cucharón.'],
+                ['Prensa hidráulica (pulgar)', 'Aditamento montado en el brazo que, junto con el cucharón, sujeta el material para manipularlo.'],
+                ['Deriva', 'Descenso lento de un cilindro con los mandos en neutral; indica una fuga interna.'],
+                ['Palanca de bloqueo', 'Deshabilita los mandos hidráulicos para subir o bajar de la cabina con seguridad.'],
+                ['Mando final', 'Reductor que transmite el giro del motor de traslación a la rueda motriz de la oruga.'],
             ],
         ];
 

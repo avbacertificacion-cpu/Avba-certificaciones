@@ -40,6 +40,13 @@ class Admin {
         'grua_torre_martillo' => ['GRÚA TORRE PUNTA DE MARTILLO', 'dictamen_grua_torre.html'],
         'grua_torre_abatible' => ['GRÚA TORRE DE PLUMA ABATIBLE', 'dictamen_grua_torre_abatible.html'],
         'grua_torre_automont' => ['GRÚA TORRE AUTODESPLEGABLE',   'dictamen_grua_torre.html'],
+
+        /* Excavadora hidráulica. No es equipo de izaje: no lleva prueba de
+           carga, sólo pruebas funcionales de todos sus movimientos —incluido el
+           aditamento, como la prensa hidráulica (pulgar)—, que van en el
+           checklist. Su plantilla no está entre las de prueba de carga de la
+           pantalla del inspector, así que ese paso no se le pide. */
+        'excavadora' => ['EXCAVADORA', 'dictamen_excavadora.html'],
     ];
 
     /**
@@ -657,6 +664,82 @@ class Admin {
                 ['NOM-006-STPS-2014',       'referencia'],
             ],
         ],
+
+        /* Excavadora hidráulica sobre orugas (o neumáticos). Lo que se revisa
+           es la estructura del equipo de trabajo, el tren de rodaje, el giro y
+           el sistema hidráulico, y sobre todo que cada movimiento funcione: es
+           una inspección con PRUEBAS FUNCIONALES, sin prueba de carga. La
+           sección D es para el aditamento —prensa hidráulica (pulgar),
+           martillo, acoplador—; si el equipo no trae, va N/A. */
+        'excavadora' => [
+            'secciones' => [
+                ['A', 'Estructura, tren de rodaje y giro'],
+                ['B', 'Equipo de trabajo: pluma, brazo y cucharón'],
+                ['C', 'Sistema hidráulico'],
+                ['D', 'Aditamento: prensa hidráulica (pulgar) u otro'],
+                ['E', 'Cabina, controles y dispositivos de seguridad'],
+                ['F', 'Pruebas funcionales'],
+                ['G', 'Motor y sistemas auxiliares'],
+                ['H', 'Documentación'],
+            ],
+            'items' => [
+                ['A', 'A-01', 'Bastidor inferior y superestructura sin fisuras, deformaciones ni soldaduras no originales'],
+                ['A', 'A-02', 'Cadenas de oruga: tensado, eslabones, zapatas y tornillería completa'],
+                ['A', 'A-03', 'Rodillos superiores e inferiores, rueda guía y rueda motriz sin desgaste excesivo ni fugas'],
+                ['A', 'A-04', 'Motores de traslación y mandos finales: sin fugas, tornillería completa y protecciones'],
+                ['A', 'A-05', 'Corona de giro: juego, tornillería y engrasado'],
+                ['A', 'A-06', 'Contrapeso fijo, completo y sin fisuras'],
+                ['B', 'B-01', 'Pluma sin fisuras, deformaciones ni soldaduras no originales'],
+                ['B', 'B-02', 'Brazo sin fisuras, deformaciones ni soldaduras no originales'],
+                ['B', 'B-03', 'Pernos y bujes de articulación: sin holgura excesiva, con sus seguros y engrasados'],
+                ['B', 'B-04', 'Cucharón: cuchilla, dientes, adaptadores y orejas de montaje'],
+                ['B', 'B-05', 'Varillaje del cucharón (bielas y balancín) y su pernería'],
+                ['B', 'B-06', 'Acoplador rápido, cuando lo trae: seguro y bloqueo mecánico funcionando'],
+                ['C', 'C-01', 'Cilindros de pluma, brazo y cucharón: vástagos sin rayas ni picaduras y sellos sin fugas'],
+                ['C', 'C-02', 'Mangueras y tubos: sin fugas, desgaste por roce ni dobleces; abrazaderas completas'],
+                ['C', 'C-03', 'Bomba, válvula de control y tanque: sin fugas y con el nivel de aceite correcto'],
+                ['D', 'D-01', 'Estructura de la prensa y sus dedos: sin fisuras ni deformaciones'],
+                ['D', 'D-02', 'Cilindro de la prensa: vástago y sellos sin fugas ni daños'],
+                ['D', 'D-03', 'Montaje al brazo: soportes, soldaduras, pernos y seguros'],
+                ['D', 'D-04', 'Mangueras, conexiones y válvula del circuito auxiliar sin fugas'],
+                ['E', 'E-01', 'Cabina: estructura de protección, puerta, cristales y limpiaparabrisas'],
+                ['E', 'E-02', 'Asiento, cinturón de seguridad y ajuste del asiento'],
+                ['E', 'E-03', 'Monitor, instrumentos, testigos y alarmas del tablero'],
+                ['E', 'E-04', 'Espejos, cámara y alarma de traslación'],
+                ['E', 'E-05', 'Accesos: escalones, pasamanos y barandales'],
+                ['E', 'E-06', 'Calcomanías de advertencia y de capacidades legibles'],
+                ['E', 'E-07', 'Extintor vigente y botiquín'],
+                ['F', 'F-01', 'Arranque y paro del motor; paro de emergencia'],
+                ['F', 'F-02', 'Palanca de bloqueo de mandos: levantada, ningún movimiento hidráulico responde'],
+                ['F', 'F-03', 'Pluma: sube y baja en todo su recorrido, sin golpes, ruidos ni tirones'],
+                ['F', 'F-04', 'Brazo: abre y cierra en todo su recorrido, sin golpes, ruidos ni tirones'],
+                ['F', 'F-05', 'Cucharón: abre y cierra en todo su recorrido'],
+                ['F', 'F-06', 'Prensa hidráulica u otro aditamento: abre, cierra y sostiene en posición'],
+                ['F', 'F-07', 'Giro a ambos lados y freno de giro: retiene al soltar el mando'],
+                ['F', 'F-08', 'Traslación adelante y atrás, vueltas y freno de estacionamiento'],
+                ['F', 'F-09', 'Deriva de cilindros: con el equipo de trabajo elevado y los mandos en neutral, sin descenso apreciable'],
+                ['F', 'F-10', 'Los mandos regresan a neutral al soltarlos; sin movimientos involuntarios'],
+                ['F', 'F-11', 'Claxon, alarma de traslación y luces de trabajo funcionando'],
+                ['F', 'F-12', 'Sin fugas, ruidos, vibraciones ni sobrecalentamiento durante las pruebas'],
+                ['G', 'G-01', 'Motor: niveles, fugas, humo y ruidos anormales'],
+                ['G', 'G-02', 'Sistema de enfriamiento y filtros'],
+                ['G', 'G-03', 'Sistema eléctrico: batería, cableado y protecciones'],
+                ['H', 'H-01', 'Placa del fabricante legible: modelo y número de serie'],
+                ['H', 'H-02', 'Manual del operador a bordo'],
+                ['H', 'H-03', 'Bitácora de mantenimiento preventivo al día'],
+                ['H', 'H-04', 'Constancia de habilidades del operador'],
+            ],
+            // No es grúa: ampara sólo la 17020 (la unidad). Lo demás se cita
+            // como referencia: la NOM de protección en maquinaria, la de
+            // construcción y la ISO de seguridad de excavadoras hidráulicas.
+            'normas' => [
+                ['NMX-EC-17020-IMNC-2014', 'acreditada'],
+                ['NOM-004-STPS-1999',      'referencia'],
+                ['NOM-031-STPS-2011',      'referencia'],
+                ['ISO 20474-1',            'referencia'],
+                ['ISO 20474-5',            'referencia'],
+            ],
+        ],
     ];
 
     /**
@@ -904,6 +987,7 @@ class Admin {
     ];
     private const SEED_CATALOGO_V2    = 'catalogo_normas_v2';
     private const SEED_CATALOGO_V3    = 'catalogo_normas_v3_torre';
+    private const SEED_CATALOGO_V4    = 'catalogo_normas_v4_excavadora';
 
     /**
      * Topes por grupo. Son de espacio, no de criterio: con siete normas
@@ -957,6 +1041,12 @@ class Admin {
      * generalidades de inspección; la parte 3 es la que habla de grúas torre y
      * se usa junto con ella.
      */
+    /** Cuarta tanda: maquinaria de movimiento de tierras (excavadoras). */
+    private const CATALOGO_NORMAS_V4 = [
+        ['ISO 20474-1', 'Maquinaria para movimiento de tierras — Seguridad — Parte 1: Requisitos generales'],
+        ['ISO 20474-5', 'Maquinaria para movimiento de tierras — Seguridad — Parte 5: Excavadoras hidráulicas'],
+    ];
+
     private const CATALOGO_NORMAS_V3 = [
         ['ISO 9927-3:2019', 'Grúas — Inspecciones — Parte 3: Grúas torre'],
         ['ASME B30.3',      'Grúas torre: instalación, operación, inspección y mantenimiento'],
@@ -1023,6 +1113,7 @@ class Admin {
     private function ampliarCatalogoNormas(): void {
         $this->agregarAlCatalogo(self::SEED_CATALOGO_V2, self::CATALOGO_NORMAS_V2);
         $this->agregarAlCatalogo(self::SEED_CATALOGO_V3, self::CATALOGO_NORMAS_V3);
+        $this->agregarAlCatalogo(self::SEED_CATALOGO_V4, self::CATALOGO_NORMAS_V4);
     }
 
     /**
@@ -2321,7 +2412,7 @@ class Admin {
             // Faltaban: la siembra se las asigna a sus tipos, pero si Calidad
             // cambiaba la plantilla ya no podía regresarla.
             'dictamen_canastilla.html', 'dictamen_canastilla_sin_puerta.html',
-            'dictamen_oreja_carga.html',
+            'dictamen_oreja_carga.html', 'dictamen_excavadora.html',
         ];
         if (!in_array($html, $allowed, true)) {
             return ['status' => 'error', 'message' => 'Plantilla HTML no válida.'];

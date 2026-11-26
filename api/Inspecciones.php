@@ -37,7 +37,7 @@ class Inspecciones {
     private const PRECARGAS = [self::PRECARGA_GRUA_AC18, self::PRECARGA_GRUA_TC4792,
                                 self::PRECARGA_CAN_260523, self::PRECARGA_CAN_120320,
                                 self::PRECARGA_TORRE_21LC1050, self::PRECARGA_TORRE_21LC660,
-                                self::PRECARGA_TORRE_21LC550];
+                                self::PRECARGA_TORRE_21LC550, self::PRECARGA_EXC_DX220LCA];
 
     private const PRECARGA_GRUA_AC18 = [
         'clave'      => 'precarga_grua_ac18_michel',
@@ -224,6 +224,35 @@ class Inspecciones {
                       . 'No hay fotos precargadas: tómalas todas en campo, incluida la placa.',
     ];
 
+    /* Excavadora DEVELON DX220LCA-2M con prensa hidráulica, para Marcos.
+       La inspección fue el 25/11/2026: la precarga trae esa fecha y se conserva
+       al enviarla (ver guardarInspeccion). Las excavadoras no llevan prueba de
+       carga, sólo pruebas funcionales (sección F de su checklist). La placa QR
+       de AVBA ya está pegada en el equipo: va en los comentarios internos para
+       que Calidad la capture al aprobar. */
+    private const PRECARGA_EXC_DX220LCA = [
+        'clave'       => 'precarga_exc_dx220lca_031389_marcos',
+        'busca'       => 'MARCOS',
+        'fotos'       => 'assets/precarga/excavadora_dx220lca_031389/',
+        'maquinaria'  => 'EXCAVADORA',
+        'cliente'     => '',
+        'marca'       => 'DEVELON',
+        'modelo'      => 'DX220LCA-2M',
+        'serie'       => 'CEBGA-031389',
+        'id_equipo'   => '',
+        'capacidad'   => '',
+        'fecha'       => '2026-11-25',
+        'comentarios' => 'Placa QR de AVBA ya colocada en el equipo: 4352617908.',
+        'nota'        => 'Excavadora hidráulica sobre orugas DEVELON DX220LCA-2M, serie CEBGA-031389 (placa del fabricante). '
+                       . 'Trae PRENSA HIDRÁULICA (pulgar) montada en el brazo: va en la sección D del checklist. '
+                       . 'Inspección realizada el 25/11/2026: esa fecha se conserva al enviarla. '
+                       . 'Las excavadoras NO llevan prueba de carga, sólo PRUEBAS FUNCIONALES, en la sección F '
+                       . '(todos los movimientos, la prensa incluida, freno de giro, traslación y deriva de cilindros). '
+                       . 'La placa QR de AVBA ya está pegada en el equipo: 4352617908 (va en los comentarios para Calidad). '
+                       . 'Faltan y los pones tú: CLIENTE, dirección, número económico y CAPACIDAD '
+                       . '(peso operativo o capacidad del cucharón, según la placa o el manual).',
+    ];
+
     private const PRECARGA_GRUA_TC4792 = [
         'clave'      => 'precarga_grua_tc4792_michel',
         'busca'      => 'MICHEL',
@@ -323,13 +352,23 @@ class Inspecciones {
             }
 
             $this->ensureNotaBorrador();
+            // La fecha de la inspección si ya se hizo (nunca a futuro); si no, hoy.
+            $fecha = self::fechaPasada((string)($cfg['fecha'] ?? '')) ?? date('Y-m-d');
             $cols = "cliente, maquinaria, marca, modelo, serie, id_equipo, capacidad,
                      fecha_inspeccion, evidencia_url, estado, inspector";
             $vals = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
             $args = [
                 $cfg['cliente'], $cfg['maquinaria'], $cfg['marca'], $cfg['modelo'], $cfg['serie'],
-                $cfg['id_equipo'], $cfg['capacidad'], date('Y-m-d'), $cfg['fotos'], self::BORRADOR, $usuario,
+                $cfg['id_equipo'], $cfg['capacidad'], $fecha, $cfg['fotos'], self::BORRADOR, $usuario,
             ];
+            // Comentarios internos para Calidad que ya trae la precarga (p. ej. la placa QR pegada)
+            if (!empty($cfg['comentarios'])) {
+                try { $this->pdo->exec("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS comentarios_inspector TEXT NULL"); }
+                catch (\Throwable $e) { /* ya existe o no aplica */ }
+                $cols .= ", comentarios_inspector";
+                $vals .= ", ?";
+                $args[] = $cfg['comentarios'];
+            }
             if (!empty($cfg['prueba_carga'])) {
                 try { $this->pdo->exec("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS prueba_carga JSON NULL"); }
                 catch (\Throwable $e) { /* ya existe o el motor no lo admite */ }
@@ -349,6 +388,15 @@ class Inspecciones {
         } catch (\Throwable $e) {
             error_log('[Inspecciones] precarga ' . ($cfg['clave'] ?? '?') . ': ' . $e->getMessage());
         }
+    }
+
+    /** 'AAAA-MM-DD' si es una fecha válida de hoy o de los últimos 60 días; si no, null. */
+    private static function fechaPasada(string $f): ?string {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $f)) return null;
+        $t = strtotime($f . ' 00:00:00');
+        if ($t === false || date('Y-m-d', $t) !== $f) return null;
+        if ($f > date('Y-m-d') || $t < strtotime('-60 days', strtotime(date('Y-m-d')))) return null;
+        return $f;
     }
 
     /** Nota que la precarga le deja al inspector. Sólo la usan los borradores. */
@@ -372,18 +420,21 @@ class Inspecciones {
      * null si no tiene ninguna. Se entregan las URL de las fotos, no su
      * contenido: el navegador las baja como cualquier imagen.
      */
-    public function inspeccionPreparada(string $usuario): array {
+    public function inspeccionPreparada(string $usuario, int $id = 0): array {
         $nota = $this->tieneNotaBorrador() ? 'nota_borrador AS nota' : "'' AS nota";
+        try { $coment = columnaExiste($this->pdo, 'equipos', 'comentarios_inspector') ? 'comentarios_inspector AS comentarios' : "'' AS comentarios"; }
+        catch (\Throwable $e) { $coment = "'' AS comentarios"; }
         try {
             $st = $this->pdo->prepare(
                 "SELECT id, cliente, maquinaria, marca, modelo, serie, id_equipo, capacidad,
-                        correo, direccion, coords_inspeccion, evidencia_url, prueba_carga, {$nota},
+                        correo, direccion, coords_inspeccion, evidencia_url, prueba_carga, {$nota}, {$coment},
                         DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha
                  FROM equipos
-                 WHERE inspector = ? AND estado = ?
+                 WHERE inspector = ? AND estado = ?" . ($id > 0 ? " AND id = ?" : "") . "
                  ORDER BY id LIMIT 1"
             );
-            $st->execute([$usuario, self::BORRADOR]);
+            // Con varias esperando, el inspector elige cuál abrir (sólo de las suyas)
+            $st->execute($id > 0 ? [$usuario, self::BORRADOR, $id] : [$usuario, self::BORRADOR]);
             $fila = $st->fetch();
         } catch (\Throwable $e) {
             error_log('[Inspecciones] inspeccionPreparada: ' . $e->getMessage());
@@ -397,13 +448,18 @@ class Inspecciones {
 
         // Cuántas esperan en total: con más de una, el aviso lo dice y el
         // inspector no se queda pensando que sólo había ésta.
+        // Todas las que esperan, para que el inspector elija por cuál empezar
         try {
-            $c = $this->pdo->prepare("SELECT COUNT(*) FROM equipos WHERE inspector = ? AND estado = ?");
+            $c = $this->pdo->prepare(
+                "SELECT id, maquinaria, marca, modelo, serie, DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha
+                 FROM equipos WHERE inspector = ? AND estado = ? ORDER BY id"
+            );
             $c->execute([$usuario, self::BORRADOR]);
-            $pendientes = (int)$c->fetchColumn();
-        } catch (\Throwable $e) { $pendientes = 1; }
+            $lista = $c->fetchAll();
+            $pendientes = count($lista) ?: 1;
+        } catch (\Throwable $e) { $lista = []; $pendientes = 1; }
 
-        return ['status' => 'success', 'data' => $fila, 'pendientes' => $pendientes];
+        return ['status' => 'success', 'data' => $fila, 'pendientes' => $pendientes, 'lista' => $lista];
     }
 
     /** URL de las imágenes que hay en una carpeta de evidencia, en orden. */
@@ -420,7 +476,7 @@ class Inspecciones {
         foreach (glob($dir . '*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}', GLOB_BRACE) ?: [] as $ruta) {
             $fotos[] = rtrim($url, '/') . '/' . basename($ruta);
         }
-        sort($fotos);
+        sort($fotos, SORT_NATURAL | SORT_FLAG_CASE);
         return $fotos;
     }
 
@@ -495,6 +551,18 @@ class Inspecciones {
 
             if (!$cliente || !$serie || !$maquinaria) {
                 return ['status' => 'error', 'message' => 'cliente, serie y maquinaria son requeridos.'];
+            }
+
+            // Fecha de la inspección: hoy, salvo que sea una inspección preparada
+            // con la fecha en que ya se hizo (de los últimos 60 días).
+            $fechaInsp = date('Y-m-d');
+            $borradorId = (int)($payload['borrador_id'] ?? 0);
+            if ($borradorId > 0) {
+                try {
+                    $bf = $this->pdo->prepare("SELECT fecha_inspeccion FROM equipos WHERE id = ? AND inspector = ? AND estado = ?");
+                    $bf->execute([$borradorId, $usuarioActual, self::BORRADOR]);
+                    $fechaInsp = self::fechaPasada((string)($bf->fetchColumn() ?: '')) ?? $fechaInsp;
+                } catch (\Throwable $e) { /* se queda la de hoy */ }
             }
 
             // Generar folio de control
@@ -593,7 +661,7 @@ class Inspecciones {
                 $u($info['modelo']     ?? ''),
                 $serie,
                 $u($info['id_cliente'] ?? ''),
-                date('Y-m-d'),
+                $fechaInsp,
                 $this->normalizarEmails($info['email_cliente'] ?? '') ?: null,
                 $control,
                 $urlCarpeta ?: null,
