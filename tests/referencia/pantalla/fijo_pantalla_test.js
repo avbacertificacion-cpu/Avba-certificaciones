@@ -1,8 +1,10 @@
-// Equipo fijo (lectura continua) en la pantalla del guardia, con la app simulada: la página abre la
-// lectura continua sola, registra cada credencial que llega del lector, ignora a quien se registró
-// hace menos de 2 min, le dice a la app qué mostrar (nombre de la base, permisos, avisos), funciona
-// sin señal, se reanuda con el botón, el carril de salida, la app vieja (sin lectura continua),
-// Cuentas y el guardia con botones. API real local; personas e IDs inventados.
+// Equipo fijo (lectura continua) en la pantalla del guardia, con la app simulada:
+//  · el guardia elige en el equipo si está en la ENTRADA o en la SALIDA; registra con su cuenta y su
+//    turno, el equipo lo recuerda si la app se reinicia y lo olvida al salir de la cámara;
+//  · la cuenta de modo fijo (sólo entradas / sólo salidas) abre la lectura continua sola;
+//  · cada lectura se registra, se ignora a quien se registró hace menos de 2 min, la app muestra el
+//    nombre de la base, permisos y avisos; sin señal; la app vieja; Cuentas.
+// API real local; personas e IDs inventados.
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const B = 'http://localhost:8794/';
@@ -113,17 +115,51 @@ const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE 
 
   // ══ App vieja (sin lectura continua) ══
   ({ ctx, p } = await telefono(b, ses('fijo.entrada', 'E'), false));
-  ok(/Instala la versión nueva/.test(await p.textContent('#fijo-estado')) && await p.isHidden('#btn-fijo') && await p.isVisible('.cap.ent'), 'app vieja: pide instalar la nueva y deja el botón ENTRADA');
+  ok(/instala la versión nueva/i.test(await p.textContent('#fijo-estado')) && await p.isHidden('#btn-fijo') && await p.isVisible('.cap.ent'), 'app vieja: pide instalar la nueva y deja el botón ENTRADA');
   await p.click('.cap.ent'); await p.waitForTimeout(500);
   ok((await p.evaluate(() => window.__leer.length)) === 1, 'el botón lee una credencial a la vez, como antes');
   await ctx.close();
 
-  // ══ Guardia con botones: todo como antes, sin la tarjeta del equipo fijo ══
-  ({ ctx, p } = await telefono(b, { token: 'tok-punto1', rol: 'ACCESOS', usuario: 'punto1', nombre: 'CASETA PUNTO 1', turno: 'D' }));
-  ok(await p.isHidden('#tarjeta-fijo') && await p.isVisible('.cap.ent') && await p.isVisible('.cap.sal') && await p.isVisible('.cap.inc'), 'el guardia con botones no cambia');
-  ok((await p.evaluate(() => window.__continuo.length)) === 0, 'y no abre la lectura continua');
+  // ══ El guardia elige en el equipo: ENTRADA o SALIDA ══
+  const punto1 = { token: 'tok-punto1', rol: 'ACCESOS', usuario: 'punto1', nombre: 'CASETA PUNTO 1', turno: 'D' };
+  ({ ctx, p } = await telefono(b, punto1));
+  ok(await p.isVisible('.cap.ent') && await p.isVisible('.cap.sal') && await p.isVisible('.cap.inc'), 'el guardia conserva sus botones ENTRADA, SALIDA e INCIDENCIA');
+  ok(await p.isVisible('#fijo-elegir') && /elige dónde está/.test(await p.textContent('#fijo-estado')), 'y puede dejar el equipo leyendo solo: «Este equipo está en la ENTRADA / SALIDA»');
+  ok((await p.evaluate(() => window.__continuo.length)) === 0, 'no abre la lectura continua hasta que elige');
+  await p.screenshot({ path: D + 'fijo_elegir.png', fullPage: true });
   await p.click('.cap.ent'); await p.waitForTimeout(400);
-  ok((await p.evaluate(() => window.__leer[0] && window.__leer[0].esperaNombre)) === 0, 'su lector tampoco espera el nombre (sale de la base)');
+  ok((await p.evaluate(() => window.__leer[0] && window.__leer[0].esperaNombre)) === 0, 'con botones, su lector tampoco espera el nombre (sale de la base)');
+  await p.click('#btn-carril-sal'); await p.waitForTimeout(3500);
+  let oc = await p.evaluate(() => window.__continuo);
+  ok(oc.length === 1 && oc[0].tipo === 'salida' && oc[0].titulo === 'SALIDA', 'elige SALIDA: se abre la lectura continua de SALIDA');
+  ok(/Leyendo SALIDAS/.test(await p.textContent('#fijo-tit')) && await p.isHidden('#fijo-elegir'), 'la pantalla dice «Leyendo SALIDAS»');
+  await leer(p, '00316', 'PEDRO'); await p.waitForTimeout(1800);
+  m = await ultimo(p);
+  ok(m && m.titulo === 'SALIDA REGISTRADA' && m.nombre === 'PEDRO VEGA CRUZ' && m.color === 'azul', 'cada credencial se registra como salida');
+  ok(sql("SELECT CONCAT(tipo,'|',usuario,'|',turno) FROM accesos_registros WHERE usuario='punto1' AND tipo='salida' AND codigo LIKE '%316' ORDER BY id DESC LIMIT 1") === 'salida|punto1|D',
+     'con la cuenta del guardia y su turno (día)');
+  await leer(p, '00316', 'PEDRO'); await p.waitForTimeout(600);
+  ok((await ultimo(p)).titulo === 'SALIDA YA REGISTRADA', 'la misma persona otra vez: no se duplica');
+  // La app se reinicia: el equipo sigue en SALIDA y vuelve a leer solo
+  await p.reload(); await p.waitForTimeout(4500);
+  oc = await p.evaluate(() => window.__continuo);
+  ok(oc.length === 1 && oc[0].tipo === 'salida', 'si la app se reinicia, el equipo vuelve a leer SALIDAS solo');
+  // Sale de la cámara a propósito: se vuelve a elegir, y al reiniciar ya no empieza solo
+  await p.evaluate(() => window.__emitir('cerrado', {})); await p.waitForTimeout(300);
+  ok(await p.isVisible('#fijo-elegir') && (await p.evaluate(() => localStorage.getItem('ca_accesos_carril'))) === '""', 'al salir de la cámara, el equipo vuelve a preguntar dónde está');
+  await p.reload(); await p.waitForTimeout(4500);
+  ok((await p.evaluate(() => window.__continuo.length)) === 0 && await p.isVisible('#fijo-elegir'), 'y al reiniciar ya no empieza solo');
+  // Ahora en ENTRADA
+  await p.click('#btn-carril-ent'); await p.waitForTimeout(3500);
+  ok((await p.evaluate(() => window.__continuo[0] && window.__continuo[0].tipo)) === 'entrada', 'puede cambiar el equipo a ENTRADA');
+  await leer(p, '00316', 'PEDRO'); await p.waitForTimeout(1500);
+  ok((await ultimo(p)).titulo === 'ENTRADA REGISTRADA', 'la misma persona sí se registra como entrada (otro tipo)');
+  ok(!p.errores.length, 'sin errores de JavaScript (guardia que elige)' + (p.errores.length ? ': ' + p.errores.join(' | ') : ''));
+  await ctx.close();
+
+  // App vieja con un guardia normal: pide instalar la nueva y deja los botones
+  ({ ctx, p } = await telefono(b, punto1, false));
+  ok(/instala la versión nueva/i.test(await p.textContent('#fijo-estado')) && await p.isHidden('#fijo-elegir') && await p.isVisible('.cap.sal'), 'app vieja: pide instalar la nueva; los botones siguen');
   await ctx.close();
 
   // ══ Cuentas: crear un equipo fijo desde la pantalla ══
@@ -135,7 +171,7 @@ const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE 
   await pa.click('#b-nueva');
   await pa.fill('#c-nombre', 'Tableta carril 2'); await pa.fill('#c-usuario', 'carril2.entrada'); await pa.selectOption('#c-rol', 'ACCESOS');
   await pa.fill('#c-pass', 'contrasena-larga');
-  ok(await pa.isVisible('#campo-turno'), 'con botones pide el turno');
+  ok(await pa.isVisible('#campo-turno'), 'la cuenta normal pide el turno');
   await pa.selectOption('#c-modo', 'E');
   ok(await pa.isHidden('#campo-turno') && /reloj/.test(await pa.textContent('#s-modo')), 'equipo fijo: sin turno (va por el reloj)');
   await pa.click('#b-guardar'); await pa.waitForTimeout(900);

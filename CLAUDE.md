@@ -118,17 +118,19 @@ y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le 
    que los registros (`clase: 'permiso'`, acción `PERMISO_AGREGAR`, confirmado por
    `ACCESOS_EXISTEN`); en las listas sólo cuentan los registros (`esRegistro`). La base es
    de datos reales: **nunca** al repositorio; las pruebas usan personas inventadas.
-9. **Equipos fijos (lectura continua):** un teléfono o tableta fijo por carril con una cuenta
-   de guardia de modo **E** (sólo entradas) o **S** (sólo salidas), que se elige en Cuentas.
-   No tiene turno (`turnoCuenta` = ''): sus registros van por el **reloj** (con el margen de
-   2 h y la entrada abierta). El servidor rechaza el otro tipo (`MODO_FIJO`). En
-   `accesos.html` (`MODO_FIJO`): sólo su botón, sin INCIDENCIA ni «Agregar permiso»; al
-   entrar abre sola la lectura continua (espera hasta 3 s la base del personal); cada
-   `lectura` se registra (misma cola sin señal) salvo si esa persona ya se registró en ese
-   equipo hace menos de `repetirSeg` (120 s, en `api/accesos-tarjeta.json`): «YA
-   REGISTRADA» en amarillo. A la app le manda `mostrar` (verde entrada, azul salida,
-   amarillo con permiso vencido o ID fuera de la base). La app vieja (sin `continuo`) pide
-   instalar la nueva y deja el botón.
+9. **Equipos fijos (lectura continua):** el acceso tiene **4 equipos fijos** y **el guardia
+   elige en cada equipo** si está en la ENTRADA o en la SALIDA (tarjeta «Lectura continua»
+   de `accesos.html`, para cualquier guardia con la app nueva): la cámara queda abierta y
+   cada credencial se registra sola **con su cuenta y su turno**. El equipo recuerda la
+   elección (`ca_accesos_carril`): si la app se reinicia vuelve a leer solo; al salir de la
+   cámara a propósito (evento `cerrado`) se olvida y se vuelve a elegir. Sus botones
+   ENTRADA/SALIDA/INCIDENCIA siguen. Opcional: una cuenta de modo **E**/**S** (Cuentas,
+   «Siempre ENTRADA/SALIDA») no elige, abre sola su tipo, no tiene turno (va por el **reloj**)
+   y el servidor rechaza el otro tipo (`MODO_FIJO`). Cada `lectura` se registra (misma cola
+   sin señal) salvo si esa persona ya se registró **del mismo tipo** en ese equipo hace menos
+   de `repetirSeg` (120 s, en `api/accesos-tarjeta.json`): «YA REGISTRADA» en amarillo. A la
+   app le manda `mostrar` (verde entrada, azul salida, amarillo con permiso vencido o ID
+   fuera de la base). La app vieja (sin `continuo`) pide instalar la nueva y deja los botones.
 
 ## Cómo probar
 

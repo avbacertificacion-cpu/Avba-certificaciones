@@ -268,6 +268,11 @@
   .fijo{text-align:center}
   .fijo-tit{font-size:24px;font-weight:900;color:#fff;border-radius:12px;padding:14px 10px;background:var(--verde);letter-spacing:.5px}
   .fijo.salida .fijo-tit{background:var(--azul)}
+  .fijo.neutro .fijo-tit{background:var(--marino);font-size:20px}
+  .fijo-elegir{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn.carril{flex-direction:column;gap:2px;min-height:82px;color:#fff;padding:10px 8px}
+  .btn.carril.entrada{background:var(--verde)} .btn.carril.salida{background:var(--azul)}
+  .btn.carril small{font-size:12px;font-weight:600;opacity:.9} .btn.carril b{font-size:21px;letter-spacing:.5px}
   .fijo-estado{font-size:14px;color:var(--texto-sub);margin:12px 4px;line-height:1.5}
   .fijo-estado b{color:var(--texto)}
   #v-foto{z-index:110}
@@ -324,9 +329,13 @@
 
   <!-- Equipo fijo (cuenta de sólo entradas o sólo salidas): lectura continua, sin botones -->
   <div class="tarjeta fijo" id="tarjeta-fijo" hidden>
-    <div class="fijo-tit" id="fijo-tit">Equipo fijo de ENTRADA</div>
+    <div class="fijo-tit" id="fijo-tit">Lectura continua</div>
     <p class="fijo-estado" id="fijo-estado"></p>
-    <button class="btn prim ancho" type="button" id="btn-fijo">Iniciar lectura continua</button>
+    <button class="btn prim ancho" type="button" id="btn-fijo" hidden>Iniciar lectura continua</button>
+    <div class="fijo-elegir" id="fijo-elegir" hidden>
+      <button class="btn carril entrada" type="button" id="btn-carril-ent"><small>Este equipo está en la</small><b>ENTRADA</b></button>
+      <button class="btn carril salida" type="button" id="btn-carril-sal"><small>Este equipo está en la</small><b>SALIDA</b></button>
+    </div>
   </div>
 
   <div class="tarjeta" id="tarjeta-camara">
@@ -2041,13 +2050,18 @@
   });
 
   /* ══ Equipo fijo: lectura continua ════════════════════════════════════
-     Un teléfono o tableta fijo en el carril de entrada (o de salida), con una cuenta de
-     sólo entradas (o sólo salidas): la app deja la cámara abierta y cada credencial que
-     se acerca se registra sola. Aquí se registra (misma cola sin señal), se ignora la
-     misma persona si ya se registró hace poco (regla repetirSeg, 2 min) y se le dice a
+     Un teléfono o tableta fijo en el acceso: el guardia elige aquí si el equipo está en la
+     ENTRADA o en la SALIDA y la app deja la cámara abierta; cada credencial que se acerca se
+     registra sola (con la cuenta y el turno del guardia). El equipo recuerda la elección: si
+     la app se reinicia, vuelve a leer solo. Al salir de la cámara (mantener 3 s) se olvida y
+     se puede elegir otra vez. Una cuenta de modo fijo (sólo entradas o sólo salidas, en
+     Cuentas) no elige: siempre es lo suyo. Aquí se registra (misma cola sin señal), se ignora
+     a la misma persona si ya se registró hace poco (regla repetirSeg, 2 min) y se le dice a
      la app qué mostrar en grande: nombre de la base, permisos o avisos. */
   var CONTINUO = { soportado: null, activo: false, escuchando: false, auto: true };
-  var LEIDAS_FIJO = {};                            // clave → hora del último registro en este equipo
+  var CLAVE_CARRIL = 'ca_accesos_carril', CARRIL = '';   // lo que eligió el guardia en este equipo
+  var LEIDAS_FIJO = {};                            // clave|tipo → hora del último registro en este equipo
+  function carril() { return MODO_FIJO || CARRIL; }
   function fijarModo(m) {
     var nuevo = CASETA ? ({ E: 'entrada', S: 'salida' })[m] || '' : '';
     if (nuevo !== MODO_FIJO) {
@@ -2056,32 +2070,47 @@
       if ($('lugar').value) fijarPunto($('lugar').value);
     }
     pintarFijo();
-    if (MODO_FIJO && CONTINUO.auto) { CONTINUO.auto = false; setTimeout(iniciarContinuo, 800); }   // al entrar, empieza solo
+    if (!CONTINUO.auto || !CASETA) return;
+    // Al entrar: la cuenta de modo fijo empieza sola; si el guardia había dejado el equipo leyendo, sigue
+    var antes = !MODO_FIJO && LECTOR ? leer(CLAVE_CARRIL, '') : '';
+    if (MODO_FIJO || antes === 'entrada' || antes === 'salida') {
+      CONTINUO.auto = false;
+      if (!MODO_FIJO) CARRIL = antes;
+      setTimeout(iniciarContinuo, 800);
+    } else if (LECTOR) soportaContinuo().then(pintarFijo);
   }
+  function elegirCarril(t) {
+    CARRIL = t; guardar(CLAVE_CARRIL, t);
+    iniciarContinuo();
+  }
+  $('btn-carril-ent').onclick = function () { elegirCarril('entrada'); };
+  $('btn-carril-sal').onclick = function () { elegirCarril('salida'); };
   function pintarFijo() {
-    var t = $('tarjeta-fijo');
-    t.hidden = !MODO_FIJO;
+    var t = $('tarjeta-fijo'), c = carril();
     document.querySelector('.cap.ent').hidden = MODO_FIJO === 'salida';
     document.querySelector('.cap.sal').hidden = MODO_FIJO === 'entrada';
-    document.querySelector('.cap.inc').hidden = !!MODO_FIJO;           // el equipo fijo sólo lee
+    document.querySelector('.cap.inc').hidden = !!MODO_FIJO;           // la cuenta de modo fijo sólo lee
     $('btn-permiso').hidden = !!MODO_FIJO;
     $('captura').style.gridTemplateColumns = MODO_FIJO ? '1fr' : '';
-    if (!MODO_FIJO) return;
-    t.className = 'tarjeta fijo ' + MODO_FIJO;
-    $('fijo-tit').textContent = 'Equipo fijo de ' + MODO_FIJO.toUpperCase();
-    var e = $('fijo-estado'), b = $('btn-fijo');
+    t.hidden = !(MODO_FIJO || (CASETA && LECTOR));   // el guardia con la app puede dejar el equipo leyendo
+    if (t.hidden) return;
+    var activo = CONTINUO.activo && !!c, e = $('fijo-estado'), b = $('btn-fijo'), el = $('fijo-elegir');
+    t.className = 'tarjeta fijo ' + (MODO_FIJO || activo ? c : 'neutro');
+    $('fijo-tit').textContent = MODO_FIJO ? 'Equipo fijo de ' + MODO_FIJO.toUpperCase() : activo ? 'Leyendo ' + c.toUpperCase() + 'S' : 'Lectura continua';
+    b.hidden = true; el.hidden = true;
     if (!LECTOR) {
       e.innerHTML = 'El equipo fijo necesita la app <b>AVBA Control de Accesos</b> para leer las credenciales solo. Desde el navegador usa el botón de abajo.';
-      b.hidden = true;
     } else if (CONTINUO.soportado === false) {
-      e.innerHTML = 'Esta versión de la app no lee sola. <b>Instala la versión nueva</b> (gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk). Mientras, usa el botón de abajo.';
-      b.hidden = true;
-    } else if (CONTINUO.activo) {
-      e.innerHTML = '<b>Leyendo credenciales.</b> Cada ' + MODO_FIJO + ' se registra sola al acercar la credencial.';
-      b.hidden = true;
-    } else {
+      e.innerHTML = 'Para dejar este equipo leyendo las credenciales solo, <b>instala la versión nueva de la app</b> (gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk). Mientras, usa los botones de abajo.';
+    } else if (activo) {
+      e.innerHTML = '<b>Leyendo credenciales.</b> Cada ' + c + ' se registra sola al acercar la credencial.' +
+        (MODO_FIJO ? '' : ' Para cambiar a ' + (c === 'entrada' ? 'salida' : 'entrada') + ', sal de la cámara (mantén presionado «Mantén para salir» 3 segundos) y elige aquí.');
+    } else if (MODO_FIJO) {
       e.innerHTML = 'La lectura continua está detenida. Toca el botón para que el equipo vuelva a leer solo.';
       b.hidden = false;
+    } else {
+      e.innerHTML = 'Si este equipo se queda fijo en el acceso, elige dónde está: la cámara queda abierta y cada credencial se registra sola, sin tocar la pantalla.';
+      el.hidden = false;
     }
   }
   function soportaContinuo() {
@@ -2090,7 +2119,7 @@
     return Promise.resolve(LECTOR.disponible()).then(function (r) { return (CONTINUO.soportado = !!(r && r.continuo)); }, function () { return (CONTINUO.soportado = false); });
   }
   function iniciarContinuo() {
-    if (!MODO_FIJO || !LECTOR || CONTINUO.activo) return;
+    if (!carril() || !LECTOR || CONTINUO.activo) return;
     // Con la base del personal a la mano (hasta 3 s), el lector sólo necesita el ID
     var base = Promise.race([actualizarPadron(), new Promise(function (ok) { setTimeout(ok, 3000); })]);
     base.then(soportaContinuo).then(function (si) {
@@ -2099,11 +2128,17 @@
       if (!CONTINUO.escuchando) {
         CONTINUO.escuchando = true;
         LECTOR.addListener('lectura', alLeerContinuo);
-        LECTOR.addListener('cerrado', function () { CONTINUO.activo = false; pintarFijo(); });
+        LECTOR.addListener('cerrado', function () {
+          CONTINUO.activo = false;
+          if (!MODO_FIJO) { CARRIL = ''; guardar(CLAVE_CARRIL, ''); }   // salió a propósito: se vuelve a elegir
+          pintarFijo();
+        });
       }
-      var o = opcionesLector(MODO_FIJO);
-      o.tipo = MODO_FIJO;
-      o.titulo = MODO_FIJO === 'entrada' ? 'ENTRADA' : 'SALIDA';
+      var c = carril();
+      if (!c) return;
+      var o = opcionesLector(c);
+      o.tipo = c;
+      o.titulo = c === 'entrada' ? 'ENTRADA' : 'SALIDA';
       o.subtitulo = 'Acerca tu credencial al recuadro';
       return Promise.resolve(LECTOR.continuo(o)).then(function () { CONTINUO.activo = true; pintarFijo(); });
     }).catch(function (e) { toast((e && e.message) || 'No se pudo abrir la cámara.', true); pintarFijo(); });
@@ -2115,7 +2150,7 @@
     var seg = +REGLAS_TARJETA.repetirSeg || 0;
     if (seg <= 0) return '';
     var k = claveId(codigo), desde = horaTxt(new Date(Date.now() - seg * 1000)), ult = '';
-    if (LEIDAS_FIJO[k] && LEIDAS_FIJO[k] >= desde) ult = LEIDAS_FIJO[k];
+    if (LEIDAS_FIJO[k + '|' + tipo] && LEIDAS_FIJO[k + '|' + tipo] >= desde) ult = LEIDAS_FIJO[k + '|' + tipo];
     cola.filter(esRegistro).concat(recienEnviados, (datos && datos.registros) || []).forEach(function (x) {
       if (x.tipo === tipo && x.codigo && claveId(x.codigo) === k && x.capturado >= desde && x.capturado > ult) ult = x.capturado;
     });
@@ -2123,8 +2158,9 @@
   }
   function mostrarEnApp(d) { if (LECTOR && LECTOR.mostrar) Promise.resolve(LECTOR.mostrar(d)).catch(function () {}); }
   function alLeerContinuo(r) {
-    if (!MODO_FIJO || !r) return;
-    var tipo = MODO_FIJO, T = tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
+    var tipo = carril();
+    if (!tipo || !r) return;
+    var T = tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
     var codigo = String(r.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
     if (!codigo) return;
     var pb = enPadron(codigo), nombre = pb ? pb.nombre : String(r.nombre || '').replace(/\s+/g, ' ').trim();
@@ -2135,7 +2171,7 @@
                      color: 'amarillo', segundos: 2.5, sonido: 'aviso', codigo: codigo });
       return;
     }
-    LEIDAS_FIJO[claveId(codigo)] = ahoraLocal();
+    LEIDAS_FIJO[claveId(codigo) + '|' + tipo] = ahoraLocal();
     registrarTarjeta(tipo, r);
     var lineas = ['ID ' + (pb ? pb.codigo : codigo) + ' · ' + ahoraLocal().slice(11, 16)], aviso = false, vistos = {};
     permisosDe(codigo).forEach(function (p) {

@@ -55,11 +55,11 @@
       <div class="fila" id="campos-guardia" hidden>
         <div class="campo"><label for="c-modo">Cómo registra</label>
           <select id="c-modo">
-            <option value="">Con botones ENTRADA y SALIDA (teléfono del guardia)</option>
-            <option value="E">Equipo fijo de ENTRADA (lee solo, sin botones)</option>
-            <option value="S">Equipo fijo de SALIDA (lee solo, sin botones)</option>
+            <option value="">Normal: el guardia elige ENTRADA o SALIDA en el equipo</option>
+            <option value="E">Siempre ENTRADA (equipo fijo, no se puede cambiar)</option>
+            <option value="S">Siempre SALIDA (equipo fijo, no se puede cambiar)</option>
           </select>
-          <small id="s-modo">El guardia toca ENTRADA o SALIDA y lee la credencial.</small></div>
+          <small id="s-modo">Con botones, o dejando el equipo leyendo solo (eligiendo en el equipo si está en la entrada o en la salida).</small></div>
         <div class="campo" id="campo-turno"><label for="c-turno">Turno del guardia</label>
           <select id="c-turno">
             <option value="">Elige…</option>
@@ -157,7 +157,7 @@
     var fijo = $('c-modo').value !== '';
     $('campo-turno').hidden = fijo;                  // el equipo fijo trabaja día y noche: va por el reloj
     $('s-modo').textContent = fijo ? 'Para el teléfono o tableta fijo del carril: lee las credenciales solo, día y noche. Su turno es el del reloj (día 06:00–18:00, noche 18:00–06:00).'
-                                   : 'El guardia toca ENTRADA o SALIDA y lee la credencial.';
+                                   : 'Con botones, o dejando el equipo leyendo solo (eligiendo en el equipo si está en la entrada o en la salida).';
   }
   $('c-rol').addEventListener('change', camposGuardia);
   $('c-modo').addEventListener('change', camposGuardia);
