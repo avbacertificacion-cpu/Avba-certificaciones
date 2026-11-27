@@ -26,6 +26,7 @@ require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/ControlAccesos.php';
 require_once __DIR__ . '/Tablero.php';
+require_once __DIR__ . '/Personal.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -85,6 +86,7 @@ try {
             'ACCESO_REGISTRAR', 'LISTAR_ACCESOS', 'LISTAR_ACCESOS_LUGARES', 'ACCESO_ELIMINAR',
             'ACCESO_INCIDENCIA', 'INCIDENCIA_ELIMINAR',
             'ACCESOS_EXISTEN', 'ACCESOS_MI_PUNTO', 'ACCESOS_TARJETA_REGLAS',
+            'PADRON_CAJA', 'PERMISO_AGREGAR', 'PERMISO_QUITAR',
         ], true)) {
         respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo puede registrar entradas y salidas.'], 403);
     }
@@ -98,7 +100,8 @@ try {
     // Lo que cambia algo va por POST (un enlace no puede borrar ni dar salidas)
     $soloPost = ['CAMBIAR_MI_CONTRASENA', 'CUENTA_CREAR', 'CUENTA_EDITAR', 'ACCESO_REGISTRAR', 'ACCESO_ELIMINAR',
                  'ACCESO_INCIDENCIA', 'INCIDENCIA_ELIMINAR',
-                 'ACCESOS_PDF', 'ACCESOS_PDF_DATOS', 'ACCESOS_DAR_SALIDA', 'TABLERO_EXCEL', 'TABLERO_PDF'];
+                 'ACCESOS_PDF', 'ACCESOS_PDF_DATOS', 'ACCESOS_DAR_SALIDA', 'TABLERO_EXCEL', 'TABLERO_PDF',
+                 'PADRON_GUARDAR', 'PADRON_ELIMINAR', 'PADRON_IMPORTAR', 'PADRON_EXCEL', 'PERMISO_AGREGAR', 'PERMISO_QUITAR'];
     if ($metodo !== 'POST' && in_array($accion, $soloPost, true)) respuesta(['status' => 'error', 'message' => 'Método no permitido.'], 405);
 
     $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
@@ -135,6 +138,18 @@ try {
         case 'ACCESOS_DAR_SALIDA':     respuesta($ca->darSalida($datos, $usr));
         case 'ACCESOS_PDF':            respuesta($ca->generarPdf($datos, $usr));
         case 'ACCESOS_PDF_DATOS':      respuesta($ca->generarPdfDatos($datos, $usr));
+
+        // ── Base del personal y permisos (Personal.php). La caseta consulta su copia y agrega permisos ──
+        case 'PADRON_CAJA':       respuesta((new Personal($pdo))->caja($datos, $usr));
+        case 'PERMISO_AGREGAR':   respuesta((new Personal($pdo))->permisoAgregar($datos, $_FILES['foto'] ?? [], $usr));
+        case 'PERMISO_QUITAR':    respuesta((new Personal($pdo))->permisoQuitar($datos, $usr));
+        case 'PADRON_LISTAR':     respuesta((new Personal($pdo))->listar($datos, $usr));
+        case 'PADRON_FICHA':      respuesta((new Personal($pdo))->ficha($datos, $usr));
+        case 'PADRON_FALTANTES':  respuesta((new Personal($pdo))->faltantes($datos, $usr));
+        case 'PADRON_GUARDAR':    respuesta((new Personal($pdo))->guardar($datos, $usr));
+        case 'PADRON_ELIMINAR':   respuesta((new Personal($pdo))->eliminar($datos, $usr));
+        case 'PADRON_IMPORTAR':   respuesta((new Personal($pdo))->importar($datos, $_FILES['archivo'] ?? [], $usr));
+        case 'PADRON_EXCEL':      respuesta((new Personal($pdo))->excel($usr));
 
         // ── Tablero (Tablero.php): gráficas, Excel y PDF. Cliente, planta y Administración ──
         case 'TABLERO':

@@ -68,6 +68,13 @@ teléfono ligado).
 
 ## Fase 2 — Padrón: empresas y personas
 
+**Adelantado (a pedido del usuario):** la base del personal (`personal.html`, `api/Personal.php`):
+IDs y nombres desde un Excel, agregar / cambiar / quitar IDs, y **permisos por ID**
+(resguardo de herramienta, celular, computadora u otro) con foto del pase, datos del equipo y
+vigencia; el guardia los ve al leer la credencial y agrega permisos con la foto del pase
+(también sin señal). Al leer, se guarda el nombre de la base. Falta: empresas con REPSE,
+documentos y cursos, y que el lector de la app sólo lea el ID (no espere el nombre).
+
 Lo que muestra la maqueta (panel → Personas, perfil de la persona, Contratistas):
 - **Empresas contratistas** con su REPSE (vigente / por vencer / vencido) y su personal.
 - **Personas**: el ID de la credencial como llave, nombre, empresa, puesto, foto,

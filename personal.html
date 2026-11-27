@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Personal y permisos · Control de Accesos · AVBA</title>
+<link rel="icon" href="assets/logos/avba.png">
+<meta name="theme-color" content="#0B2545">
+<link rel="stylesheet" href="css/ca.css">
+<!--
+  La base del personal (Administración AVBA y administrador de la planta):
+  cada persona con el ID de su credencial, su nombre completo, empresa y cargo.
+  Se carga desde un Excel y aquí se agregan, cambian o quitan IDs. Cada ID
+  puede tener permisos especiales (resguardo de herramienta, celular,
+  computadora u otro) con la foto del pase y/o los datos del equipo; la caseta
+  los ve al leer la credencial. Servidor: api/Personal.php.
+-->
+<style>
+  .buscar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .buscar input{flex:1 1 220px;min-width:0;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;font:inherit;font-size:15px}
+  .filtros{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .filtros button{border:1.5px solid var(--borde);background:#fff;color:var(--texto);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+  .filtros button[aria-pressed="true"]{background:var(--azul);border-color:var(--azul);color:#fff}
+  .cifras{font-size:13px;color:var(--sub);margin-top:8px}
+  .acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .id{display:inline-block;background:#1d5fa8;color:#fff;font-weight:800;font-size:14px;letter-spacing:.5px;border-radius:999px;padding:5px 11px;
+    min-width:68px;text-align:center;font-variant-numeric:tabular-nums;flex-shrink:0}
+  .per{border-top:1px solid var(--borde);padding:11px 0;display:flex;gap:12px;align-items:center;cursor:pointer}
+  .per:first-child{border-top:0}
+  .per:hover .nom{color:var(--azul)}
+  .per .datos{flex:1;min-width:0}
+  .per .nom{font-weight:700;font-size:14.5px;overflow-wrap:anywhere}
+  .per .m{font-size:12.5px;color:var(--sub);margin-top:3px}
+  .pm{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:20px;background:#E6F1FB;color:#0C447C;margin:4px 4px 0 0}
+  .pm.venc{background:var(--rojo-claro);color:var(--rojo)}
+  .mas{text-align:center;margin-top:10px}
+  .falta{border-top:1px solid var(--borde);padding:10px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .falta:first-child{border-top:0}
+  .falta .datos{flex:1 1 200px;min-width:0}
+  .falta .m{font-size:12.5px;color:var(--sub)}
+  /* Ventanas */
+  .fondo{position:fixed;inset:0;z-index:30;background:rgba(11,37,69,.6);display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow:auto}
+  .ventana{background:#fff;border-radius:16px;width:100%;max-width:640px;padding:18px;margin:auto 0}
+  .ventana h2{font-size:17px;color:var(--azul-dark);margin-bottom:10px}
+  .ventana h3{font-size:14.5px;color:var(--azul-dark);margin:18px 0 8px}
+  .cerrar{float:right;border:0;background:none;font-size:26px;line-height:1;color:var(--sub);cursor:pointer;padding:0 4px}
+  .permiso{border:1px solid var(--borde);border-radius:12px;padding:10px;display:flex;gap:10px;margin-bottom:8px;align-items:flex-start}
+  .permiso.quitado{opacity:.6}
+  .permiso img{width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--borde);cursor:zoom-in;flex-shrink:0;background:#eef1f6}
+  .permiso .datos{flex:1;min-width:0;font-size:13.5px}
+  .permiso .det{margin-top:4px;overflow-wrap:anywhere}
+  .permiso .m{font-size:12px;color:var(--sub);margin-top:4px}
+  .checks{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+  .checks label{display:flex;align-items:center;gap:7px;border:1.5px solid var(--borde);border-radius:10px;padding:9px 12px;font-size:14px;cursor:pointer;background:#fff}
+  .checks input{width:18px;height:18px;accent-color:var(--azul)}
+  .checks label:has(input:checked){border-color:var(--azul);background:#E6F1FB}
+  .campo textarea{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;font:inherit;font-size:14.5px;min-height:70px;resize:vertical}
+  .previa{max-width:160px;max-height:160px;border-radius:10px;border:1px solid var(--borde);display:block;margin-top:8px}
+  .nuevo-permiso{background:#f7f9fc;border:1px solid var(--borde);border-radius:12px;padding:14px;margin-top:8px}
+  details summary{cursor:pointer;font-size:13px;color:var(--sub);font-weight:700;margin:8px 0}
+  table.t{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.t th{text-align:left;color:var(--sub);font-weight:700;border-bottom:1.5px solid var(--borde);padding:6px}
+  table.t td{border-bottom:1px solid var(--borde);padding:6px;vertical-align:top}
+  .tabla-env{overflow-x:auto}
+  .resumen-imp{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:10px 0}
+  .resumen-imp div{background:#f3f6fa;border-radius:10px;padding:10px;font-size:12.5px;color:var(--sub)}
+  .resumen-imp b{display:block;font-size:22px;color:var(--marino)}
+  .grande{max-width:100%;max-height:80vh;border-radius:10px;display:block;margin:0 auto}
+</style>
+</head>
+<body>
+<header class="barra">
+  <a class="atras" href="index.html" aria-label="Regresar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+  <div><h1>Personal y permisos</h1><div class="sub" id="sub">Base de IDs y nombres de la planta</div></div>
+</header>
+<main class="ancho">
+  <div class="card" id="sin-permiso" hidden><p class="aviso mal">Sólo Administración AVBA y el administrador de la planta manejan la base del personal.</p><a class="btn sec" href="index.html">Regresar</a></div>
+
+  <div id="todo" hidden>
+    <div class="card">
+      <form class="buscar" id="f-buscar" role="search">
+        <input type="search" id="q" placeholder="Buscar por ID, nombre, empresa o cargo" aria-label="Buscar" autocomplete="off">
+      </form>
+      <div class="filtros" id="filtros" role="group" aria-label="Mostrar">
+        <button type="button" data-f="" aria-pressed="true">Todos</button>
+        <button type="button" data-f="permisos" aria-pressed="false">Con permisos</button>
+      </div>
+      <p class="cifras" id="cifras"></p>
+      <div class="acciones">
+        <button class="btn chico" type="button" id="b-nueva">+ Agregar persona</button>
+        <button class="btn sec chico" type="button" id="b-importar">Cargar Excel</button>
+        <button class="btn sec chico" type="button" id="b-excel">Descargar Excel</button>
+      </div>
+    </div>
+
+    <div class="card"><div id="lista"><p>Cargando…</p></div><div class="mas" id="mas" hidden><button class="btn sec chico" type="button" id="b-mas">Ver más</button></div></div>
+
+    <div class="card" id="c-faltan" hidden>
+      <h2>Leídos en la caseta y no están en la base</h2>
+      <p style="font-size:13px">IDs que se leyeron en los últimos 30 días y no están en la base: personas nuevas o una lectura equivocada. Agrégalas para que la caseta muestre su nombre correcto.</p>
+      <div id="faltan"></div>
+    </div>
+  </div>
+</main>
+
+<!-- Persona: datos y permisos -->
+<div class="fondo" id="v-per" hidden>
+  <div class="ventana" role="dialog" aria-modal="true" aria-labelledby="per-tit">
+    <button class="cerrar" type="button" data-cerrar aria-label="Cerrar">×</button>
+    <h2 id="per-tit">Persona</h2>
+    <form id="f-per" autocomplete="off">
+      <div class="aviso mal" id="per-err" hidden role="alert"></div>
+      <div class="fila">
+        <div class="campo" style="flex:0 1 150px"><label for="p-codigo">ID de la credencial</label><input id="p-codigo" maxlength="32" inputmode="numeric" required placeholder="Ej. 00287"></div>
+        <div class="campo"><label for="p-nombre">Nombre completo</label><input id="p-nombre" maxlength="150" required placeholder="Como viene en la credencial"></div>
+      </div>
+      <div class="fila">
+        <div class="campo"><label for="p-empresa">Empresa (opcional)</label><input id="p-empresa" maxlength="150"></div>
+        <div class="campo"><label for="p-cargo">Cargo (opcional)</label><input id="p-cargo" maxlength="150"></div>
+      </div>
+      <div class="fila"><button class="btn" type="submit" id="p-guardar">Guardar</button>
+        <button class="btn peligro" type="button" id="p-eliminar" hidden>Quitar de la base</button></div>
+      <p class="cifras" id="p-meta"></p>
+    </form>
+
+    <div id="sec-permisos" hidden>
+      <h3>Permisos especiales</h3>
+      <p style="font-size:13px;color:var(--sub)">La caseta los ve al leer la credencial de esta persona.</p>
+      <div id="permisos"></div>
+      <details id="d-quitados" hidden><summary id="s-quitados">Permisos quitados</summary><div id="quitados"></div></details>
+      <button class="btn sec chico" type="button" id="b-nuevo-permiso" style="margin-top:6px">+ Agregar permiso</button>
+      <form class="nuevo-permiso" id="f-permiso" hidden autocomplete="off">
+        <div class="aviso mal" id="pm-err" hidden role="alert"></div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--sub);margin-bottom:6px">¿Qué permiso tiene?</div>
+        <div class="checks" id="pm-tipos">
+          <label><input type="checkbox" value="HERRAMIENTA"> Resguardo de herramienta</label>
+          <label><input type="checkbox" value="CELULAR"> Celular</label>
+          <label><input type="checkbox" value="COMPUTADORA"> Computadora</label>
+          <label><input type="checkbox" value="OTRO"> Otro</label>
+        </div>
+        <div class="campo"><label for="pm-foto">Foto del pase o del resguardo</label>
+          <input type="file" id="pm-foto" accept="image/*"><img class="previa" id="pm-previa" alt="Foto del pase" hidden></div>
+        <div class="campo"><label for="pm-detalle">Datos del equipo o de la herramienta</label>
+          <textarea id="pm-detalle" maxlength="500" placeholder="Ej. Celular Samsung A54, IMEI 3512…; Laptop Dell Latitude, serie 8H2K…; taladro Makita y juego de llaves"></textarea>
+          <small>Con la foto o con estos datos basta; mejor ambos.</small></div>
+        <div class="campo" style="max-width:220px"><label for="pm-vigencia">Vigente hasta (opcional)</label><input type="date" id="pm-vigencia"></div>
+        <div class="fila"><button class="btn" type="submit" id="pm-guardar">Guardar permiso</button><button class="btn sec" type="button" id="pm-cancelar">Cancelar</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Cargar Excel -->
+<div class="fondo" id="v-imp" hidden>
+  <div class="ventana" role="dialog" aria-modal="true" aria-labelledby="imp-tit">
+    <button class="cerrar" type="button" data-cerrar aria-label="Cerrar">×</button>
+    <h2 id="imp-tit">Cargar Excel del personal</h2>
+    <p style="font-size:13.5px;color:var(--sub);line-height:1.5">El Excel (.xlsx o .csv) debe tener una columna con el <b>ID</b> de la credencial y otra con el <b>nombre</b> (o nombres y apellidos en columnas separadas). Empresa y cargo son opcionales. Primero se revisa y te dice qué va a pasar; nada cambia hasta que tocas «Cargar a la base». No se quita a nadie que ya esté.</p>
+    <div class="campo" style="margin-top:12px"><label for="imp-archivo">Archivo</label><input type="file" id="imp-archivo" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"></div>
+    <div class="aviso" id="imp-msg" hidden role="status"></div>
+    <div id="imp-res" hidden>
+      <h3>Columnas</h3>
+      <p style="font-size:12.5px;color:var(--sub)" id="imp-fila"></p>
+      <div class="fila" id="imp-cols"></div>
+      <div class="resumen-imp" id="imp-cuenta"></div>
+      <div id="imp-detalle"></div>
+    </div>
+    <div class="fila" style="margin-top:12px">
+      <button class="btn sec" type="button" id="imp-revisar">Revisar</button>
+      <button class="btn" type="button" id="imp-aplicar" hidden>Cargar a la base</button>
+    </div>
+  </div>
+</div>
+
+<!-- Foto en grande -->
+<div class="fondo" id="v-foto" hidden><div class="ventana" style="max-width:760px"><button class="cerrar" type="button" data-cerrar aria-label="Cerrar">×</button>
+  <img class="grande" id="foto-grande" alt="Foto del pase"></div></div>
+
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="js/destinos.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var API = 'api/index.php', CLAVE = window.CA_SESION || 'ca_sesion';
+  var ses = null;
+  try { ses = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) {}
+  if (!ses || !ses.token) { location.replace('login.html?volver=personal.html'); return; }
+  if (ses.rol !== 'ADMIN' && ses.rol !== 'PLANTA') { $('sin-permiso').hidden = false; return; }
+  $('todo').hidden = false;
+
+  var TIPOS = { HERRAMIENTA: 'Resguardo de herramienta', CELULAR: 'Permiso de celular', COMPUTADORA: 'Permiso de computadora', OTRO: 'Otro permiso' };
+  var ICONO = { HERRAMIENTA: '🔧', CELULAR: '📱', COMPUTADORA: '💻', OTRO: '📄' };
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function fecha(t) { return t ? t.slice(8, 10) + '/' + t.slice(5, 7) + '/' + t.slice(0, 4) : ''; }
+  function fechaHora(t) { return t ? fecha(t) + ' ' + t.slice(11, 16) : ''; }
+  var tToast;
+  function toast(t, err) { var el = $('toast'); el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 4000); }
+  function salir() { location.replace('login.html?volver=personal.html'); throw new Error('Tu sesión venció.'); }
+  function json(r) { if (r.status === 401) salir(); return r.json().catch(function () { throw new Error('El servidor no respondió bien (' + r.status + ').'); }); }
+  function get(accion, q) {
+    var u = API + '?action=' + accion; for (var k in q || {}) u += '&' + k + '=' + encodeURIComponent(q[k]);
+    return fetch(u, { headers: { Authorization: 'Bearer ' + ses.token } }).then(json);
+  }
+  function post(accion, payload) {
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ses.token },
+                        body: JSON.stringify({ action: accion, payload: payload || {} }) }).then(json);
+  }
+  function postForm(fd) {
+    return fetch(API, { method: 'POST', headers: { Authorization: 'Bearer ' + ses.token }, body: fd }).then(json);
+  }
+  function urlFoto(id, mini) { return 'descargar.php?tipo=permiso_foto&id=' + id + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(ses.token); }
+  function etiquetas(permisos) {
+    var vistos = {};
+    return (permisos || []).map(function (p) {
+      return p.tipos.map(function (t) {
+        if (vistos[t + p.vencido]) return ''; vistos[t + p.vencido] = 1;
+        return '<span class="pm' + (p.vencido ? ' venc' : '') + '">' + ICONO[t] + ' ' + esc(TIPOS[t]) + (p.vencido ? ' (vencido)' : '') + '</span>';
+      }).join('');
+    }).join('');
+  }
+
+  /* ══ Lista ══ */
+  var estado = { q: '', filtro: '', desde: 0, personas: [] }, pedido = 0;
+  function cargar(mas) {
+    var yo = ++pedido;
+    if (!mas) estado.desde = 0;
+    return get('PADRON_LISTAR', { q: estado.q, filtro: estado.filtro, desde: estado.desde, limite: 100 }).then(function (r) {
+      if (yo !== pedido) return;
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo leer la base.');
+      estado.personas = mas ? estado.personas.concat(r.personas) : r.personas;
+      $('sub').textContent = r.total_base + (r.total_base === 1 ? ' persona' : ' personas') + ' en la base';
+      $('cifras').textContent = (estado.q || estado.filtro ? r.total + (r.total === 1 ? ' coincide' : ' coinciden') + ' · ' : '') +
+        r.total_base + ' en la base · ' + r.con_permisos + (r.con_permisos === 1 ? ' con permisos' : ' con permisos');
+      pintar();
+      $('mas').hidden = estado.personas.length >= r.total;
+    }).catch(function (e) { if (yo === pedido) $('lista').innerHTML = '<p class="aviso mal">' + esc(e.message) + '</p>'; });
+  }
+  function pintar() {
+    var l = estado.personas;
+    if (!l.length) {
+      $('lista').innerHTML = estado.q || estado.filtro ? '<p>Nadie coincide con la búsqueda.</p>'
+        : '<p>La base está vacía. Toca <b>Cargar Excel</b> para subir el listado del personal, o <b>Agregar persona</b>.</p>';
+      return;
+    }
+    $('lista').innerHTML = l.map(function (p, i) {
+      return '<div class="per" data-i="' + i + '" tabindex="0" role="button"><span class="id">' + esc(p.codigo) + '</span><div class="datos">' +
+        '<div class="nom">' + esc(p.nombre) + '</div>' +
+        ((p.empresa || p.cargo) ? '<div class="m">' + esc([p.empresa, p.cargo].filter(Boolean).join(' · ')) + '</div>' : '') +
+        (p.permisos.length ? '<div>' + etiquetas(p.permisos) + '</div>' : '') + '</div></div>';
+    }).join('');
+  }
+  var tBuscar;
+  $('q').addEventListener('input', function () { clearTimeout(tBuscar); tBuscar = setTimeout(function () { estado.q = $('q').value.trim(); cargar(); }, 250); });
+  $('f-buscar').addEventListener('submit', function (ev) { ev.preventDefault(); estado.q = $('q').value.trim(); cargar(); });
+  $('filtros').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    $('filtros').querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    estado.filtro = b.dataset.f; cargar();
+  });
+  $('b-mas').onclick = function () { estado.desde = estado.personas.length; cargar(true); };
+  $('lista').addEventListener('click', function (ev) { var d = ev.target.closest('.per'); if (d) abrirPersona(estado.personas[+d.dataset.i]); });
+  $('lista').addEventListener('keydown', function (ev) { var d = ev.target.closest('.per'); if (d && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrirPersona(estado.personas[+d.dataset.i]); } });
+
+  /* ══ IDs leídos que no están en la base ══ */
+  var faltan = [];
+  function cargarFaltan() {
+    return get('PADRON_FALTANTES', { dias: 30 }).then(function (r) {
+      faltan = (r && r.ids) || [];
+      $('c-faltan').hidden = !faltan.length;
+      $('faltan').innerHTML = faltan.slice(0, 60).map(function (x, i) {
+        return '<div class="falta"><span class="id">' + esc(x.codigo) + '</span><div class="datos"><b>' + esc(x.nombre || 'Nombre no leído') + '</b>' +
+          '<div class="m">' + x.lecturas + (x.lecturas === 1 ? ' lectura' : ' lecturas') + ' · última ' + esc(fechaHora(x.ultima)) + '</div></div>' +
+          '<button class="btn sec chico" type="button" data-falta="' + i + '">Agregar a la base</button></div>';
+      }).join('') + (faltan.length > 60 ? '<p class="cifras">Y ' + (faltan.length - 60) + ' más.</p>' : '');
+    }).catch(function () {});
+  }
+  $('faltan').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-falta]'); if (!b) return;
+    var x = faltan[+b.dataset.falta];
+    abrirPersona(null, { codigo: x.codigo, nombre: x.nombre });
+  });
+
+  /* ══ Ventanas ══ */
+  function abrirV(id) { $(id).hidden = false; document.body.style.overflow = 'hidden'; }
+  function cerrarV(id) { $(id).hidden = true; if (document.querySelectorAll('.fondo:not([hidden])').length === 0) document.body.style.overflow = ''; }
+  document.querySelectorAll('.fondo').forEach(function (f) {
+    f.addEventListener('click', function (ev) { if (ev.target === f || ev.target.closest('[data-cerrar]')) cerrarV(f.id); });
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    var abiertas = document.querySelectorAll('.fondo:not([hidden])');
+    if (abiertas.length) cerrarV(abiertas[abiertas.length - 1].id);
+  });
+
+  /* ══ Persona ══ */
+  var actual = null;                                // la persona abierta (null = nueva)
+  function abrirPersona(p, sugerido) {
+    actual = p || null;
+    $('per-err').hidden = true; $('f-permiso').hidden = true;
+    $('per-tit').textContent = p ? p.nombre : 'Agregar persona';
+    $('p-codigo').value = p ? p.codigo : (sugerido && sugerido.codigo) || '';
+    $('p-nombre').value = p ? p.nombre : (sugerido && sugerido.nombre) || '';
+    $('p-empresa').value = p ? p.empresa : ''; $('p-cargo').value = p ? p.cargo : '';
+    $('p-eliminar').hidden = !p;
+    $('p-meta').textContent = p && p.actualizado ? 'Último cambio: ' + fechaHora(p.actualizado) + (p.actualizado_por ? ' por ' + p.actualizado_por : '') : '';
+    $('sec-permisos').hidden = !p;
+    if (p) cargarFicha(p.codigo);
+    abrirV('v-per');
+    (p ? $('p-nombre') : ($('p-codigo').value ? $('p-nombre') : $('p-codigo'))).focus();
+  }
+  function cargarFicha(codigo) {
+    $('permisos').innerHTML = '<p class="cifras">Cargando permisos…</p>';
+    return get('PADRON_FICHA', { codigo: codigo }).then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudieron leer los permisos.');
+      if (r.persona && actual) { actual = Object.assign(actual, r.persona); }
+      var act = r.permisos.filter(function (x) { return x.activo; }), quit = r.permisos.filter(function (x) { return !x.activo; });
+      $('permisos').innerHTML = act.length ? act.map(htmlPermiso).join('') : '<p class="cifras">Sin permisos especiales.</p>';
+      $('d-quitados').hidden = !quit.length;
+      $('s-quitados').textContent = 'Permisos quitados (' + quit.length + ')';
+      $('quitados').innerHTML = quit.map(htmlPermiso).join('');
+    }).catch(function (e) { $('permisos').innerHTML = '<p class="aviso mal">' + esc(e.message) + '</p>'; });
+  }
+  function htmlPermiso(x) {
+    return '<div class="permiso' + (x.activo ? '' : ' quitado') + '">' +
+      (x.con_foto ? '<img alt="Foto del pase" loading="lazy" src="' + esc(urlFoto(x.id, true)) + '" data-foto="' + x.id + '">' : '') +
+      '<div class="datos"><div>' + x.tipos.map(function (t) { return '<span class="pm' + (x.vencido ? ' venc' : '') + '">' + ICONO[t] + ' ' + esc(TIPOS[t]) + '</span>'; }).join('') + '</div>' +
+      (x.detalle ? '<div class="det">' + esc(x.detalle) + '</div>' : '') +
+      (x.vigencia ? '<div class="m" style="' + (x.vencido ? 'color:var(--rojo);font-weight:700' : '') + '">' + (x.vencido ? 'Venció el ' : 'Vigente hasta el ') + esc(fecha(x.vigencia)) + '</div>' : '') +
+      '<div class="m">Agregado el ' + esc(fechaHora(x.creado)) + (x.por ? ' por ' + esc(x.por) : '') + (x.origen === 'caseta' ? ' (en la caseta)' : '') +
+      (!x.activo && x.quitado_por ? ' · quitado por ' + esc(x.quitado_por) : '') + '</div></div>' +
+      (x.puede_quitar ? '<button class="btn peligro chico" type="button" data-quitar="' + x.id + '">Quitar</button>' : '') + '</div>';
+  }
+  $('sec-permisos').addEventListener('click', function (ev) {
+    var t;
+    if ((t = ev.target.closest('[data-foto]'))) { $('foto-grande').src = urlFoto(t.dataset.foto, false); abrirV('v-foto'); return; }
+    if ((t = ev.target.closest('[data-quitar]'))) {
+      if (!confirm('¿Quitar este permiso? La caseta dejará de verlo. Queda en el historial.')) return;
+      t.disabled = true;
+      post('PERMISO_QUITAR', { id: +t.dataset.quitar }).then(function (r) {
+        toast(r.message || 'Listo.', r.status !== 'success');
+        cargarFicha(actual.codigo); cargar();
+      }).catch(function (e) { t.disabled = false; toast(e.message, true); });
+    }
+  });
+
+  $('f-per').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    $('per-err').hidden = true;
+    $('p-guardar').disabled = true;
+    post('PADRON_GUARDAR', { id: actual ? actual.id : 0, codigo: $('p-codigo').value, nombre: $('p-nombre').value, empresa: $('p-empresa').value, cargo: $('p-cargo').value })
+      .then(function (r) {
+        $('p-guardar').disabled = false;
+        if (!r || r.status !== 'success') { $('per-err').textContent = (r && r.message) || 'No se pudo guardar.'; $('per-err').hidden = false; return; }
+        toast(r.message);
+        var nueva = !actual;
+        return get('PADRON_FICHA', { codigo: r.codigo }).then(function (f) {
+          cargar(); cargarFaltan();
+          if (f && f.persona) {
+            if (nueva) abrirPersona(f.persona);                       // ya existe: ahora se le pueden agregar permisos
+            else { actual = Object.assign(actual || {}, f.persona); $('per-tit').textContent = f.persona.nombre; $('p-codigo').value = f.persona.codigo; $('p-nombre').value = f.persona.nombre; $('p-empresa').value = f.persona.empresa; $('p-cargo').value = f.persona.cargo; }
+          }
+        });
+      }).catch(function (e) { $('p-guardar').disabled = false; $('per-err').textContent = e.message; $('per-err').hidden = false; });
+  });
+  $('p-eliminar').onclick = function () {
+    if (!actual || !confirm('¿Quitar de la base a ' + actual.nombre + ' (ID ' + actual.codigo + ')? Sus permisos también se quitan. Sus entradas y salidas no se borran.')) return;
+    post('PADRON_ELIMINAR', { id: actual.id }).then(function (r) {
+      toast(r.message || 'Listo.', r.status !== 'success');
+      if (r.status === 'success') { cerrarV('v-per'); cargar(); cargarFaltan(); }
+    }).catch(function (e) { toast(e.message, true); });
+  };
+
+  /* ══ Agregar permiso ══ */
+  var fotoPermiso = null;
+  $('b-nuevo-permiso').onclick = function () {
+    $('f-permiso').reset(); $('pm-err').hidden = true; $('pm-previa').hidden = true; fotoPermiso = null;
+    $('f-permiso').hidden = false; $('b-nuevo-permiso').hidden = true;
+    $('f-permiso').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  };
+  $('pm-cancelar').onclick = function () { $('f-permiso').hidden = true; $('b-nuevo-permiso').hidden = false; };
+  /** Foto más ligera: hasta 1400 px, JPEG. */
+  function achicar(archivo) {
+    return new Promise(function (ok, mal) {
+      var url = URL.createObjectURL(archivo), img = new Image();
+      img.onload = function () {
+        var k = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(function (b) { b ? ok(b) : mal(new Error('No se pudo procesar la foto.')); }, 'image/jpeg', 0.82);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); mal(new Error('El archivo no es una foto.')); };
+      img.src = url;
+    });
+  }
+  $('pm-foto').addEventListener('change', function () {
+    var f = $('pm-foto').files[0]; fotoPermiso = null; $('pm-previa').hidden = true;
+    if (!f) return;
+    achicar(f).then(function (b) { fotoPermiso = b; $('pm-previa').src = URL.createObjectURL(b); $('pm-previa').hidden = false; })
+      .catch(function (e) { $('pm-err').textContent = e.message; $('pm-err').hidden = false; });
+  });
+  $('f-permiso').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var tipos = Array.prototype.map.call($('pm-tipos').querySelectorAll('input:checked'), function (x) { return x.value; });
+    var err = function (m) { $('pm-err').textContent = m; $('pm-err').hidden = false; };
+    if (!tipos.length) return err('Marca qué permiso es.');
+    if (!fotoPermiso && !$('pm-detalle').value.trim()) return err('Sube la foto del pase o escribe los datos del equipo o de la herramienta.');
+    if (tipos.indexOf('OTRO') >= 0 && !$('pm-detalle').value.trim()) return err('Para «Otro» escribe de qué es el permiso.');
+    var fd = new FormData();
+    fd.append('action', 'PERMISO_AGREGAR'); fd.append('codigo', actual.codigo); fd.append('tipos', tipos.join(','));
+    fd.append('detalle', $('pm-detalle').value.trim()); fd.append('vigencia', $('pm-vigencia').value);
+    fd.append('uid', 'adm-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10));
+    if (fotoPermiso) fd.append('foto', fotoPermiso, 'pase.jpg');
+    $('pm-guardar').disabled = true;
+    postForm(fd).then(function (r) {
+      $('pm-guardar').disabled = false;
+      if (!r || r.status !== 'success') return err((r && r.message) || 'No se pudo guardar.');
+      toast(r.message);
+      $('f-permiso').hidden = true; $('b-nuevo-permiso').hidden = false;
+      cargarFicha(actual.codigo); cargar();
+    }).catch(function (e) { $('pm-guardar').disabled = false; err(e.message); });
+  });
+
+  /* ══ Cargar Excel ══ */
+  var imp = null;                                   // lo último que respondió el servidor
+  $('b-importar').onclick = function () {
+    $('imp-archivo').value = ''; $('imp-msg').hidden = true; $('imp-res').hidden = true; $('imp-aplicar').hidden = true; imp = null;
+    abrirV('v-imp');
+  };
+  $('imp-archivo').addEventListener('change', function () { imp = null; $('imp-res').hidden = true; $('imp-aplicar').hidden = true; if ($('imp-archivo').files[0]) enviarImp('revisar'); });
+  function mapaElegido() {
+    if (!imp) return null;
+    var m = { fila: imp.fila_titulos };
+    $('imp-cols').querySelectorAll('select').forEach(function (s) { m[s.dataset.k] = +s.value; });
+    return m;
+  }
+  function msgImp(t, tipo) { $('imp-msg').innerHTML = t; $('imp-msg').className = 'aviso ' + (tipo || 'info'); $('imp-msg').hidden = !t; }
+  function enviarImp(modo) {
+    var f = $('imp-archivo').files[0];
+    if (!f) { msgImp('Elige el archivo de Excel.', 'mal'); return; }
+    var fd = new FormData();
+    fd.append('action', 'PADRON_IMPORTAR'); fd.append('modo', modo); fd.append('archivo', f, f.name);
+    var m = mapaElegido(); if (m) fd.append('mapa', JSON.stringify(m));
+    $('imp-revisar').disabled = $('imp-aplicar').disabled = true;
+    msgImp(modo === 'aplicar' ? 'Cargando a la base…' : 'Revisando el archivo…');
+    postForm(fd).then(function (r) {
+      $('imp-revisar').disabled = $('imp-aplicar').disabled = false;
+      if (r && r.titulos) { imp = r; pintarImp(r); }
+      if (!r || r.status !== 'success') { msgImp(esc((r && r.message) || 'No se pudo leer el archivo.'), 'mal'); $('imp-aplicar').hidden = true; return; }
+      if (r.aplicado) {
+        msgImp(esc(r.message), 'bien'); $('imp-aplicar').hidden = true;
+        cargar(); cargarFaltan();
+      } else {
+        msgImp('Revisa lo que va a pasar. Si las columnas no son las correctas, cámbialas y toca «Revisar».');
+        $('imp-aplicar').hidden = !r.renglones;
+      }
+    }).catch(function (e) { $('imp-revisar').disabled = $('imp-aplicar').disabled = false; msgImp(esc(e.message), 'mal'); });
+  }
+  $('imp-revisar').onclick = function () { enviarImp('revisar'); };
+  $('imp-aplicar').onclick = function () {
+    if (!imp || !confirm('¿Cargar a la base? Se agregan ' + imp.cuenta.nuevos + ' personas y se actualizan ' + imp.cuenta.cambian + '.')) return;
+    enviarImp('aplicar');
+  };
+  var NOM_COL = { id: 'ID de la credencial', nombre: 'Nombre (o nombres)', paterno: 'Apellido paterno', materno: 'Apellido materno', empresa: 'Empresa', cargo: 'Cargo' };
+  function pintarImp(r) {
+    $('imp-res').hidden = false;
+    $('imp-fila').textContent = 'Títulos en el renglón ' + r.renglon_titulos + ' del Excel.';
+    $('imp-cols').innerHTML = Object.keys(NOM_COL).map(function (k) {
+      return '<div class="campo" style="flex:1 1 180px"><label>' + NOM_COL[k] + '</label><select data-k="' + k + '"><option value="-1">(ninguna)</option>' +
+        r.titulos.map(function (t, i) { return '<option value="' + i + '"' + (r.mapa[k] === i ? ' selected' : '') + '>' + esc(t || 'Columna ' + (i + 1)) + '</option>'; }).join('') + '</select></div>';
+    }).join('');
+    if (!r.cuenta) { $('imp-cuenta').innerHTML = ''; $('imp-detalle').innerHTML = ''; return; }
+    var c = r.cuenta;
+    $('imp-cuenta').innerHTML = '<div><b>' + r.renglones + '</b>personas en el archivo</div><div><b>' + c.nuevos + '</b>nuevas</div><div><b>' + c.cambian + '</b>con cambios</div>' +
+      '<div><b>' + c.iguales + '</b>sin cambios</div>' + (r.total_problemas ? '<div><b>' + r.total_problemas + '</b>' + (r.total_problemas === 1 ? 'renglón con problema' : 'renglones con problema') + '</div>' : '') +
+      (r.repetidos ? '<div><b>' + r.repetidos + '</b>IDs repetidos (queda el último)</div>' : '');
+    var h = '';
+    if (r.muestra && r.muestra.length) {
+      h += '<h3>Así se van a guardar (primeros renglones)</h3><div class="tabla-env"><table class="t"><thead><tr><th>Renglón</th><th>ID</th><th>Nombre</th><th>Empresa</th><th>Cargo</th></tr></thead><tbody>' +
+        r.muestra.map(function (x) { return '<tr><td>' + x.renglon + '</td><td><b>' + esc(x.codigo) + '</b></td><td>' + esc(x.nombre) + '</td><td>' + esc(x.empresa) + '</td><td>' + esc(x.cargo) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    }
+    if (r.cambios && r.cambios.length) {
+      h += '<h3>Con cambios</h3><div class="tabla-env"><table class="t"><thead><tr><th>ID</th><th>Nombre</th><th>Qué cambia</th></tr></thead><tbody>' +
+        r.cambios.map(function (x) { return '<tr><td><b>' + esc(x.codigo) + '</b></td><td>' + esc(x.nombre) + '</td><td>' + esc(x.que) + '</td></tr>'; }).join('') + '</tbody></table></div>' +
+        (c.cambian > r.cambios.length ? '<p class="cifras">Y ' + (c.cambian - r.cambios.length) + ' más.</p>' : '');
+    }
+    if (r.problemas && r.problemas.length) {
+      h += '<h3>Renglones que no se van a cargar</h3><div class="tabla-env"><table class="t"><thead><tr><th>Renglón</th><th>Motivo</th><th>Dato</th></tr></thead><tbody>' +
+        r.problemas.map(function (x) { return '<tr><td>' + x.renglon + '</td><td>' + esc(x.motivo) + '</td><td>' + esc(x.texto) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    }
+    $('imp-detalle').innerHTML = h;
+  }
+
+  /* ══ Descargar Excel ══ */
+  $('b-excel').onclick = function () {
+    var b = $('b-excel'); b.disabled = true;
+    post('PADRON_EXCEL').then(function (r) {
+      b.disabled = false;
+      if (!r || r.status !== 'success') { toast((r && r.message) || 'No se pudo preparar el Excel.', true); return; }
+      var a = document.createElement('a'); a.href = r.url + '&token=' + encodeURIComponent(ses.token); a.download = r.archivo;
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('Descargando la base (' + r.personas + ' personas).');
+    }).catch(function (e) { b.disabled = false; toast(e.message, true); });
+  };
+
+  $('b-nueva').onclick = function () { abrirPersona(null); };
+
+  // personal.html?id=287 abre esa persona (desde «movimientos por ID» del control de accesos)
+  var pedidoId = new URLSearchParams(location.search).get('id');
+  cargar().then(function () {
+    if (!pedidoId) return;
+    get('PADRON_FICHA', { codigo: pedidoId }).then(function (f) {
+      if (f && f.persona) abrirPersona(f.persona);
+      else abrirPersona(null, { codigo: pedidoId });
+    });
+  });
+  cargarFaltan();
+})();
+</script>
+</body>
+</html>

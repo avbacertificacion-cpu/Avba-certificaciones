@@ -30,6 +30,8 @@
    a través de descargar.php.
    ══════════════════════════════════════════════════════════════ */
 
+require_once __DIR__ . '/Personal.php';      // la base del personal: el nombre correcto de cada ID
+
 class ControlAccesos {
     private PDO $pdo;
 
@@ -282,6 +284,8 @@ class ControlAccesos {
         // Tarjeta leída en el teléfono: nombre y código, sin foto
         $codigo = strtoupper(substr((string)preg_replace('/[^0-9A-Za-z-]/', '', (string)($p['codigo'] ?? '')), 0, 32));
         $persona = $codigo !== '' ? mb_substr(textoEstandar($p['persona'] ?? ''), 0, 150) : '';
+        // Si el ID está en la base del personal, se guarda su nombre correcto (no el que leyó la cámara)
+        if ($codigo !== '' && ($nb = Personal::nombreDe($this->pdo, $codigo)) !== '') $persona = $nb;
         $origenPedido = (string)($p['origen'] ?? '');
         $origen = $codigo === '' ? 'foto'
                 : ($origenPedido === 'manual' ? 'manual'
@@ -354,7 +358,7 @@ class ControlAccesos {
     }
 
     /** Mensaje si el archivo subido no es una foto aceptable, o '' si sí lo es. */
-    private static function fotoInvalida(array $archivo): string {
+    public static function fotoInvalida(array $archivo): string {
         if ((int)($archivo['size'] ?? 0) > 15 * 1048576) return 'La foto pesa demasiado (máximo 15 MB).';
         $info = @getimagesize($archivo['tmp_name']);
         if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) return 'El archivo no es una foto válida (JPG, PNG o WEBP).';
@@ -362,14 +366,15 @@ class ControlAccesos {
     }
 
     /**
-     * Guarda la foto (y su miniatura) en uploads/accesos/fotos/AAAA/MM/.
+     * Guarda la foto (y su miniatura) en uploads/accesos/fotos/AAAA/MM/ (o en otra subcarpeta:
+     * los permisos van en permisos/AAAA/MM/).
      * Regresa [ruta de la foto, ruta de la miniatura] dentro de la carpeta, o null.
      * Miles de fotos al día: 1400 px es de sobra para leer el número de una
      * credencial que llena la foto, y cada una queda en ~150 KB.
      */
-    private static function guardarFoto(array $archivo, string $uid, string $fecha): ?array {
+    public static function guardarFoto(array $archivo, string $uid, string $fecha, string $carpeta = 'fotos'): ?array {
         self::protegerCarpeta();
-        $sub = 'fotos/' . substr($fecha, 0, 4) . '/' . substr($fecha, 5, 2) . '/';
+        $sub = $carpeta . '/' . substr($fecha, 0, 4) . '/' . substr($fecha, 5, 2) . '/';
         $dir = self::carpeta() . $sub;
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return null;
         $foto = comprimirImagen($archivo['tmp_name'], $dir . $uid . '.jpg', 1400, 1400, 76);
@@ -552,6 +557,11 @@ class ControlAccesos {
         $st = $this->pdo->prepare("SELECT uid, id FROM accesos_incidencias WHERE uid IN ($marcas)");
         $st->execute($uids);
         $r += $st->fetchAll(PDO::FETCH_KEY_PAIR);
+        // Y los permisos que agrega el guardia (resguardo de herramienta, celular…)
+        Personal::asegurarTablas($this->pdo);
+        $st = $this->pdo->prepare("SELECT uid, id FROM personal_permisos WHERE uid IN ($marcas)");
+        $st->execute($uids);
+        $r += $st->fetchAll(PDO::FETCH_KEY_PAIR);
         return ['status' => 'success', 'existen' => $r ?: (object)[]];
     }
 
@@ -664,6 +674,7 @@ class ControlAccesos {
         if ($tipo === 'OTRO' && $detalle === '') return ['status' => 'error', 'message' => 'Describe qué pasó.'];
         $codigo = strtoupper(substr((string)preg_replace('/[^0-9A-Za-z-]/', '', (string)($p['codigo'] ?? '')), 0, 32));
         $persona = mb_substr(textoEstandar($p['persona'] ?? ''), 0, 150);
+        if ($codigo !== '' && ($nb = Personal::nombreDe($this->pdo, $codigo)) !== '') $persona = $nb;      // nombre de la base del personal
         $conFoto = !empty($archivo['tmp_name']) && (int)($archivo['error'] ?? 1) === UPLOAD_ERR_OK;
         if ($codigo === '' && !$conFoto && $persona === '') {
             return ['status' => 'error', 'message' => 'Falta saber quién es: lee su credencial, escribe su ID o su nombre.'];

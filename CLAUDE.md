@@ -50,6 +50,9 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `tablero.html` | **Tablero** (perfil CLIENTE; también PLANTA y ADMIN): periodo (hoy, 7 y 30 días, mes, otras fechas; hasta 93 días), cifras, gráficas con Chart.js (`js/chart/`, colores validados: entradas azul `#257de0`, salidas naranja `#f47230`, tiempo dentro en escala de azules), «Ver datos» de cada gráfica, quién está dentro e incidencias. Descarga Excel y PDF (el PDF lleva las gráficas que dibuja la pantalla). |
 | `api/Tablero.php` | Cálculos del tablero (acciones `TABLERO`, `TABLERO_EXCEL`, `TABLERO_PDF`): entradas, salidas, personas por ID, visitas (entrada con su salida; más de 24 h no cuenta en horas), personas dentro hora por hora o máximo por día, tiempo dentro, más horas, incidencias. Archivos en `uploads/accesos/reportes/` (se borran al día). |
 | `api/lib/xlsx.php` | Excel (.xlsx) propio, sin librerías ni extensión zip: hojas con títulos fijos, filtros, fechas y el ID como texto. |
+| `personal.html` | **Personal y permisos** (ADMIN y PLANTA): la base de IDs y nombres (buscar, agregar, cambiar —cambiar el ID se lleva sus permisos—, quitar), **cargar Excel** (revisa primero: columnas reconocidas o elegidas a mano, nuevos, con cambios, renglones con problema; no quita a nadie), descargar Excel, IDs leídos en la caseta que no están en la base, y **permisos** por ID con checklist (herramienta, celular, computadora, otro), foto del pase y/o datos del equipo y vigencia. `personal.html?id=287` abre a esa persona. |
+| `api/Personal.php` | La base del personal (`personal`, llave = ID sin ceros) y sus permisos (`personal_permisos`; quitar = `activo` 0, queda historial). Acciones `PADRON_*` y `PERMISO_AGREGAR`/`PERMISO_QUITAR`. `PADRON_CAJA`: la copia para el teléfono de la caseta, con versión (`ca_ajustes.padron_version`). `registrar` e incidencias guardan el **nombre de la base** si el ID está (`Personal::nombreDe`). |
+| `api/lib/xlsx_lector.php` | Lee .xlsx (abre el ZIP con zlib, sin extensión zip) y .csv (también los de Excel en Windows); regresa los renglones con su número de Excel. |
 | `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. |
 | `api/lib/qrcode.php` | Generador de códigos QR (lo usa la portada de la maqueta). |
 | `demo/` | **La maqueta** que hay que volver real: `control-accesos.html` (panel), `caseta.html` (guardia), `demo-datos.js` (datos ficticios y reglas), `index.html` (portada), `sala.php` (sincroniza la demo entre equipos). **Sólo Administración:** `solo-admin.js` regresa a su inicio a quien entre con otro perfil (sin sesión sí abre, para el teléfono que entra con el QR de la portada). |
@@ -61,7 +64,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 
 **Perfiles** (`Auth::ROLES`): **ADMIN** (Administración AVBA: todo, incluidas las cuentas),
 **PLANTA** (administrador de accesos de la planta: registros, En planta, PDF, dar salida)
-**ACCESOS** (guardia: sólo registra; el enrutador le rechaza todo lo demás) y **CLIENTE** (el cliente: sólo el tablero
+**ACCESOS** (guardia: sólo registra, consulta la copia de la base y agrega permisos con foto; el enrutador le rechaza todo lo demás) y **CLIENTE** (el cliente: sólo el tablero
 y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le da fotos). Cada guardia tiene su **turno**
 (`usuarios.turno`: D día | N noche), que se elige en Cuentas.
 
@@ -107,6 +110,14 @@ y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le 
 7. **Foto de evidencia:** cada lectura guarda la foto de la credencial (sale de la misma
    imagen en la que se leyó el ID). Las fotos viven en `uploads/accesos/` (protegida) y
    se sirven sólo con sesión.
+8. **Base del personal y permisos en la caseta:** el teléfono guarda una copia de la base
+   (`ca_padron`, se actualiza al entrar, cada 5 min y al volver la señal) y funciona sin
+   señal. Al leer: nombre de la base, sus permisos en la confirmación (dura 3.5 s si hay
+   algo que decir) y en «Última credencial leída», o «no está en la base». El guardia agrega
+   un permiso con **la foto del pase (obligatoria)** desde esa tarjeta; va por la **misma cola**
+   que los registros (`clase: 'permiso'`, acción `PERMISO_AGREGAR`, confirmado por
+   `ACCESOS_EXISTEN`); en las listas sólo cuentan los registros (`esRegistro`). La base es
+   de datos reales: **nunca** al repositorio; las pruebas usan personas inventadas.
 
 ## Cómo probar
 

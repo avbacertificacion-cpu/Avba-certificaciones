@@ -562,11 +562,11 @@ class Tablero {
     /* ── Archivos ────────────────────────────────────────────────────────── */
 
     /** uploads/accesos/reportes/ (protegida); se borran los de más de un día. */
-    private static function carpetaReportes(): string {
+    public static function carpetaReportes(): string {
         ControlAccesos::protegerCarpeta();
         $dir = ControlAccesos::carpeta() . 'reportes/';
         if (!is_dir($dir)) @mkdir($dir, 0755, true);
-        foreach (glob($dir . 'TABLERO_*') ?: [] as $f) if (@filemtime($f) < time() - 86400) @unlink($f);
+        foreach (array_merge(glob($dir . 'TABLERO_*') ?: [], glob($dir . 'PERSONAL_*') ?: []) as $f) if (@filemtime($f) < time() - 86400) @unlink($f);
         foreach (glob($dir . 'tmp-*', GLOB_ONLYDIR) ?: [] as $d) if (@filemtime($d) < time() - 3600) self::borrarCarpeta($d . '/');
         return $dir;
     }

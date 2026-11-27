@@ -110,5 +110,52 @@ CREATE TABLE IF NOT EXISTS accesos_incidencias (
   KEY idx_fecha (fecha)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── Base del personal (Personal.php): ID de la credencial y nombre correcto ──
+-- clave = el ID sin ceros a la izquierda (la llave); codigo = como se muestra (00287).
+-- Se carga desde un Excel en personal.html. Al leer una credencial se guarda este nombre.
+CREATE TABLE IF NOT EXISTS personal (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  clave           VARCHAR(32)  NOT NULL,
+  codigo          VARCHAR(32)  NOT NULL,
+  nombre          VARCHAR(150) NOT NULL,
+  empresa         VARCHAR(150) NOT NULL DEFAULT '',
+  cargo           VARCHAR(150) NOT NULL DEFAULT '',
+  creado          DATETIME     NOT NULL,
+  actualizado     DATETIME     NOT NULL,
+  actualizado_por VARCHAR(150) NOT NULL DEFAULT '',
+  UNIQUE KEY uk_clave (clave),
+  KEY idx_nombre (nombre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Permisos especiales de un ID: tipos = HERRAMIENTA,CELULAR,COMPUTADORA,OTRO ──
+-- Con la foto del pase o resguardo (uploads/accesos/permisos/) y/o los datos del equipo.
+-- origen: caseta (lo agregó el guardia) | admin. Quitar = activo 0 (queda en el historial).
+CREATE TABLE IF NOT EXISTS personal_permisos (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  uid            VARCHAR(64)  NOT NULL,
+  clave          VARCHAR(32)  NOT NULL,
+  tipos          VARCHAR(80)  NOT NULL,
+  detalle        VARCHAR(500) NOT NULL DEFAULT '',
+  vigencia       DATE         NULL,
+  foto           VARCHAR(255) NOT NULL DEFAULT '',
+  foto_mini      VARCHAR(255) NOT NULL DEFAULT '',
+  origen         VARCHAR(12)  NOT NULL DEFAULT 'admin',
+  creado         DATETIME     NOT NULL,
+  usuario        VARCHAR(50)  NOT NULL DEFAULT '',
+  usuario_nombre VARCHAR(150) NOT NULL DEFAULT '',
+  activo         TINYINT(1)   NOT NULL DEFAULT 1,
+  actualizado    DATETIME     NOT NULL,
+  quitado_por    VARCHAR(150) NOT NULL DEFAULT '',
+  UNIQUE KEY uk_uid (uid),
+  KEY idx_clave (clave, activo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Ajustes (padron_version: sube con cada cambio en la base o en los permisos) ──
+CREATE TABLE IF NOT EXISTS ca_ajustes (
+  clave       VARCHAR(50)  NOT NULL PRIMARY KEY,
+  valor       VARCHAR(255) NOT NULL DEFAULT '',
+  actualizado DATETIME     NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- (Ya no hay tabla de puntos de control: la planta tiene un solo acceso y los guardias
 --  registran a la vez desde cualquier teléfono. Una base de antes conserva la suya, sin uso.)

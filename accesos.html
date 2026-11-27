@@ -244,6 +244,26 @@
   .hecho .c{font-size:17px;margin-top:6px;opacity:.95}
   .hecho .foto{width:auto;height:120px;max-width:70vw;object-fit:cover;border-radius:12px;border:3px solid rgba(255,255,255,.9);margin-top:14px;background:#0003}
   .hecho .ev{font-size:13px;margin-top:6px;opacity:.9;font-weight:700}
+  .hecho{overflow:auto}
+  .hecho .pms{margin-top:14px;display:flex;flex-direction:column;gap:6px;align-items:center}
+  .hecho .pm{background:#fff;color:#0b2545;border-radius:12px;padding:7px 14px;font-size:17px;font-weight:800}
+  .hecho .pm.venc{background:#ffe1e1;color:#8f1f1f}
+  .hecho .fuera{margin-top:12px;background:#fff3d6;color:#7a4f00;border-radius:12px;padding:7px 14px;font-size:15px;font-weight:800}
+  /* Última credencial leída: quién es, sus permisos y «Agregar permiso» */
+  .ultima .cab{display:flex;gap:12px;align-items:center;margin-bottom:4px}
+  .ultima .nom{font-size:16px;font-weight:800;overflow-wrap:anywhere}
+  .ultima .m{font-size:12.5px;color:var(--texto-sub)}
+  .ultima .fuera-base{margin-top:8px;font-size:13px;font-weight:700;color:var(--ambar);background:var(--ambar-light);border-radius:10px;padding:8px 10px}
+  .pmc{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--borde);border-radius:12px;padding:10px;margin-top:8px}
+  .pmc img{width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:zoom-in;border:1px solid var(--borde);flex-shrink:0;background:#e8edf4}
+  .pmc .t{font-weight:800;font-size:14px}
+  .pmc.venc{border-color:#f0b4b4;background:#fff6f6}
+  .pmc.venc .t{color:var(--rojo)}
+  .pmc .d{font-size:13px;margin-top:2px;overflow-wrap:anywhere}
+  .pmc .m{font-size:12px;color:var(--texto-sub);margin-top:2px}
+  .sin-perm{font-size:13px;color:var(--texto-sub);margin-top:8px}
+  #perm-tipos button[aria-pressed=true]{border-color:var(--azul);background:#E6F1FB;color:var(--azul-dark)}
+  .perm-quien{font-size:13.5px;margin:-4px 0 10px;min-height:18px}
   #v-foto{z-index:110}
   .mov-fotos{display:flex;gap:10px;margin-top:6px}
   .mov-fotos figure{margin:0;text-align:center;font-size:11px;color:var(--texto-sub);font-weight:700}
@@ -327,6 +347,14 @@
     </div>
   </div>
   <input type="file" id="archivo" accept="image/*" capture="environment" hidden>
+
+  <!-- Última credencial leída: su nombre en la base, sus permisos y «Agregar permiso» -->
+  <div class="tarjeta ultima" id="tarjeta-ultima" hidden>
+    <h2>Última credencial leída</h2>
+    <div id="ultima"></div>
+    <button class="btn sec ancho" type="button" id="btn-permiso" style="margin-top:10px">+ Agregar permiso o resguardo</button>
+  </div>
+  <input type="file" id="perm-archivo" accept="image/*" capture="environment" hidden>
 
   <div class="tarjeta nav-turno" id="nav-turno">
     <button type="button" class="flecha" id="t-ant" aria-label="Turno anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -440,6 +468,32 @@
   </div>
 </div>
 
+<!-- Agregar un permiso (resguardo de herramienta, celular, computadora) con la foto del pase -->
+<div class="fondo" id="v-perm" hidden>
+  <div class="ventana" role="dialog" aria-modal="true" aria-labelledby="perm-tit">
+    <h2 id="perm-tit" style="font-size:17px">Agregar permiso o resguardo</h2>
+    <div class="campo"><label for="perm-id">ID de la credencial</label><input type="text" id="perm-id" inputmode="numeric" maxlength="32" autocomplete="off" placeholder="Ej. 00287"></div>
+    <div class="perm-quien" id="perm-quien"></div>
+    <span style="font-size:12.5px;font-weight:700;color:var(--texto-sub)">¿Qué trae? (puedes marcar varios)</span>
+    <div class="inc-tipos" id="perm-tipos" role="group" aria-label="Tipo de permiso">
+      <button type="button" data-v="HERRAMIENTA" aria-pressed="false">🔧 Herramienta (resguardo)</button>
+      <button type="button" data-v="CELULAR" aria-pressed="false">📱 Celular</button>
+      <button type="button" data-v="COMPUTADORA" aria-pressed="false">💻 Computadora</button>
+      <button type="button" data-v="OTRO" aria-pressed="false">📄 Otro</button>
+    </div>
+    <button class="btn prim ancho" type="button" id="perm-foto-btn">📷 Tomar foto del pase o del resguardo</button>
+    <img class="prev" id="perm-img" alt="Foto del pase" hidden style="margin-top:10px">
+    <div class="campo" style="margin-top:10px"><label for="perm-detalle" id="perm-detalle-lbl">Qué es (opcional)</label>
+      <textarea id="perm-detalle" maxlength="500" placeholder="Ej. Taladro y extensión; celular Samsung negro; laptop Dell"></textarea></div>
+    <div class="campo"><label for="perm-vigencia">Vigente hasta (si el pase lo dice)</label><input type="date" id="perm-vigencia"></div>
+    <p class="nota mal" id="perm-err" hidden></p>
+    <div class="botones">
+      <button class="btn sec" type="button" id="perm-cancelar">Cancelar</button>
+      <button class="btn verde" type="button" id="perm-guardar">Guardar permiso</button>
+    </div>
+  </div>
+</div>
+
 <!-- Foto en grande -->
 <div class="fondo" id="v-foto" hidden><div class="ventana" style="max-width:760px;padding:10px">
   <img class="grande-img" id="foto-grande" alt="Identificación"><div id="foto-pie" style="font-size:13px;color:var(--texto-sub);margin-top:8px;text-align:center"></div>
@@ -452,8 +506,10 @@
     <p class="ayuda" id="per-sub" style="font-size:12.5px;color:var(--texto-sub)"></p>
     <ul class="movs" id="per-movs"></ul>
     <div class="per-inc" id="per-inc" hidden></div>
+    <div id="per-permisos" hidden></div>
     <div class="botones">
       <button class="btn rojo" type="button" id="per-salida" hidden>Dar salida ahora</button>
+      <a class="btn sec" id="per-personal" hidden>Datos y permisos</a>
       <button class="btn sec" type="button" id="per-cerrar">Cerrar</button>
     </div>
   </div>
@@ -601,7 +657,7 @@
     if (tipo !== 'salida' || !codigo) return t;
     var k = claveId(codigo), desde = new Date(new Date(cap.replace(' ', 'T')).getTime() - 16 * 3600e3);
     var desdeTxt = fechaDe(desde) + ' ' + dos(desde.getHours()) + ':' + dos(desde.getMinutes()) + ':' + dos(desde.getSeconds());
-    var conocidos = (typeof cola !== 'undefined' ? cola : []).filter(function (x) { return !esInc(x); })
+    var conocidos = (typeof cola !== 'undefined' ? cola : []).filter(esRegistro)
       .concat(typeof recienEnviados !== 'undefined' ? recienEnviados : [], (typeof datos !== 'undefined' && datos.registros) || []);
     var ult = null;
     conocidos.forEach(function (x) {
@@ -676,6 +732,8 @@
   function sesionVencida() { $('banda-sesion').hidden = false; }
   var TIPOS_INC = { ALCOHOLIMETRO: 'Alcoholímetro positivo', CONDUCTA: 'Mala conducta', PERSONA: 'Problema con la persona', OTRO: 'Otro' };
   function esInc(x) { return x && x.clase === 'incidencia'; }
+  function esPermiso(x) { return x && x.clase === 'permiso'; }
+  function esRegistro(x) { return x && !x.clase; }             // entrada o salida
   function urlFotoInc(id, mini) { return 'descargar.php?tipo=incidencia_foto&id=' + encodeURIComponent(id) + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(token()); }
   function urlFoto(id, mini) { return 'descargar.php?tipo=acceso_foto&id=' + encodeURIComponent(id) + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(token()); }
 
@@ -744,7 +802,10 @@
       fd.append('incidencia', it.incidencia); fd.append('detalle', it.detalle || '');
       if (!it.codigo) fd.append('persona', it.persona || '');
     }
-    fd.append('action', esInc(it) ? 'ACCESO_INCIDENCIA' : 'ACCESO_REGISTRAR'); fd.append('token', token());
+    if (esPermiso(it)) {                           // permiso o resguardo con la foto del pase: misma cola
+      fd.append('tipos', it.tipos); fd.append('detalle', it.detalle || ''); fd.append('vigencia', it.vigencia || '');
+    }
+    fd.append('action', esPermiso(it) ? 'PERMISO_AGREGAR' : esInc(it) ? 'ACCESO_INCIDENCIA' : 'ACCESO_REGISTRAR'); fd.append('token', token());
     return fd;
   }
   /* Envía uno. Devuelve 'ok' | 'red' (reintentar después) | 'sesion' | 'rechazo' */
@@ -782,10 +843,15 @@
                 }
                 hubo++;
                 enviados[it.uid] = ya[it.uid];
-                if (!esInc(it)) recienEnviados.push(resumen(it, ya[it.uid]));
+                if (esRegistro(it)) recienEnviados.push(resumen(it, ya[it.uid]));
+                if (esPermiso(it)) setTimeout(actualizarPadron, 300);     // la copia de la base trae el permiso ya guardado
                 recienEnviados = recienEnviados.slice(-50);
                 return quitarDeCola(it.uid).then(function () { return true; });
               }, function () { return false; });                             // sin confirmar: se queda y se reintenta (no duplica)
+            }
+            if (r === 'rechazo' && esPermiso(it)) {                         // un permiso rechazado no se queda trabado en la cola
+              toast('No se guardó el permiso del ID ' + it.codigo + ': ' + it.error, true);
+              return quitarDeCola(it.uid).then(function () { pintarUltima(); return true; });
             }
             if (r === 'rechazo') return ponerEnCola(it).then(function () { return true; });
             if (r === 'sesion') { sesionVencida(); return false; }
@@ -804,7 +870,7 @@
     }).catch(function () { enviando = null; });
   }
   setInterval(function () { if (cola.length && !enviando) enviarCola(); }, 20000);
-  window.addEventListener('online', function () { espera = 0; enviarCola(); pintarBotonPdf(); cargar(true); });
+  window.addEventListener('online', function () { espera = 0; enviarCola(); pintarBotonPdf(); cargar(true); actualizarPadron(); });
   window.addEventListener('offline', function () { pintarBotonPdf(); });
   document.addEventListener('visibilitychange', function () { if (!document.hidden) { enviarCola(); cargar(true); } });
   window.addEventListener('beforeunload', function (e) {
@@ -839,15 +905,18 @@
       if (cola.some(function (x) { return x.uid === it.uid; })) { quitarDeCola(it.uid).then(pintarLista); toast('Registro descartado.'); return; }
       var id = enviados[it.uid];
       if (!id) { toast('Ya no se puede deshacer desde aquí: búscalo en la lista.', true); return; }
-      api(esInc(it) ? 'INCIDENCIA_ELIMINAR' : 'ACCESO_ELIMINAR', { id: id }).then(function (r) { toast(r.message || 'Eliminado.'); cargar(true); });
+      api(esPermiso(it) ? 'PERMISO_QUITAR' : esInc(it) ? 'INCIDENCIA_ELIMINAR' : 'ACCESO_ELIMINAR', { id: id }).then(function (r) {
+        toast(r.message || 'Eliminado.', r.status !== 'success'); cargar(true); if (esPermiso(it)) actualizarPadron();
+      });
     };
-    var txt = esInc(it) ? 'Incidencia ' + it.capturado.slice(11, 16) + ' guardada (' + TIPOS_INC[it.incidencia] + ')'
+    var txt = esPermiso(it) ? 'Permiso guardado para el ID ' + it.codigo
+            : esInc(it) ? 'Incidencia ' + it.capturado.slice(11, 16) + ' guardada (' + TIPOS_INC[it.incidencia] + ')'
             : (it.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + it.capturado.slice(11, 16) + ' guardada' + (it.persona ? ': ' + it.persona : '');
     it.cuenta = cuentaActual();
     if (sinCola) {                                 // sin almacenamiento local: se envía y se espera
       return enviarUno(it).then(function (r) {
         enviando = null;
-        if (r === 'ok') { if (!esInc(it)) recienEnviados.push(resumen(it, enviados[it.uid])); toast(txt + '.', false, deshacer); cargar(true); }
+        if (r === 'ok') { if (esRegistro(it)) recienEnviados.push(resumen(it, enviados[it.uid])); if (esPermiso(it)) actualizarPadron(); toast(txt + '.', false, deshacer); cargar(true); }
         else toast(r === 'sesion' ? 'Tu sesión venció.' : r === 'bloqueo' ? 'No se guardó: ' + $('banda-punto').textContent
                  : (it.error || 'Sin conexión: no se guardó. Inténtalo de nuevo.'), true);
       });
@@ -884,8 +953,9 @@
   }
   function registrarTarjeta(tipo, r) {
     if (tipo === 'incidencia') {                   // primero se dice qué pasó; luego se guarda
-      var f = fotoDeLectura(r);
-      abrirIncidencia({ codigo: r.codigo, persona: r.nombre, origen: r.manual ? 'manual' : 'tarjeta', blob: f });
+      var f = fotoDeLectura(r), pb = enPadron(r.codigo);
+      ponerUltima(r.codigo, r.nombre);
+      abrirIncidencia({ codigo: r.codigo, persona: pb ? pb.nombre : r.nombre, origen: r.manual ? 'manual' : 'tarjeta', blob: f });
       return;
     }
     var codigo = String(r.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
@@ -894,6 +964,10 @@
     var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoLectura(tipo, codigo, capturado), lugar: normaLugar($('lugar').value),
                nota: '', mini: '', codigo: codigo, persona: String(r.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 150),
                origen: r.manual ? 'manual' : 'tarjeta', creado: Date.now() };
+    // Si el ID está en la base del personal, su nombre correcto (no el que leyó la cámara)
+    var enBase = enPadron(codigo);
+    if (enBase) it.persona = enBase.nombre;
+    ponerUltima(codigo, r.nombre);
     // La foto de la credencial que tomó el lector va con el registro como evidencia (también sin señal:
     // queda en el equipo con el registro y se envía junto con él)
     var foto = fotoDeLectura(r);
@@ -924,10 +998,12 @@
       '<b>' + (inc ? 'INCIDENCIA' : ent ? 'ENTRADA' : 'SALIDA') + ' REGISTRADA</b>' + (inc ? '<div class="t-inc">' + esc(TIPOS_INC[it.incidencia]) + '</div>' : '') +
       '<div class="n">' + esc(it.persona || (inc && !it.codigo ? 'Sin credencial' : 'Nombre no leído')) + '</div>' +
       '<div class="c">' + (it.codigo ? 'ID ' + esc(it.codigo) + ' · ' : '') + esc(it.capturado.slice(11, 16)) + '</div>' +
+      avisosPersona(it.codigo) +
       (it.mini ? '<img class="foto" alt="Foto de la credencial" src="' + esc(it.mini) + '"><div class="ev">Foto guardada como evidencia</div>' : '');
     el.hidden = false;
     if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
-    clearTimeout(tHecho); tHecho = setTimeout(function () { el.hidden = true; }, 1500);
+    // Con permisos o fuera de la base, se queda más tiempo para leerlo
+    clearTimeout(tHecho); tHecho = setTimeout(function () { el.hidden = true; }, avisosPersona(it.codigo) ? 3500 : 1500);
   }
   $('hecho').onclick = function () { clearTimeout(tHecho); $('hecho').hidden = true; };
 
@@ -988,6 +1064,172 @@
       return guardarRegistro(it);
     }).catch(function (e) { $('inc-guardar').disabled = false; errorInc('No se pudo guardar: ' + (e.message || e)); });
   };
+  /* ══ Base del personal y permisos ═══════════════════════════════════
+     El teléfono guarda una copia de la base (IDs, nombres y permisos) para
+     funcionar sin señal: al leer una credencial muestra el nombre correcto y
+     sus permisos (resguardo de herramienta, celular, computadora), o avisa si
+     el ID no está en la base. Se actualiza sola (PADRON_CAJA). El guardia
+     agrega un permiso con la foto del pase: va por la misma cola sin señal. */
+  var CLAVE_PADRON = 'ca_padron';
+  var PADRON = { version: '', total: 0, personas: {}, permisos: {} };
+  try { var guardado = JSON.parse(localStorage.getItem(CLAVE_PADRON) || 'null'); if (guardado && guardado.personas) PADRON = guardado; } catch (e) {}
+  var TIPOS_PERM = { HERRAMIENTA: 'Resguardo de herramienta', CELULAR: 'Permiso de celular', COMPUTADORA: 'Permiso de computadora', OTRO: 'Otro permiso' };
+  var ICONO_PERM = { HERRAMIENTA: '🔧', CELULAR: '📱', COMPUTADORA: '💻', OTRO: '📄' };
+  var pidiendoPadron = false;
+  function actualizarPadron() {
+    if (pidiendoPadron || !enLinea()) return Promise.resolve();
+    pidiendoPadron = true;
+    return api('PADRON_CAJA', { version: PADRON.version || '' }, 'GET').then(function (r) {
+      pidiendoPadron = false;
+      if (!r || r.status !== 'success' || r.sin_cambios) return;
+      PADRON = { version: String(r.version || ''), total: r.total || 0, personas: r.personas || {}, permisos: r.permisos || {} };
+      try { localStorage.setItem(CLAVE_PADRON, JSON.stringify(PADRON)); } catch (e) {}
+      pintarUltima();
+    }).catch(function () { pidiendoPadron = false; });
+  }
+  /** La persona de un ID en la base: {codigo, nombre, empresa} o null. */
+  function enPadron(codigo) {
+    var k = claveId(String(codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase()), x = k ? PADRON.personas[k] : null;
+    return x ? { codigo: x[0], nombre: x[1], empresa: x[2] || '' } : null;
+  }
+  function hoyTxt() { return fechaDe(new Date()); }
+  /** Sus permisos: los que ya tiene el servidor y los que esperan en la cola de este teléfono. */
+  function permisosDe(codigo) {
+    var k = claveId(String(codigo || '').toUpperCase());
+    if (!k) return [];
+    var pend = (typeof cola !== 'undefined' ? cola : []).filter(function (x) { return esPermiso(x) && claveId(x.codigo) === k; }).map(function (x) {
+      return { tipos: String(x.tipos).split(','), detalle: x.detalle, vigencia: x.vigencia, vencido: !!x.vigencia && x.vigencia < hoyTxt(),
+               pendiente: true, mini: x.mini, creado: x.capturado, por: 'Tú', error: x.error };
+    });
+    var srv = (PADRON.permisos[k] || []).map(function (x) {
+      return Object.assign({}, x, { vencido: !!x.vigencia && x.vigencia < hoyTxt() });
+    });
+    return pend.concat(srv);
+  }
+  /** Lo que la confirmación grande dice de la persona: sus permisos y si no está en la base. */
+  function avisosPersona(codigo) {
+    if (!codigo) return '';
+    var h = '', pms = permisosDe(codigo);
+    if (pms.length) {
+      var vistos = {};
+      h += '<div class="pms">' + pms.map(function (p) {
+        return p.tipos.map(function (t) {
+          var k = t + (p.vencido ? 'v' : ''); if (vistos[k] || !TIPOS_PERM[t]) return ''; vistos[k] = 1;
+          return '<span class="pm' + (p.vencido ? ' venc' : '') + '">' + ICONO_PERM[t] + ' ' + esc(TIPOS_PERM[t]) + (p.vencido ? ' · VENCIDO' : '') + '</span>';
+        }).join('');
+      }).join('') + '</div>';
+    }
+    if (PADRON.total && !enPadron(codigo)) h += '<div class="fuera">⚠ Este ID no está en la base del personal</div>';
+    return h;
+  }
+  /* Tarjeta «Última credencial leída» */
+  var ULTIMA = null;
+  function ponerUltima(codigo, leido) {
+    codigo = String(codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
+    if (!codigo) return;
+    ULTIMA = { codigo: codigo, leido: String(leido || '').replace(/\s+/g, ' ').trim() };
+    pintarUltima();
+  }
+  function urlFotoPermiso(id, mini) { return 'descargar.php?tipo=permiso_foto&id=' + encodeURIComponent(id) + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(token()); }
+  function htmlPermisoCaseta(p) {
+    var foto = p.mini ? '<img alt="Foto del pase" src="' + esc(p.mini) + '">'
+             : p.con_foto ? '<img alt="Foto del pase" loading="lazy" data-foto-permiso="' + p.id + '" src="' + esc(urlFotoPermiso(p.id, true)) + '" onerror="this.remove()">' : '';
+    return '<div class="pmc' + (p.vencido ? ' venc' : '') + '">' + foto + '<div style="flex:1;min-width:0">' +
+      '<div class="t">' + p.tipos.map(function (t) { return (ICONO_PERM[t] || '') + ' ' + esc(TIPOS_PERM[t] || t); }).join(' · ') + '</div>' +
+      (p.detalle ? '<div class="d">' + esc(p.detalle) + '</div>' : '') +
+      (p.vigencia ? '<div class="m"' + (p.vencido ? ' style="color:var(--rojo);font-weight:800"' : '') + '>' + (p.vencido ? 'VENCIÓ el ' : 'Vigente hasta el ') +
+        esc(p.vigencia.slice(8, 10) + '/' + p.vigencia.slice(5, 7) + '/' + p.vigencia.slice(0, 4)) + '</div>' : '') +
+      '<div class="m">' + (p.pendiente ? (p.error ? '<span style="color:var(--rojo)">No se aceptó: ' + esc(p.error) + '</span>' : '<span class="badge cola">Por enviar</span>')
+        : 'Desde el ' + esc((p.creado || '').slice(8, 10) + '/' + (p.creado || '').slice(5, 7)) + (p.por ? ' · ' + esc(p.por) : '')) + '</div></div></div>';
+  }
+  function pintarUltima() {
+    var t = $('tarjeta-ultima');
+    if (!t) return;
+    if (!ULTIMA) { t.hidden = true; return; }
+    var p = enPadron(ULTIMA.codigo), pms = permisosDe(ULTIMA.codigo);
+    $('ultima').innerHTML = '<div class="cab"><span class="id-azul">' + esc(p ? p.codigo : ULTIMA.codigo) + '</span><div style="min-width:0">' +
+      '<div class="nom">' + esc(p ? p.nombre : (ULTIMA.leido || 'Nombre no leído')) + '</div>' +
+      (p && p.empresa ? '<div class="m">' + esc(p.empresa) + '</div>' : '') + '</div></div>' +
+      (PADRON.total && !p ? '<div class="fuera-base">⚠ Este ID no está en la base del personal. Revisa que el número sea correcto; avisa a Administración si es alguien nuevo.</div>' : '') +
+      (pms.length ? pms.map(htmlPermisoCaseta).join('') : '<p class="sin-perm">Sin permisos especiales (herramienta, celular o computadora).</p>');
+    t.hidden = false;
+  }
+  $('tarjeta-ultima').addEventListener('click', function (ev) {
+    var im = ev.target.closest('[data-foto-permiso]');
+    if (im) { $('foto-grande').src = urlFotoPermiso(im.dataset.fotoPermiso, false); $('foto-pie').textContent = 'Pase o resguardo'; $('v-foto').hidden = false; }
+  });
+
+  /* Ventana «Agregar permiso o resguardo»: el guardia toma la foto del pase físico */
+  var permActual = null;
+  function abrirPermiso(codigo) {
+    permActual = { blob: null, mini: '' };
+    $('perm-id').value = codigo || '';
+    $('perm-tipos').querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+    $('perm-detalle').value = ''; $('perm-vigencia').value = ''; $('perm-err').hidden = true;
+    $('perm-img').hidden = true; $('perm-img').removeAttribute('src');
+    $('perm-foto-btn').textContent = '📷 Tomar foto del pase o del resguardo';
+    $('perm-detalle-lbl').textContent = 'Qué es (opcional)';
+    $('perm-guardar').disabled = false;
+    quienPermiso();
+    $('v-perm').hidden = false;
+    if (!codigo) $('perm-id').focus();
+  }
+  function quienPermiso() {
+    var c = $('perm-id').value.trim(), p = enPadron(c);
+    $('perm-quien').innerHTML = p ? '<b>' + esc(p.nombre) + '</b>' + (p.empresa ? ' · ' + esc(p.empresa) : '')
+      : (c && PADRON.total ? '<span style="color:var(--ambar);font-weight:700">Este ID no está en la base del personal</span>' : '');
+  }
+  $('perm-id').addEventListener('input', quienPermiso);
+  $('btn-permiso').onclick = function () { abrirPermiso(ULTIMA ? ULTIMA.codigo : ''); };
+  $('perm-tipos').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    var otro = !!$('perm-tipos').querySelector('[data-v=OTRO][aria-pressed=true]');
+    $('perm-detalle-lbl').textContent = otro ? 'Qué es (obligatorio para «Otro»)' : 'Qué es (opcional)';
+    $('perm-err').hidden = true;
+  });
+  $('perm-foto-btn').onclick = function () { $('perm-archivo').value = ''; $('perm-archivo').click(); };
+  $('perm-archivo').addEventListener('change', function () {
+    var f = $('perm-archivo').files[0]; if (!f || !permActual) return;
+    canvasDeArchivo(f).then(function (c) {
+      return aBlob(c, 0.8).then(function (b) {
+        permActual.blob = b; permActual.mini = miniatura(c);
+        var img = $('perm-img'); if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+        img.dataset.url = URL.createObjectURL(b); img.src = img.dataset.url; img.hidden = false;
+        $('perm-foto-btn').textContent = '📷 Tomar otra foto';
+        $('perm-err').hidden = true;
+      });
+    }).catch(function (e) { $('perm-err').textContent = e.message || 'No se pudo leer la foto.'; $('perm-err').hidden = false; });
+  });
+  $('perm-cancelar').onclick = function () { $('v-perm').hidden = true; permActual = null; };
+  $('perm-guardar').onclick = function () {
+    if (!permActual) return;
+    var err = function (m) { $('perm-err').textContent = m; $('perm-err').hidden = false; };
+    var codigo = $('perm-id').value.replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
+    var tipos = Array.prototype.map.call($('perm-tipos').querySelectorAll('button[aria-pressed=true]'), function (b) { return b.dataset.v; });
+    var detalle = $('perm-detalle').value.replace(/\s+/g, ' ').trim();
+    if (!codigo) { err('Escribe el ID de la credencial.'); $('perm-id').focus(); return; }
+    if (!tipos.length) { err('Marca qué trae: herramienta, celular, computadora u otro.'); return; }
+    if (tipos.indexOf('OTRO') >= 0 && !detalle) { err('Para «Otro» escribe qué es.'); $('perm-detalle').focus(); return; }
+    if (!permActual.blob && (CASETA || !detalle)) { err('Toma la foto del pase o del resguardo.'); return; }
+    $('perm-guardar').disabled = true;
+    var it = { uid: nuevoUid(), clase: 'permiso', tipo: 'permiso', codigo: codigo, tipos: tipos.join(','), detalle: detalle,
+               vigencia: $('perm-vigencia').value || '', capturado: ahoraLocal(), turno: '-', lugar: normaLugar($('lugar').value), nota: '',
+               mini: permActual.mini || '', persona: (enPadron(codigo) || {}).nombre || '', creado: Date.now() };
+    var b = permActual.blob;
+    (b ? b.arrayBuffer().then(function (ab) { it.datos = ab; it.mime = 'image/jpeg'; }) : Promise.resolve()).then(function () {
+      $('v-perm').hidden = true; permActual = null;
+      if (!ULTIMA || claveId(ULTIMA.codigo) !== claveId(codigo)) ponerUltima(codigo, '');
+      return guardarRegistro(it).then(pintarUltima);
+    }).catch(function (e) { $('perm-guardar').disabled = false; err('No se pudo guardar: ' + (e.message || e)); });
+  };
+  // En la ventana de incidencia, el nombre sale de la base al escribir el ID
+  $('inc-id').addEventListener('input', function () {
+    var p = enPadron($('inc-id').value);
+    if (p && (!$('inc-nombre').value || $('inc-nombre').dataset.auto === '1')) { $('inc-nombre').value = p.nombre; $('inc-nombre').dataset.auto = '1'; }
+  });
+  $('inc-nombre').addEventListener('input', function () { $('inc-nombre').dataset.auto = ''; });
+
   /* El turno de una incidencia es el del reloj (como ControlAccesos::turnoReloj) */
   function turnoReloj(cap) {
     var f = cap.slice(0, 10), m = (+cap.slice(11, 13)) * 60 + (+cap.slice(14, 16));
@@ -1347,7 +1589,7 @@
     return ks.indexOf(x.turno) >= 0 && (!solo || x.lugar === l);
   }
   function enColaVisible() {
-    return cola.filter(function (x) { return !esInc(x) && (x.error || visible(x)); });     // lo rechazado siempre a la vista
+    return cola.filter(function (x) { return esRegistro(x) && (x.error || visible(x)); });     // lo rechazado siempre a la vista
   }
   function enviadosSinListar() {
     var enLista = {}; (datos.registros || []).forEach(function (x) { enLista[x.uid] = 1; });
@@ -1577,6 +1819,13 @@
           fotosMov(m) + '</li>';
       }).join('');
       $('per-salida').hidden = !(r.en_planta && ES_GESTOR);
+      var pb = enPadron(r.id), pms = permisosDe(r.id);
+      if (pb) $('per-nombre').textContent = pb.nombre;
+      $('per-permisos').hidden = !pms.length && !(PADRON.total && !pb);
+      $('per-permisos').innerHTML = (PADRON.total && !pb ? '<p class="nota" style="color:var(--ambar)">Este ID no está en la base del personal.</p>' : '') +
+        (pms.length ? '<h3 style="font-size:14px;margin-top:12px">Permisos</h3>' + pms.map(htmlPermisoCaseta).join('') : '');
+      $('per-personal').hidden = !ES_GESTOR;
+      $('per-personal').href = 'personal.html?id=' + encodeURIComponent(r.id);
       var inc = r.incidencias || [];
       $('per-inc').hidden = !inc.length;
       $('per-inc').innerHTML = inc.length ? '<h3>Incidencias (' + inc.length + ')</h3><ul>' + inc.map(function (x) {
@@ -1809,6 +2058,9 @@
   // Otros puntos registran al mismo tiempo: se actualiza solo
   setInterval(function () { if (!document.hidden && enLinea() && $('v-prev').hidden && !cargando) cargar(true); }, 30000);
   opcionesPdf(); armarPrompt();
+  // La copia de la base del personal: al entrar y cada 5 minutos
+  actualizarPadron();
+  setInterval(function () { if (!document.hidden) actualizarPadron(); }, 5 * 60 * 1000);
   firmaVista = turnosVista().join(',');
   pintarTurno(); pintarLista(); cargar(true);
 })();

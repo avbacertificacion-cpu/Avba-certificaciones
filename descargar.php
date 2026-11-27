@@ -9,6 +9,8 @@
      descargar.php?tipo=incidencia_foto&id=<incidencia>[&m=1]&token=<sesión>
      descargar.php?tipo=accesos_pdf&f=<archivo>&token=<sesión>
      descargar.php?tipo=reporte&f=<archivo>&token=<sesión>      (Excel y PDF del tablero)
+     descargar.php?tipo=permiso_foto&id=<permiso>[&m=1]&token=<sesión>   (pase o resguardo)
+     descargar.php?tipo=personal&f=<archivo>&token=<sesión>     (Excel de la base del personal)
 
    El guardia de caseta sólo ve las fotos que registró él y no baja PDF.
    El cliente sólo baja los reportes del tablero (ni fotos ni los otros PDF).
@@ -31,6 +33,7 @@ require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/api/helpers.php';
 require_once __DIR__ . '/api/ControlAccesos.php';
 require_once __DIR__ . '/api/Tablero.php';
+require_once __DIR__ . '/api/Personal.php';
 
 $tipo = (string)($_GET['tipo'] ?? '');
 $pdo = Database::conexion();
@@ -55,6 +58,20 @@ if ($tipo === 'acceso_foto' || $tipo === 'incidencia_foto') {
     if (!$abs) fallo(404, 'El PDF ya no está disponible. Vuelve a generarlo.');
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="' . $archivo . '"');
+    header('Cache-Control: no-store');
+} elseif ($tipo === 'permiso_foto') {
+    $abs = (new Personal($pdo))->rutaFotoPermiso((int)($_GET['id'] ?? 0), !empty($_GET['m']), $usr);
+    if (!$abs) fallo(404, 'La foto ya no está disponible.');
+    $mime = (@getimagesize($abs)['mime'] ?? '') ?: 'image/jpeg';
+    header('Content-Type: ' . (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) ? $mime : 'image/jpeg'));
+    header('Cache-Control: private, max-age=86400');
+} elseif ($tipo === 'personal') {
+    if (!Personal::puedeAdministrar($usr)) fallo(403, 'Sólo Administración y el administrador de la planta.');
+    $archivo = basename((string)($_GET['f'] ?? ''));
+    $abs = Personal::rutaExcel($archivo);
+    if (!$abs) fallo(404, 'El archivo ya no está disponible. Vuelve a generarlo.');
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="' . $archivo . '"');
     header('Cache-Control: no-store');
 } elseif ($tipo === 'reporte') {
     if (!Tablero::puede($usr)) fallo(403, 'Tu cuenta no tiene acceso al tablero.');
