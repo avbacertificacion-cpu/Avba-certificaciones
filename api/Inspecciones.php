@@ -38,7 +38,7 @@ class Inspecciones {
                                 self::PRECARGA_CAN_260523, self::PRECARGA_CAN_120320,
                                 self::PRECARGA_TORRE_21LC1050, self::PRECARGA_TORRE_21LC660,
                                 self::PRECARGA_TORRE_21LC550, self::PRECARGA_EXC_DX220LCA,
-                               self::PRECARGA_EXC_DX220LCA_030335];
+                               self::PRECARGA_EXC_DX220LCA_030335, self::PRECARGA_GRUA_GMK5240];
 
     private const PRECARGA_GRUA_AC18 = [
         'clave'      => 'precarga_grua_ac18_michel',
@@ -288,6 +288,30 @@ class Inspecciones {
                        . '(peso operativo o capacidad del cucharón, según la placa o el manual).',
     ];
 
+    /* Grúa todo terreno GROVE GMK 5240 de CIS Rentals, para Marcos. Datos de la
+       ficha que mandó la dirección (propietario, marca, modelo, serie y
+       capacidad); sin fotos ni fecha: Marcos las toma y la fecha es la del
+       envío. No hay tipo «todo terreno»: va como grúa hidráulica sobre
+       camión, que es su checklist y su dictamen más cercanos, con prueba de
+       carga. */
+    private const PRECARGA_GRUA_GMK5240 = [
+        'clave'      => 'precarga_grua_gmk5240_52008332_marcos',
+        'busca'      => 'MARCOS',
+        'fotos'      => '',
+        'maquinaria' => 'GRÚA HIDRÁULICA SOBRE CAMIÓN',
+        'cliente'    => 'CIS RENTALS AND CONSTRUCTION, S.A. DE C.V.',
+        'marca'      => 'GROVE',
+        'modelo'     => 'GMK 5240',
+        'serie'      => '52008332',
+        'id_equipo'  => '',
+        'capacidad'  => '240 TON',
+        'nota'       => 'Grúa todo terreno GROVE GMK 5240, serie 52008332, 240 ton, propiedad de '
+                      . 'CIS RENTALS AND CONSTRUCTION, S.A. DE C.V. (datos de la ficha del equipo). '
+                      . 'Va como grúa hidráulica sobre camión: lleva checklist completo y PRUEBA DE CARGA '
+                      . 'con su tabla de capacidades. No trae fotos: tómalas tú (placa con la serie incluida). '
+                      . 'Faltan y los pones tú: dirección, número económico y, si aplica, la placa QR de AVBA.',
+    ];
+
     private const PRECARGA_GRUA_TC4792 = [
         'clave'      => 'precarga_grua_tc4792_michel',
         'busca'      => 'MICHEL',
@@ -381,7 +405,8 @@ class Inspecciones {
             $t->execute([$cfg['maquinaria']]);
             if (!$t->fetchColumn()) return;
 
-            if (!is_dir(__DIR__ . '/../' . $cfg['fotos'])) {
+            // Sin fotos se vale (el inspector las toma); con carpeta, que exista.
+            if ($cfg['fotos'] !== '' && !is_dir(__DIR__ . '/../' . $cfg['fotos'])) {
                 error_log('[Inspecciones] precarga: no están las fotos en ' . $cfg['fotos']);
                 return;
             }
@@ -463,7 +488,7 @@ class Inspecciones {
             $st = $this->pdo->prepare(
                 "SELECT id, cliente, maquinaria, marca, modelo, serie, id_equipo, capacidad,
                         correo, direccion, coords_inspeccion, evidencia_url, prueba_carga, {$nota}, {$coment},
-                        DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha
+                        IF(fecha_inspeccion < DATE(marca_temporal), DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y'), '') AS fecha
                  FROM equipos
                  WHERE inspector = ? AND estado = ?" . ($id > 0 ? " AND id = ?" : "") . "
                  ORDER BY id LIMIT 1"
@@ -486,7 +511,8 @@ class Inspecciones {
         // Todas las que esperan, para que el inspector elija por cuál empezar
         try {
             $c = $this->pdo->prepare(
-                "SELECT id, maquinaria, marca, modelo, serie, DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha
+                "SELECT id, maquinaria, marca, modelo, serie,
+                        IF(fecha_inspeccion < DATE(marca_temporal), DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y'), '') AS fecha
                  FROM equipos WHERE inspector = ? AND estado = ? ORDER BY id"
             );
             $c->execute([$usuario, self::BORRADOR]);
@@ -589,12 +615,15 @@ class Inspecciones {
             }
 
             // Fecha de la inspección: hoy, salvo que sea una inspección preparada
-            // con la fecha en que ya se hizo (de los últimos 60 días).
+            // con la fecha en que ya se hizo (de los últimos 60 días). Sólo cuenta
+            // si es anterior al día en que se preparó: una precarga sin fecha
+            // nace con la de ese día y debe enviarse con la del envío.
             $fechaInsp = date('Y-m-d');
             $borradorId = (int)($payload['borrador_id'] ?? 0);
             if ($borradorId > 0) {
                 try {
-                    $bf = $this->pdo->prepare("SELECT fecha_inspeccion FROM equipos WHERE id = ? AND inspector = ? AND estado = ?");
+                    $bf = $this->pdo->prepare("SELECT IF(fecha_inspeccion < DATE(marca_temporal), fecha_inspeccion, NULL)
+                                               FROM equipos WHERE id = ? AND inspector = ? AND estado = ?");
                     $bf->execute([$borradorId, $usuarioActual, self::BORRADOR]);
                     $fechaInsp = self::fechaPasada((string)($bf->fetchColumn() ?: '')) ?? $fechaInsp;
                 } catch (\Throwable $e) { /* se queda la de hoy */ }
