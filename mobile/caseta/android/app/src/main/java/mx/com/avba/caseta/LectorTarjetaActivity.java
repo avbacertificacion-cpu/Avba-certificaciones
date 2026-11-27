@@ -294,11 +294,11 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         bCambiar = boton("Cambiar cámara", Color.argb(60, 255, 255, 255));
         bCambiar.setVisibility(View.GONE);                          // sólo si el teléfono tiene las dos
         bCambiar.setOnClickListener(v -> cambiarCamara());
-        if (continuo) {                                           // equipo fijo: salir manteniendo 3 s; sin «Escribir ID»
+        if (continuo) {                                           // equipo fijo: salir manteniendo 3 s
             bCancelar.setText("Mantén para salir");
             bCancelar.setOnClickListener(null);
             salirManteniendo(bCancelar);
-            bEscribir.setVisibility(View.GONE);
+            // «Escribir ID» se queda: una credencial dañada (rayas de la impresora) se registra sin cerrar la cámara
         }
         fila.addView(bCancelar, peso());
         fila.addView(bEscribir, peso());
@@ -466,7 +466,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             // El código ya es seguro: se entrega en cuanto hay nombre (o tras un momento sin él)
             String nombre = estab.nombreProbable(confirmado.codigo);
             if (nombre != null || SystemClock.elapsedRealtime() - confirmadoEn >= esperaNombreMs) {
-                if (continuo) entregarContinuo(confirmado.codigo, nombre);
+                if (continuo) entregarContinuo(confirmado.codigo, nombre, false);
                 else entregar(confirmado.codigo, nombre, false, false);
                 return;
             }
@@ -508,7 +508,9 @@ public class LectorTarjetaActivity extends AppCompatActivity {
                 .setView(caja)
                 .setPositiveButton("Aceptar", (dlg, w) -> {
                     String c = e.getText().toString().replaceAll("\\D", "");
-                    if (!c.isEmpty()) entregar(c, null, true, false); else pausado = false;
+                    if (c.isEmpty()) pausado = false;
+                    else if (continuo) { pausado = false; entregarContinuo(c, null, true); }   // la cámara sigue abierta
+                    else entregar(c, null, true, false);
                 })
                 .setNegativeButton("Cancelar", (dlg, w) -> pausado = false)
                 .setOnCancelListener(dlg -> pausado = false)
@@ -618,9 +620,9 @@ public class LectorTarjetaActivity extends AppCompatActivity {
     /* ══ Lectura continua (equipo fijo de entrada o de salida) ══════════════ */
 
     /** Manda la credencial leída a la página y queda lista para la siguiente. */
-    private void entregarContinuo(String codigo, String nombre) {
+    private void entregarContinuo(String codigo, String nombre, boolean manual) {
         long ahora = SystemClock.elapsedRealtime();
-        if (codigo.equals(ultimoEnviado) && ahora - ultimoEnviadoEn < MISMA_CREDENCIAL_MS) {
+        if (!manual && codigo.equals(ultimoEnviado) && ahora - ultimoEnviadoEn < MISMA_CREDENCIAL_MS) {
             ultimoEnviadoEn = ahora;                                 // sigue frente a la cámara: no se reenvía
             reiniciarLectura();
             return;
@@ -631,7 +633,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         d.put("codigo", codigo);
         d.put("nombre", nombre == null ? "" : nombre);
         d.put("texto", ultimoTexto);
-        d.put("manual", false);
+        d.put("manual", manual);
         d.put("continuo", true);
         d.put("tipo", tipoContinuo);
         d.put("lecturas", lecturas);

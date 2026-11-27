@@ -279,6 +279,16 @@ public class AnalizadorTarjetaTest {
         ver(conRayas(ln("0 0287", 825, 700, 70, 230)), credencial(), "00287", NOMBRE_CRED);
     }
 
+    /** La raya también cruza el último dígito: cortado, se parece a una letra («4» → «A», «0» → «C»). Si se pierde, no se adivina. */
+    @Test public void ultimoDigitoCortadoPorLaRaya() {
+        for (String t : new String[] { "ID: 0|028A", "ID: 0 028 A", "ID: 0028A", "ID: 0I028A" })
+            assertEquals("ID leído como «" + t + "»", "00284", AnalizadorTarjeta.analizar(conRayas(ln(t, 825, 560, 70, 370)), credencial()).codigo);
+        assertEquals("00280", AnalizadorTarjeta.analizar(conRayas(ln("ID: 0 028C", 825, 560, 70, 370)), credencial()).codigo);
+        assertEquals("00287", AnalizadorTarjeta.analizar(conRayas(ln("ID: 0028T", 825, 560, 70, 370)), credencial()).codigo);
+        // «4» que quedó como «L»: falta un dígito; aunque 28 esté en la base, no se toma
+        assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 0|028L", 825, 560, 70, 370)), credencial("28", "284")).codigo);
+    }
+
     /** Si la raya se lee como un «1» y no se sabe cuál es, decide la base del personal; sin base no se adivina. */
     @Test public void rayaDudosaLaDecideLaBase() {
         List<AnalizadorTarjeta.Linea> l = conRayas(ln("ID: 101213", 825, 560, 70, 370));   // 10213 con un «1» de más

@@ -133,6 +133,8 @@ public final class AnalizadorTarjeta {
        El reconocimiento lee la raya como «|», «I», «l» o un «1» de más, o parte el número en dos
        («0 0287», «0028 7»). Todo lo que sigue a «ID:» en esa fila es el número: se juntan los pedazos
        y, si sobra un dígito, se quita el que parece raya. */
+    /** Letras que en el recuadro del ID se leen como un dígito (ver codigoDelId). */
+    private static final String PARECE_DIGITO = "IliOoQDCSsBZzAGbTgq";
     private static final Pattern ETIQUETA_ID = Pattern.compile("(?<![\\p{L}\\d])[I1l|!]\\s?D(?!\\p{L})\\s*[:;.,]?",
             Pattern.CASE_INSENSITIVE);
 
@@ -146,25 +148,33 @@ public final class AnalizadorTarjeta {
         StringBuilder dig = new StringBuilder();
         List<Integer> costo = new ArrayList<>();               // lo que cuesta quitar cada dígito (0 = no se quita)
         for (String tok : resto.trim().split("\\s+")) {
-            // Una palabra (letras que no se confunden con números, o más de dos sin ningún dígito) no es parte del ID
-            boolean conDigito = tok.matches(".*\\d.*"), palabra = false;
-            for (int i = 0; i < tok.length() && !palabra; i++)
-                palabra = Character.isLetter(tok.charAt(i)) && "IliOoQDSsBZz".indexOf(tok.charAt(i)) < 0;
-            if (palabra || (!conDigito && tok.replaceAll("[^\\p{L}]", "").length() > 2)) {
-                if (dig.length() > 0) break;                     // ahí acaba el número
-                continue;
+            // Sin ningún dígito, una palabra (más de dos letras, o letras que no se confunden con números) no es
+            // parte del ID: ahí acaba. Con dígitos, cada letra se lee como el número al que se parece.
+            if (!tok.matches(".*\\d.*")) {
+                boolean palabra = tok.replaceAll("[^\\p{L}]", "").length() > 2;
+                for (int i = 0; i < tok.length() && !palabra; i++)
+                    palabra = Character.isLetter(tok.charAt(i)) && PARECE_DIGITO.indexOf(tok.charAt(i)) < 0;
+                if (palabra) {
+                    if (dig.length() > 0) break;
+                    continue;
+                }
             }
             for (int i = 0; i < tok.length(); i++) {
                 char ch = tok.charAt(i), d; int c;
                 if (ch >= '0' && ch <= '9') { d = ch; c = ch == '1' ? 3 : 0; }
                 else switch (ch) {
-                    case '|': case '!': d = '1'; c = 1; break;
+                    case '|': case '!': d = '1'; c = 1; break;              // casi siempre es la raya
                     case 'I': case 'l': case 'i': d = '1'; c = 2; break;
-                    case 'O': case 'o': case 'Q': case 'D': d = '0'; c = 0; break;
+                    // Un dígito cortado por la raya se parece a una letra: «0» → C, «4» → A, «6» → G/b, «7» → T, «9» → g/q
+                    case 'O': case 'o': case 'Q': case 'D': case 'C': d = '0'; c = 0; break;
                     case 'S': case 's': d = '5'; c = 0; break;
                     case 'B': d = '8'; c = 0; break;
                     case 'Z': case 'z': d = '2'; c = 0; break;
-                    default: continue;                                                  // signo: se salta
+                    case 'A': d = '4'; c = 0; break;
+                    case 'G': case 'b': d = '6'; c = 0; break;
+                    case 'T': d = '7'; c = 0; break;
+                    case 'g': case 'q': d = '9'; c = 0; break;
+                    default: continue;               // signo u otra letra: se salta (si faltan dígitos, no se adivina)
                 }
                 dig.append(d); costo.add(c);
             }

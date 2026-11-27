@@ -122,6 +122,11 @@ const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE 
   await leer(p, '00287', 'RAMIRO'); await p.waitForTimeout(1500);
   m = await ultimo(p);
   ok(m && m.titulo === 'SALIDA REGISTRADA' && m.color === 'azul' && cuenta('287', 'salida') === '1', 'salida registrada (en azul)');
+  // Credencial muy dañada: el guardia escribe el ID en la cámara («Escribir ID») y la cámara sigue abierta
+  await p.evaluate(() => window.__emitir('lectura', { codigo: '00412', nombre: '', manual: true, continuo: true, ms: 9000 })); await p.waitForTimeout(1500);
+  m = await ultimo(p);
+  ok(m && m.titulo === 'SALIDA REGISTRADA' && m.nombre === 'ANA SOFIA RUIZ PAEZ' && sql("SELECT origen FROM accesos_registros WHERE tipo='salida' AND codigo='00412'") === 'manual',
+     'ID escrito a mano en la lectura continua: se registra (origen manual) con el nombre de la base');
   ok(!p.errores.length, 'sin errores de JavaScript (salida)' + (p.errores.length ? ': ' + p.errores.join(' | ') : ''));
   await ctx.close();
 

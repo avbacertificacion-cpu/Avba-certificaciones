@@ -90,6 +90,7 @@ y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le 
    **Credenciales con rayas de la impresora** (rayas blancas verticales que cruzan el recuadro
    del ID y parten etiquetas: «N OMBRE», «N SS»): con la regla `digitosId` (5) el lector junta
    los pedazos del número («0 0287», «0028 7»), quita la raya leída como «|», «I» o un «1» de más,
+   lee el dígito cortado como la letra a la que se parece («4» → «A», «0» → «C», «7» → «T»),
    **nunca toma un pedazo** (sería otra persona) y, si queda en duda, decide con los IDs de la
    base que le manda la página (`ids`); sin base no adivina. «N SS» partida no se toma como «N.»
    de número. La página además corrige con la base una lectura de la app anterior con un dígito
@@ -130,7 +131,8 @@ y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le 
    de `accesos.html`, para cualquier guardia con la app nueva): la cámara queda abierta y
    cada credencial se registra sola **con su cuenta y su turno**. El equipo recuerda la
    elección (`ca_accesos_carril`): si la app se reinicia vuelve a leer solo; al salir de la
-   cámara a propósito (evento `cerrado`) se olvida y se vuelve a elegir. Sus botones
+   cámara a propósito (evento `cerrado`) se olvida y se vuelve a elegir. En la cámara, «Escribir
+   ID» registra una credencial que no se lee (`manual`) sin cerrarla. Sus botones
    ENTRADA/SALIDA/INCIDENCIA siguen. Opcional: una cuenta de modo **E**/**S** (Cuentas,
    «Siempre ENTRADA/SALIDA») no elige, abre sola su tipo, no tiene turno (va por el **reloj**)
    y el servidor rechaza el otro tipo (`MODO_FIJO`). Cada `lectura` se registra (misma cola
