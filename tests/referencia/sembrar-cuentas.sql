@@ -19,6 +19,12 @@ INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
 -- El cliente: sólo el tablero (gráficas, Excel y PDF).
 INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
   ('cliente', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'CLIENTE', 'CLIENTE DE PRUEBA');
+-- Equipos fijos (lectura continua): uno de entrada y uno de salida, sin turno (van por el reloj).
+INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
+  ('fijo.entrada', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'EQUIPO FIJO ENTRADA'),
+  ('fijo.salida',  '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'EQUIPO FIJO SALIDA');
+UPDATE usuarios SET modo = 'E' WHERE usuario = 'fijo.entrada';
+UPDATE usuarios SET modo = 'S' WHERE usuario = 'fijo.salida';
 UPDATE usuarios SET turno = 'D' WHERE usuario IN ('punto1', 'punto2', 'punto3', 'punto4');
 UPDATE usuarios SET turno = 'N' WHERE usuario IN ('noche1', 'noche2');
 

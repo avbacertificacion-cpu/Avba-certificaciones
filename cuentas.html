@@ -53,7 +53,14 @@
           <small id="s-pass">Al menos 8 caracteres. Dísela a la persona en persona, no por mensaje.</small></div>
       </div>
       <div class="fila" id="campos-guardia" hidden>
-        <div class="campo"><label for="c-turno">Turno del guardia</label>
+        <div class="campo"><label for="c-modo">Cómo registra</label>
+          <select id="c-modo">
+            <option value="">Con botones ENTRADA y SALIDA (teléfono del guardia)</option>
+            <option value="E">Equipo fijo de ENTRADA (lee solo, sin botones)</option>
+            <option value="S">Equipo fijo de SALIDA (lee solo, sin botones)</option>
+          </select>
+          <small id="s-modo">El guardia toca ENTRADA o SALIDA y lee la credencial.</small></div>
+        <div class="campo" id="campo-turno"><label for="c-turno">Turno del guardia</label>
           <select id="c-turno">
             <option value="">Elige…</option>
             <option value="D">Turno de día</option>
@@ -83,6 +90,7 @@
 
   var ROLES = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de la planta', ACCESOS: 'Guardia de caseta', CLIENTE: 'Cliente' };
   var TURNO = { D: 'Turno de día', N: 'Turno de noche' };
+  var MODO = { E: 'Equipo fijo · Entradas', S: 'Equipo fijo · Salidas' };
 
   var COLOR = { ADMIN: 'azul', PLANTA: 'verde', ACCESOS: '', CLIENTE: 'gris' };
   var cuentas = [], editando = null;
@@ -116,7 +124,8 @@
         '<b>' + esc(c.nombre) + '</b>' + (yo ? ' <span class="etq gris">tú</span>' : '') +
         '<div class="u">' + esc(c.usuario) + '</div>' +
         '<div class="m"><span class="etq ' + COLOR[c.rol] + '">' + esc(ROLES[c.rol] || c.rol) + '</span> ' +
-        (c.rol === 'ACCESOS' ? (c.turno ? '<span class="etq ' + (c.turno === 'N' ? 'noche' : 'dia') + '">' + TURNO[c.turno] + '</span> ' : '<span class="etq">Sin turno</span> ') : '') +
+        (c.rol === 'ACCESOS' ? (c.modo ? '<span class="etq azul">' + MODO[c.modo] + '</span> '
+          : c.turno ? '<span class="etq ' + (c.turno === 'N' ? 'noche' : 'dia') + '">' + TURNO[c.turno] + '</span> ' : '<span class="etq">Sin turno</span> ') : '') +
         (c.activo ? '' : '<span class="etq gris">Desactivada</span> ') +
         '· último acceso: ' + esc(fecha(c.ultimo_acceso)) + (c.sesiones ? ' · ' + c.sesiones + ' sesión' + (c.sesiones === 1 ? '' : 'es') + ' abierta' + (c.sesiones === 1 ? '' : 's') : '') + '</div></div>' +
         '<div class="acc"><button class="btn sec chico" type="button" data-editar="' + c.id + '">Editar</button>' +
@@ -135,6 +144,7 @@
     $('s-pass').textContent = c ? 'Déjala vacía para no cambiarla. Si la cambias, se cierran sus sesiones abiertas.' : 'Al menos 8 caracteres. Dísela a la persona en persona, no por mensaje.';
     if (c) { $('c-nombre').value = c.nombre; $('c-usuario').value = c.usuario; $('c-rol').value = c.rol; }
     $('c-turno').value = c ? (c.turno || '') : '';
+    $('c-modo').value = c ? (c.modo || '') : '';
     camposGuardia();
     $('c-rol').disabled = !!(c && c.usuario === ses.usuario);      // no te quitas tu propio perfil
     $('c-nombre').focus();
@@ -142,8 +152,15 @@
   }
   function cerrar() { $('f-cuenta').hidden = true; editando = null; }
   /* El turno: sólo para guardias */
-  function camposGuardia() { $('campos-guardia').hidden = $('c-rol').value !== 'ACCESOS'; }
+  function camposGuardia() {
+    $('campos-guardia').hidden = $('c-rol').value !== 'ACCESOS';
+    var fijo = $('c-modo').value !== '';
+    $('campo-turno').hidden = fijo;                  // el equipo fijo trabaja día y noche: va por el reloj
+    $('s-modo').textContent = fijo ? 'Para el teléfono o tableta fijo del carril: lee las credenciales solo, día y noche. Su turno es el del reloj (día 06:00–18:00, noche 18:00–06:00).'
+                                   : 'El guardia toca ENTRADA o SALIDA y lee la credencial.';
+  }
   $('c-rol').addEventListener('change', camposGuardia);
+  $('c-modo').addEventListener('change', camposGuardia);
 
   $('b-nueva').addEventListener('click', function () { abrir(null); });
   $('b-cancelar').addEventListener('click', cerrar);
@@ -152,8 +169,11 @@
     var datos = { nombre: $('c-nombre').value };
     if (!$('c-rol').disabled) datos.rol = $('c-rol').value;
     if ($('c-rol').value === 'ACCESOS') {
-      if (!$('c-turno').value) { $('f-err').textContent = 'Elige el turno del guardia: día o noche.'; $('f-err').hidden = false; $('c-turno').focus(); return; }
-      datos.turno = $('c-turno').value;
+      datos.modo = $('c-modo').value;
+      if (!datos.modo) {
+        if (!$('c-turno').value) { $('f-err').textContent = 'Elige el turno del guardia: día o noche.'; $('f-err').hidden = false; $('c-turno').focus(); return; }
+        datos.turno = $('c-turno').value;
+      }
     }
     if ($('c-pass').value) datos.password = $('c-pass').value;
     var accion = 'CUENTA_CREAR';

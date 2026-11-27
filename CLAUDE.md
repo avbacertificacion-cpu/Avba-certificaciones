@@ -56,7 +56,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. |
 | `api/lib/qrcode.php` | Generador de códigos QR (lo usa la portada de la maqueta). |
 | `demo/` | **La maqueta** que hay que volver real: `control-accesos.html` (panel), `caseta.html` (guardia), `demo-datos.js` (datos ficticios y reglas), `index.html` (portada), `sala.php` (sincroniza la demo entre equipos). **Sólo Administración:** `solo-admin.js` regresa a su inicio a quien entre con otro perfil (sin sesión sí abre, para el teléfono que entra con el QR de la portada). |
-| `mobile/caseta/` | App Android «AVBA Control de Accesos» (Capacitor): abre `accesos.html` y agrega el lector nativo de la credencial (CameraX + ML Kit sin internet, `AnalizadorTarjeta.java` con sus pruebas). Cámara frontal o trasera según la regla `camara`; el botón «Cambiar cámara» pasa a la otra y el teléfono la recuerda mientras la regla no cambie. |
+| `mobile/caseta/` | App Android «AVBA Control de Accesos» (Capacitor): abre `accesos.html` y agrega el lector nativo de la credencial (CameraX + ML Kit sin internet, `AnalizadorTarjeta.java` con sus pruebas). Cámara frontal o trasera según la regla `camara`; el botón «Cambiar cámara» pasa a la otra y el teléfono la recuerda mientras la regla no cambie. `esperaNombre` (0 con la base del personal): tras confirmar el ID no espera el nombre. **Lectura continua** (`continuo`, eventos `lectura`/`cerrado`, `mostrar`, `detener`; `disponible()` responde `continuo: true`): la cámara no se cierra, cada credencial se avisa a la página, la misma credencial frente a la cámara no se reenvía (6 s), muestra en grande lo que dice la página (o «Leída» si no contesta en 2.5 s), con tono; salir = mantener 3 s. |
 | `config/config.example.php` | Plantilla de la configuración (base propia). `config.php` vive sólo en el servidor. |
 | `sql/esquema-inicial.sql` | Tablas de la base propia (cuentas, sesiones, registros, puntos). |
 | `tests/referencia/` | Pruebas (PHP, API y pantallas con Playwright) contra la API propia. Todas: `bash tests/referencia/correr.sh` (una: `… correr.sh pantalla/sesion`). |
@@ -64,7 +64,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 
 **Perfiles** (`Auth::ROLES`): **ADMIN** (Administración AVBA: todo, incluidas las cuentas),
 **PLANTA** (administrador de accesos de la planta: registros, En planta, PDF, dar salida)
-**ACCESOS** (guardia: sólo registra, consulta la copia de la base y agrega permisos con foto; el enrutador le rechaza todo lo demás) y **CLIENTE** (el cliente: sólo el tablero
+**ACCESOS** (guardia: sólo registra, consulta la copia de la base y agrega permisos con foto; el enrutador le rechaza todo lo demás; puede ser **equipo fijo**: `usuarios.modo` E sólo entradas | S sólo salidas, sin turno) y **CLIENTE** (el cliente: sólo el tablero
 y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le da fotos). Cada guardia tiene su **turno**
 (`usuarios.turno`: D día | N noche), que se elige en Cuentas.
 
@@ -118,6 +118,17 @@ y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le 
    que los registros (`clase: 'permiso'`, acción `PERMISO_AGREGAR`, confirmado por
    `ACCESOS_EXISTEN`); en las listas sólo cuentan los registros (`esRegistro`). La base es
    de datos reales: **nunca** al repositorio; las pruebas usan personas inventadas.
+9. **Equipos fijos (lectura continua):** un teléfono o tableta fijo por carril con una cuenta
+   de guardia de modo **E** (sólo entradas) o **S** (sólo salidas), que se elige en Cuentas.
+   No tiene turno (`turnoCuenta` = ''): sus registros van por el **reloj** (con el margen de
+   2 h y la entrada abierta). El servidor rechaza el otro tipo (`MODO_FIJO`). En
+   `accesos.html` (`MODO_FIJO`): sólo su botón, sin INCIDENCIA ni «Agregar permiso»; al
+   entrar abre sola la lectura continua (espera hasta 3 s la base del personal); cada
+   `lectura` se registra (misma cola sin señal) salvo si esa persona ya se registró en ese
+   equipo hace menos de `repetirSeg` (120 s, en `api/accesos-tarjeta.json`): «YA
+   REGISTRADA» en amarillo. A la app le manda `mostrar` (verde entrada, azul salida,
+   amarillo con permiso vencido o ID fuera de la base). La app vieja (sin `continuo`) pide
+   instalar la nueva y deja el botón.
 
 ## Cómo probar
 

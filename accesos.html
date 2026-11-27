@@ -264,6 +264,12 @@
   .sin-perm{font-size:13px;color:var(--texto-sub);margin-top:8px}
   #perm-tipos button[aria-pressed=true]{border-color:var(--azul);background:#E6F1FB;color:var(--azul-dark)}
   .perm-quien{font-size:13.5px;margin:-4px 0 10px;min-height:18px}
+  /* Equipo fijo */
+  .fijo{text-align:center}
+  .fijo-tit{font-size:24px;font-weight:900;color:#fff;border-radius:12px;padding:14px 10px;background:var(--verde);letter-spacing:.5px}
+  .fijo.salida .fijo-tit{background:var(--azul)}
+  .fijo-estado{font-size:14px;color:var(--texto-sub);margin:12px 4px;line-height:1.5}
+  .fijo-estado b{color:var(--texto)}
   #v-foto{z-index:110}
   .mov-fotos{display:flex;gap:10px;margin-top:6px}
   .mov-fotos figure{margin:0;text-align:center;font-size:11px;color:var(--texto-sub);font-weight:700}
@@ -315,6 +321,13 @@
 
   <div class="aviso-dia" id="aviso-dia" hidden>Estás viendo un turno anterior. Para registrar entradas y salidas, regresa al turno en curso.
     <br><button class="btn sec" type="button" id="btn-curso" style="margin-top:8px">Ir al turno en curso</button></div>
+
+  <!-- Equipo fijo (cuenta de sólo entradas o sólo salidas): lectura continua, sin botones -->
+  <div class="tarjeta fijo" id="tarjeta-fijo" hidden>
+    <div class="fijo-tit" id="fijo-tit">Equipo fijo de ENTRADA</div>
+    <p class="fijo-estado" id="fijo-estado"></p>
+    <button class="btn prim ancho" type="button" id="btn-fijo">Iniciar lectura continua</button>
+  </div>
 
   <div class="tarjeta" id="tarjeta-camara">
     <div id="cam-apagada">
@@ -549,10 +562,10 @@
      internet (la imagen no sale del equipo) y el registro queda guardado al
      instante, sin foto. En el navegador sigue la foto de la identificación. */
   var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
-  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal' };
+  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal', repetirSeg: 120 };
   function mezclarReglas(g) {
     if (!g || typeof g !== 'object') return;
-    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara', 'repetirSeg', 'esperaNombre'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
   }
   /* Equipo: identificador propio de este teléfono o navegador (no cambia al cerrar sesión). Se
      sigue mandando con cada petición, pero el servidor ya no liga cuentas a teléfonos: varios
@@ -672,6 +685,8 @@
      hora, y sólo ve ése (igual que ControlAccesos::turnoDeGuardia). Lo de la madrugada del guardia
      de noche es de la noche que empezó el día anterior. */
   var TURNO_CUENTA = CASETA && /^[DN]$/.test(ses.turno || '') ? ses.turno : '';
+  /* Equipo fijo (cuenta de sólo entradas o sólo salidas): lee las credenciales sin botones */
+  var MODO_FIJO = CASETA ? ({ E: 'entrada', S: 'salida' })[ses.modo] || '' : '';
   function turnoGuardia(cap) {
     var f = cap.slice(0, 10);
     return TURNO_CUENTA === 'N' ? ((+cap.slice(11, 13)) < 12 ? sumarDias(f, -1) : f) + '-N' : f + '-D';
@@ -929,14 +944,21 @@
 
   /* ── Tarjeta: leer y registrar al instante ── */
   var leyendoTarjeta = false;
-  function leerTarjeta(tipo) {
-    if (leyendoTarjeta) return;
-    leyendoTarjeta = true;
+  /** Las reglas para el lector de la app. Con la base del personal cargada sólo hace falta el ID
+   *  (el nombre sale de la base): el lector no espera a leer el nombre. */
+  function opcionesLector(tipo) {
     var o = {};
     for (var k in REGLAS_TARJETA) o[k] = REGLAS_TARJETA[k];
     o.titulo = (tipo === 'entrada' ? 'ENTRADA' : tipo === 'salida' ? 'SALIDA' : 'INCIDENCIA') + ' · ' + normaLugar($('lugar').value);
     o.subtitulo = 'Acomoda la credencial dentro del recuadro, sin reflejos. Se lee en este teléfono, sin internet.';
     o.simular = false;
+    o.esperaNombre = typeof REGLAS_TARJETA.esperaNombre === 'number' ? REGLAS_TARJETA.esperaNombre : (PADRON.total ? 0 : 1500);
+    return o;
+  }
+  function leerTarjeta(tipo) {
+    if (leyendoTarjeta) return;
+    leyendoTarjeta = true;
+    var o = opcionesLector(tipo);
     LECTOR.leer(o).then(function (r) {
       leyendoTarjeta = false;
       if (!r || r.cancelado) {
@@ -1075,17 +1097,18 @@
   try { var guardado = JSON.parse(localStorage.getItem(CLAVE_PADRON) || 'null'); if (guardado && guardado.personas) PADRON = guardado; } catch (e) {}
   var TIPOS_PERM = { HERRAMIENTA: 'Resguardo de herramienta', CELULAR: 'Permiso de celular', COMPUTADORA: 'Permiso de computadora', OTRO: 'Otro permiso' };
   var ICONO_PERM = { HERRAMIENTA: '🔧', CELULAR: '📱', COMPUTADORA: '💻', OTRO: '📄' };
-  var pidiendoPadron = false;
+  var pidiendoPadron = null;                       // la petición en curso (quien la pide otra vez, la espera)
   function actualizarPadron() {
-    if (pidiendoPadron || !enLinea()) return Promise.resolve();
-    pidiendoPadron = true;
-    return api('PADRON_CAJA', { version: PADRON.version || '' }, 'GET').then(function (r) {
-      pidiendoPadron = false;
+    if (pidiendoPadron) return pidiendoPadron;
+    if (!enLinea()) return Promise.resolve();
+    pidiendoPadron = api('PADRON_CAJA', { version: PADRON.version || '' }, 'GET').then(function (r) {
+      pidiendoPadron = null;
       if (!r || r.status !== 'success' || r.sin_cambios) return;
       PADRON = { version: String(r.version || ''), total: r.total || 0, personas: r.personas || {}, permisos: r.permisos || {} };
       try { localStorage.setItem(CLAVE_PADRON, JSON.stringify(PADRON)); } catch (e) {}
       pintarUltima();
-    }).catch(function () { pidiendoPadron = false; });
+    }).catch(function () { pidiendoPadron = null; });
+    return pidiendoPadron;
   }
   /** La persona de un ID en la base: {codigo, nombre, empresa} o null. */
   function enPadron(codigo) {
@@ -2017,6 +2040,116 @@
     };
   });
 
+  /* ══ Equipo fijo: lectura continua ════════════════════════════════════
+     Un teléfono o tableta fijo en el carril de entrada (o de salida), con una cuenta de
+     sólo entradas (o sólo salidas): la app deja la cámara abierta y cada credencial que
+     se acerca se registra sola. Aquí se registra (misma cola sin señal), se ignora la
+     misma persona si ya se registró hace poco (regla repetirSeg, 2 min) y se le dice a
+     la app qué mostrar en grande: nombre de la base, permisos o avisos. */
+  var CONTINUO = { soportado: null, activo: false, escuchando: false, auto: true };
+  var LEIDAS_FIJO = {};                            // clave → hora del último registro en este equipo
+  function fijarModo(m) {
+    var nuevo = CASETA ? ({ E: 'entrada', S: 'salida' })[m] || '' : '';
+    if (nuevo !== MODO_FIJO) {
+      MODO_FIJO = nuevo;
+      try { var sv = sesion(); sv.modo = m || ''; localStorage.setItem('ca_sesion', JSON.stringify(sv)); } catch (e) {}
+      if ($('lugar').value) fijarPunto($('lugar').value);
+    }
+    pintarFijo();
+    if (MODO_FIJO && CONTINUO.auto) { CONTINUO.auto = false; setTimeout(iniciarContinuo, 800); }   // al entrar, empieza solo
+  }
+  function pintarFijo() {
+    var t = $('tarjeta-fijo');
+    t.hidden = !MODO_FIJO;
+    document.querySelector('.cap.ent').hidden = MODO_FIJO === 'salida';
+    document.querySelector('.cap.sal').hidden = MODO_FIJO === 'entrada';
+    document.querySelector('.cap.inc').hidden = !!MODO_FIJO;           // el equipo fijo sólo lee
+    $('btn-permiso').hidden = !!MODO_FIJO;
+    $('captura').style.gridTemplateColumns = MODO_FIJO ? '1fr' : '';
+    if (!MODO_FIJO) return;
+    t.className = 'tarjeta fijo ' + MODO_FIJO;
+    $('fijo-tit').textContent = 'Equipo fijo de ' + MODO_FIJO.toUpperCase();
+    var e = $('fijo-estado'), b = $('btn-fijo');
+    if (!LECTOR) {
+      e.innerHTML = 'El equipo fijo necesita la app <b>AVBA Control de Accesos</b> para leer las credenciales solo. Desde el navegador usa el botón de abajo.';
+      b.hidden = true;
+    } else if (CONTINUO.soportado === false) {
+      e.innerHTML = 'Esta versión de la app no lee sola. <b>Instala la versión nueva</b> (gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk). Mientras, usa el botón de abajo.';
+      b.hidden = true;
+    } else if (CONTINUO.activo) {
+      e.innerHTML = '<b>Leyendo credenciales.</b> Cada ' + MODO_FIJO + ' se registra sola al acercar la credencial.';
+      b.hidden = true;
+    } else {
+      e.innerHTML = 'La lectura continua está detenida. Toca el botón para que el equipo vuelva a leer solo.';
+      b.hidden = false;
+    }
+  }
+  function soportaContinuo() {
+    if (CONTINUO.soportado !== null) return Promise.resolve(CONTINUO.soportado);
+    if (!LECTOR || !LECTOR.disponible || !LECTOR.continuo) return Promise.resolve(CONTINUO.soportado = false);
+    return Promise.resolve(LECTOR.disponible()).then(function (r) { return (CONTINUO.soportado = !!(r && r.continuo)); }, function () { return (CONTINUO.soportado = false); });
+  }
+  function iniciarContinuo() {
+    if (!MODO_FIJO || !LECTOR || CONTINUO.activo) return;
+    // Con la base del personal a la mano (hasta 3 s), el lector sólo necesita el ID
+    var base = Promise.race([actualizarPadron(), new Promise(function (ok) { setTimeout(ok, 3000); })]);
+    base.then(soportaContinuo).then(function (si) {
+      pintarFijo();
+      if (!si || CONTINUO.activo) return;
+      if (!CONTINUO.escuchando) {
+        CONTINUO.escuchando = true;
+        LECTOR.addListener('lectura', alLeerContinuo);
+        LECTOR.addListener('cerrado', function () { CONTINUO.activo = false; pintarFijo(); });
+      }
+      var o = opcionesLector(MODO_FIJO);
+      o.tipo = MODO_FIJO;
+      o.titulo = MODO_FIJO === 'entrada' ? 'ENTRADA' : 'SALIDA';
+      o.subtitulo = 'Acerca tu credencial al recuadro';
+      return Promise.resolve(LECTOR.continuo(o)).then(function () { CONTINUO.activo = true; pintarFijo(); });
+    }).catch(function (e) { toast((e && e.message) || 'No se pudo abrir la cámara.', true); pintarFijo(); });
+  }
+  $('btn-fijo').onclick = function () { iniciarContinuo(); };
+  function horaTxt(d) { return fechaDe(d) + ' ' + dos(d.getHours()) + ':' + dos(d.getMinutes()) + ':' + dos(d.getSeconds()); }
+  /** ¿Esa persona ya se registró (en este equipo, del mismo tipo) hace menos de repetirSeg? Devuelve la hora o ''. */
+  function repetida(codigo, tipo) {
+    var seg = +REGLAS_TARJETA.repetirSeg || 0;
+    if (seg <= 0) return '';
+    var k = claveId(codigo), desde = horaTxt(new Date(Date.now() - seg * 1000)), ult = '';
+    if (LEIDAS_FIJO[k] && LEIDAS_FIJO[k] >= desde) ult = LEIDAS_FIJO[k];
+    cola.filter(esRegistro).concat(recienEnviados, (datos && datos.registros) || []).forEach(function (x) {
+      if (x.tipo === tipo && x.codigo && claveId(x.codigo) === k && x.capturado >= desde && x.capturado > ult) ult = x.capturado;
+    });
+    return ult;
+  }
+  function mostrarEnApp(d) { if (LECTOR && LECTOR.mostrar) Promise.resolve(LECTOR.mostrar(d)).catch(function () {}); }
+  function alLeerContinuo(r) {
+    if (!MODO_FIJO || !r) return;
+    var tipo = MODO_FIJO, T = tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
+    var codigo = String(r.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
+    if (!codigo) return;
+    var pb = enPadron(codigo), nombre = pb ? pb.nombre : String(r.nombre || '').replace(/\s+/g, ' ').trim();
+    var ya = repetida(codigo, tipo);
+    if (ya) {                                       // ya pasó hace poco: no se registra dos veces
+      ponerUltima(codigo, r.nombre);
+      mostrarEnApp({ titulo: T + ' YA REGISTRADA', nombre: nombre, lineas: ['ID ' + (pb ? pb.codigo : codigo) + ' · registrada a las ' + ya.slice(11, 16)],
+                     color: 'amarillo', segundos: 2.5, sonido: 'aviso', codigo: codigo });
+      return;
+    }
+    LEIDAS_FIJO[claveId(codigo)] = ahoraLocal();
+    registrarTarjeta(tipo, r);
+    var lineas = ['ID ' + (pb ? pb.codigo : codigo) + ' · ' + ahoraLocal().slice(11, 16)], aviso = false, vistos = {};
+    permisosDe(codigo).forEach(function (p) {
+      p.tipos.forEach(function (t) {
+        var k = t + (p.vencido ? 'v' : ''); if (vistos[k] || !TIPOS_PERM[t]) return; vistos[k] = 1;
+        lineas.push(ICONO_PERM[t] + ' ' + TIPOS_PERM[t] + (p.vencido ? ' · VENCIDO' : ''));
+        if (p.vencido) aviso = true;
+      });
+    });
+    if (PADRON.total && !pb) { lineas.push('⚠ No está en la base del personal: pasa con el guardia'); aviso = true; }
+    mostrarEnApp({ titulo: T + ' REGISTRADA', nombre: nombre || 'Nombre no leído', lineas: lineas,
+                   color: aviso ? 'amarillo' : (tipo === 'entrada' ? 'verde' : 'azul'), segundos: aviso ? 3.5 : 2.5, sonido: aviso ? 'aviso' : 'ok', codigo: codigo });
+  }
+
   /* ── Cuenta de caseta: registra en el acceso, en su turno ──
      Ya no hay punto que asignar ni teléfono ligado: varios guardias registran a la vez,
      cada uno con su cuenta. Lo registrado se ve igual al salir y volver a entrar (la
@@ -2026,7 +2159,8 @@
   function fijarPunto(p) {
     $('lugar').value = p; $('lugar').readOnly = true;
     guardar(CLAVE_LUGAR, p); guardar(CLAVE_PUNTO, p);
-    $('sub-usuario').textContent = nombrePunto(p) + (TURNO_CUENTA ? ' · Turno de ' + (TURNO_CUENTA === 'N' ? 'noche' : 'día') : '') + ' · ' + (ses.nombre || ses.usuario || '');
+    $('sub-usuario').textContent = nombrePunto(p) + (MODO_FIJO ? ' · Equipo fijo de ' + MODO_FIJO : '') +
+      (TURNO_CUENTA ? ' · Turno de ' + (TURNO_CUENTA === 'N' ? 'noche' : 'día') : '') + ' · ' + (ses.nombre || ses.usuario || '');
     $('ayuda-lugar').textContent = 'Donde registras. ' +
       (LECTOR ? 'Cada registro se guarda con el nombre, el ID y la foto de la credencial (evidencia) y la hora.' : 'Cada registro se guarda con la hora en que se toma la foto.');
   }
@@ -2039,8 +2173,9 @@
     $('lugar').readOnly = true; $('lugar').removeAttribute('list');
     fijarPunto(PUNTOS_FIJOS[0]);                   // el acceso: se puede registrar de inmediato, aun sin señal
     if (UN_ACCESO) $('tarjeta-lugar').hidden = true;
+    fijarModo(ses.modo);                           // equipo fijo: empieza a leer aunque no haya señal
     api('ACCESOS_MI_PUNTO', {}, 'GET').then(function (r) {
-      if (r && r.status === 'success') { fijarTurnoCuenta(r.turno_cuenta); if (r.punto) fijarPunto(r.punto); bloquear(''); enviarCola(); cargar(true); }
+      if (r && r.status === 'success') { fijarModo(r.modo); fijarTurnoCuenta(r.turno_cuenta); if (r.punto) fijarPunto(r.punto); bloquear(''); enviarCola(); cargar(true); }
       else if (r) bloquear(r.message || 'No se pudo revisar tu cuenta.');
     }).catch(function () {});
   }

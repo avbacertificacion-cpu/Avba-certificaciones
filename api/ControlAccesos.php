@@ -161,9 +161,34 @@ class ControlAccesos {
         }
     }
 
+    /* ── Equipos fijos: cuentas de guardia que sólo registran entradas o sólo salidas ──
+       Un teléfono o tableta fijo en el carril de entrada (o de salida) lee las credenciales
+       sin que nadie toque la pantalla. Su cuenta tiene modo E (sólo entradas) o S (sólo
+       salidas) y no tiene turno: trabaja día y noche, así que su turno es el del reloj. */
+    public const MODOS = ['E' => 'entrada', 'S' => 'salida'];
+
+    /** usuarios.modo (E | S | NULL): el modo de las cuentas de equipos fijos. Se agrega si falta. */
+    public static function asegurarModoCuentas(PDO $pdo): bool {
+        static $hecho = [];
+        $k = spl_object_id($pdo);
+        if (isset($hecho[$k])) return $hecho[$k];
+        try { $pdo->query("SELECT modo FROM usuarios LIMIT 1"); return $hecho[$k] = true; }
+        catch (\Throwable $e) {
+            try { $pdo->exec("ALTER TABLE usuarios ADD COLUMN modo CHAR(1) NULL"); return $hecho[$k] = true; }
+            catch (\Throwable $e2) { error_log('[ControlAccesos] usuarios.modo: ' . $e2->getMessage()); return $hecho[$k] = false; }
+        }
+    }
+
+    /** El modo de una cuenta de guardia: 'E' (sólo entradas), 'S' (sólo salidas) o '' (con botones). */
+    public static function modoCuenta(?array $usr): string {
+        $m = strtoupper((string)($usr['modo'] ?? ''));
+        return self::esCaseta($usr) && isset(self::MODOS[$m]) ? $m : '';
+    }
+
     /** El turno de una cuenta de guardia ('D' | 'N'), o '' si no es guardia o no lo tiene. */
     public static function turnoCuenta(?array $usr): string {
         $t = strtoupper((string)($usr['turno'] ?? ''));
+        if (self::modoCuenta($usr) !== '') return '';                    // equipo fijo: turno del reloj
         return self::esCaseta($usr) && isset(self::TURNOS[$t]) ? $t : '';
     }
 
@@ -189,7 +214,7 @@ class ControlAccesos {
         if (!self::esCaseta($usr)) return ['status' => 'success', 'punto' => ''];
         $t = self::turnoCuenta($usr);
         return ['status' => 'success', 'punto' => self::ACCESO, 'nombre_punto' => self::nombrePunto(self::ACCESO),
-                'turno_cuenta' => $t, 'turno_actual' => $t !== '' ? implode('-', self::turnoDeGuardia($t, date('Y-m-d H:i:s'))) : ''];
+                'turno_cuenta' => $t, 'modo' => self::modoCuenta($usr), 'turno_actual' => $t !== '' ? implode('-', self::turnoDeGuardia($t, date('Y-m-d H:i:s'))) : ''];
     }
 
     /** ¿La tabla ya tiene nombre, código y origen? Si la migración no se pudo
@@ -273,6 +298,10 @@ class ControlAccesos {
         self::asegurarTabla($this->pdo);
         $tipo = strtolower(trim((string)($p['tipo'] ?? '')));
         if (!in_array($tipo, ['entrada', 'salida'], true)) return ['status' => 'error', 'message' => 'Indica si es entrada o salida.'];
+        // Equipo fijo: sólo registra lo suyo (el carril de entrada no registra salidas)
+        if (($m = self::modoCuenta($usr)) !== '' && self::MODOS[$m] !== $tipo) {
+            return ['status' => 'error', 'codigo' => 'MODO_FIJO', 'message' => 'Esta cuenta es de un equipo fijo de ' . self::MODOS[$m] . 's: no registra ' . $tipo . 's.'];
+        }
         $uid = (string)($p['uid'] ?? '');
         if (!preg_match('/^[A-Za-z0-9-]{8,64}$/', $uid)) return ['status' => 'error', 'message' => 'Registro sin identificador.'];
 

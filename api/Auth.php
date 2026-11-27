@@ -9,7 +9,9 @@
      PLANTA   Administrador de accesos de la planta: registros, En planta,
               PDF y dar salida.
      ACCESOS  Guardia de caseta: sólo registra entradas y salidas en el acceso,
-              en su turno (día o noche), desde cualquier teléfono.
+              en su turno (día o noche), desde cualquier teléfono. Una cuenta de
+              guardia puede ser de un EQUIPO FIJO (modo E: sólo entradas; S: sólo
+              salidas): lee las credenciales sin botones y va por el turno del reloj.
      CLIENTE  El cliente (la planta): sólo consulta el tablero con gráficas y
               descarga el Excel y el PDF. No registra ni cambia nada.
 
@@ -79,8 +81,18 @@ class Auth {
              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
         // Turno de las cuentas de guardia (D | N), en usuarios.turno
-        if (class_exists('ControlAccesos')) ControlAccesos::asegurarTurnoCuentas($pdo);
+        if (class_exists('ControlAccesos')) { ControlAccesos::asegurarTurnoCuentas($pdo); ControlAccesos::asegurarModoCuentas($pdo); }
         $hecho[$k] = true;
+    }
+
+    /** El modo de una cuenta de equipo fijo ('E' | 'S' | ''), tolerando que la columna no exista. */
+    private function modoDe(int $id): string {
+        try {
+            $st = $this->pdo->prepare("SELECT modo FROM usuarios WHERE id = ?");
+            $st->execute([$id]);
+            $m = strtoupper((string)$st->fetchColumn());
+            return isset(ControlAccesos::MODOS[$m]) ? $m : '';
+        } catch (\Throwable $e) { return ''; }
     }
 
     /** El turno guardado de una cuenta ('D' | 'N' | ''), tolerando que la columna no exista. */
@@ -140,7 +152,8 @@ class Auth {
         $this->pdo->prepare("UPDATE usuarios SET ultimo_acceso = ? WHERE id = ?")->execute([$ahora, (int)$row['id']]);
         return ['status' => 'success', 'token' => $token, 'usuario' => (string)$row['usuario'],
                 'nombre' => (string)$row['nombre'], 'rol' => (string)$row['rol'], 'expira' => $expira,
-                'turno' => $row['rol'] === 'ACCESOS' ? $this->turnoDe((int)$row['id']) : ''];
+                'turno' => $row['rol'] === 'ACCESOS' ? $this->turnoDe((int)$row['id']) : '',
+                'modo' => $row['rol'] === 'ACCESOS' ? $this->modoDe((int)$row['id']) : ''];
     }
 
     public function cerrarSesion(?string $token): array {
@@ -215,8 +228,9 @@ class Auth {
 
     public function listar(): array {
         $conTurno = ControlAccesos::asegurarTurnoCuentas($this->pdo);
+        $conModo = ControlAccesos::asegurarModoCuentas($this->pdo);
         $filas = $this->pdo->query(
-            "SELECT id, usuario, rol, nombre, activo, fecha_alta, ultimo_acceso" . ($conTurno ? ", turno" : ", NULL AS turno") . "
+            "SELECT id, usuario, rol, nombre, activo, fecha_alta, ultimo_acceso" . ($conTurno ? ", turno" : ", NULL AS turno") . ($conModo ? ", modo" : ", NULL AS modo") . "
                FROM usuarios ORDER BY FIELD(rol, 'ADMIN', 'PLANTA', 'CLIENTE', 'ACCESOS'), FIELD(turno, 'D', 'N'), usuario"
         )->fetchAll(PDO::FETCH_ASSOC);
         $sesiones = [];
@@ -227,6 +241,7 @@ class Auth {
             'id' => (int)$f['id'], 'usuario' => $f['usuario'], 'rol' => $f['rol'], 'nombre' => $f['nombre'],
             'activo' => (bool)$f['activo'], 'fecha_alta' => $f['fecha_alta'], 'ultimo_acceso' => $f['ultimo_acceso'],
             'turno' => $f['rol'] === 'ACCESOS' && in_array((string)$f['turno'], ['D', 'N'], true) ? (string)$f['turno'] : '',
+            'modo' => $f['rol'] === 'ACCESOS' && in_array((string)$f['modo'], ['E', 'S'], true) ? (string)$f['modo'] : '',
             'sesiones' => $sesiones[(int)$f['id']] ?? 0,
         ], $filas)];
     }
@@ -240,10 +255,13 @@ class Auth {
         if ($nombre === '') return ['status' => 'error', 'message' => 'Escribe el nombre de la cuenta.'];
         if (!in_array($rol, self::ROLES, true)) return ['status' => 'error', 'message' => 'Elige el perfil de la cuenta.'];
         if (mb_strlen($pass) < self::MIN_CONTRASENA) return ['status' => 'error', 'message' => 'La contraseña debe tener al menos ' . self::MIN_CONTRASENA . ' caracteres.'];
-        // Guardia de caseta: su turno (día o noche) decide el turno de todo lo que registra
+        // Guardia de caseta: su turno (día o noche) decide el turno de todo lo que registra.
+        // Equipo fijo (sólo entradas o sólo salidas): sin turno, va por el reloj.
+        $modo = $rol === 'ACCESOS' ? strtoupper(trim((string)($p['modo'] ?? ''))) : '';
+        if ($modo !== '' && !isset(ControlAccesos::MODOS[$modo])) return ['status' => 'error', 'message' => 'Elige cómo registra la cuenta.'];
         $turno = strtoupper(trim((string)($p['turno'] ?? '')));
-        if ($rol === 'ACCESOS' && !in_array($turno, ['D', 'N'], true)) return ['status' => 'error', 'message' => 'Elige el turno del guardia: día o noche.'];
-        if ($rol !== 'ACCESOS') $turno = '';
+        if ($rol === 'ACCESOS' && $modo === '' && !in_array($turno, ['D', 'N'], true)) return ['status' => 'error', 'message' => 'Elige el turno del guardia: día o noche.'];
+        if ($rol !== 'ACCESOS' || $modo !== '') $turno = '';
         $st = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ?");
         $st->execute([$usuario]);
         if ($st->fetchColumn()) return ['status' => 'error', 'message' => "Ya existe la cuenta «{$usuario}»."];
@@ -255,6 +273,11 @@ class Auth {
             if (!ControlAccesos::asegurarTurnoCuentas($this->pdo)) return ['status' => 'success', 'id' => $id, 'message' => $msg . ' El servidor no pudo guardar su turno: avisa a AVBA.'];
             $this->pdo->prepare("UPDATE usuarios SET turno = ? WHERE id = ?")->execute([$turno, $id]);
             $msg .= ' ' . ucfirst(ControlAccesos::TURNOS[$turno]) . '.';
+        }
+        if ($modo !== '') {
+            if (!ControlAccesos::asegurarModoCuentas($this->pdo)) return ['status' => 'success', 'id' => $id, 'message' => $msg . ' El servidor no pudo guardar su modo: avisa a AVBA.'];
+            $this->pdo->prepare("UPDATE usuarios SET modo = ? WHERE id = ?")->execute([$modo, $id]);
+            $msg .= ' Equipo fijo de ' . ControlAccesos::MODOS[$modo] . 's.';
         }
         return ['status' => 'success', 'id' => $id, 'message' => $msg];
     }
@@ -288,13 +311,24 @@ class Auth {
             if (mb_strlen((string)$p['password']) < self::MIN_CONTRASENA) return ['status' => 'error', 'message' => 'La contraseña debe tener al menos ' . self::MIN_CONTRASENA . ' caracteres.'];
             $sets[] = 'password_hash = ?'; $args[] = password_hash((string)$p['password'], PASSWORD_DEFAULT); $cerrar = true;
         }
-        // Turno del guardia
+        // Modo (equipo fijo de entradas o de salidas) y turno del guardia
+        $modoAntes = $this->modoDe($id);
+        $modo = $rol === 'ACCESOS' ? $modoAntes : '';
+        if ($rol === 'ACCESOS' && array_key_exists('modo', $p)) {
+            $modo = strtoupper(trim((string)$p['modo']));
+            if ($modo !== '' && !isset(ControlAccesos::MODOS[$modo])) return ['status' => 'error', 'message' => 'Elige cómo registra la cuenta.'];
+        }
+        if ($modo !== $modoAntes) {
+            if (!ControlAccesos::asegurarModoCuentas($this->pdo)) return ['status' => 'error', 'message' => 'El servidor no pudo guardar el modo: avisa a AVBA.'];
+            $sets[] = 'modo = ?'; $args[] = $modo !== '' ? $modo : null;
+        }
         $turnoAntes = $this->turnoDe($id);
         $turno = $rol === 'ACCESOS' ? $turnoAntes : '';
-        if ($rol === 'ACCESOS' && array_key_exists('turno', $p)) {
+        if ($rol === 'ACCESOS' && $modo === '' && array_key_exists('turno', $p)) {
             $turno = strtoupper(trim((string)$p['turno']));
             if (!in_array($turno, ['D', 'N'], true)) return ['status' => 'error', 'message' => 'Elige el turno del guardia: día o noche.'];
         }
+        if ($modo !== '') $turno = '';                                   // equipo fijo: turno del reloj
         if ($turno !== $turnoAntes) {
             if (!ControlAccesos::asegurarTurnoCuentas($this->pdo)) return ['status' => 'error', 'message' => 'El servidor no pudo guardar el turno: avisa a AVBA.'];
             $sets[] = 'turno = ?'; $args[] = $turno !== '' ? $turno : null;
@@ -315,6 +349,7 @@ class Auth {
         if ($cerrar) self::cerrarSesionesDe($this->pdo, $id, $esYo ? ($yo['token'] ?? null) : null);
         if (!empty($p['password'])) $this->pdo->prepare("DELETE FROM login_intentos WHERE usuario = ?")->execute([$c['usuario']]);
         return ['status' => 'success', 'message' => "Cuenta «{$c['usuario']}» actualizada."
+                . ($modo !== $modoAntes ? ($modo !== '' ? ' Ahora es un equipo fijo de ' . ControlAccesos::MODOS[$modo] . 's.' : ' Ahora registra con botones.') : '')
                 . ($turno !== $turnoAntes && $turno !== '' ? ' Ahora es del ' . ControlAccesos::TURNOS[$turno] . '.' : '')];
     }
 

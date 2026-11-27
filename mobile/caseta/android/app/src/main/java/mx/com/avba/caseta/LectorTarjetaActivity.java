@@ -13,11 +13,16 @@ import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.drawable.GradientDrawable;
+import android.media.AudioManager;
+import android.media.ToneGenerator;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.text.InputType;
 import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Size;
 import android.util.TypedValue;
 import android.view.Gravity;
@@ -31,7 +36,9 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
 import androidx.appcompat.app.AlertDialog;
@@ -53,6 +60,7 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.getcapacitor.JSObject;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.common.InputImage;
 import com.google.mlkit.vision.text.Text;
@@ -63,6 +71,7 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,6 +81,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import org.json.JSONArray;
 
 /**
  * Pantalla de la cámara que lee la tarjeta de identificación.
@@ -88,13 +99,22 @@ import java.util.concurrent.TimeUnit;
  * Cámara: la regla «camara» del servidor dice con cuál empieza (frontal o
  * trasera). El botón «Cambiar cámara» pasa a la otra y este teléfono la
  * recuerda mientras la regla del servidor no cambie.
+ *
+ * Lectura continua (equipo fijo de entrada o de salida): la pantalla no se
+ * cierra. Cada credencial leída se avisa a la página (evento «lectura» del
+ * plugin), que la registra y responde qué mostrar (mostrarResultado: nombre,
+ * permisos, avisos) en grande sobre la cámara, con un tono. Si la página no
+ * responde a tiempo, se muestra «Leída» de todos modos. La misma credencial
+ * frente a la cámara no se vuelve a mandar hasta que se retire unos segundos.
+ * Para salir hay que mantener presionado «Salir» 3 segundos.
  */
 public class LectorTarjetaActivity extends AppCompatActivity {
 
     public static final String EXTRA_TITULO = "titulo", EXTRA_SUBTITULO = "subtitulo", EXTRA_SIMULAR = "simular",
             EXTRA_MIN = "minDigitos", EXTRA_MAX = "maxDigitos", EXTRA_LONGITUD = "longitud", EXTRA_PATRON = "patron",
             EXTRA_CLAVES = "claves", EXTRA_NO_NOMBRE = "noNombre", EXTRA_NO_CODIGO = "noCodigo", EXTRA_CONFIRMAR = "confirmar",
-            EXTRA_VERTICAL = "vertical", EXTRA_FOTO = "foto", EXTRA_CAMARA = "camara";
+            EXTRA_VERTICAL = "vertical", EXTRA_FOTO = "foto", EXTRA_CAMARA = "camara",
+            EXTRA_CONTINUO = "continuo", EXTRA_TIPO = "tipo", EXTRA_ESPERA_NOMBRE = "esperaNombre";
 
     private static final int VERDE = Color.rgb(76, 175, 80), AMARILLO = Color.rgb(255, 202, 40), BLANCO = Color.WHITE;
 
@@ -121,7 +141,21 @@ public class LectorTarjetaActivity extends AppCompatActivity {
     private String ultimoTexto = "";
     private AnalizadorTarjeta.Lectura confirmado = null;   // código ya seguro; se espera un momento por el nombre
     private long confirmadoEn = 0;
-    private static final long ESPERA_NOMBRE_MS = 1500;
+    private long esperaNombreMs = 1500;     // tras confirmar el ID, cuánto se espera por el nombre (0 con la base del personal)
+
+    /* Lectura continua (equipo fijo) */
+    private boolean continuo = false, cerradoAvisado = false;
+    private String tipoContinuo = "entrada";
+    private String ultimoEnviado = "";
+    private long ultimoEnviadoEn = 0;
+    private static final long MISMA_CREDENCIAL_MS = 6000;   // la misma credencial frente a la cámara no se reenvía
+    private static final long AVISO_PROPIO_MS = 2500;       // si la página no responde en este tiempo, se muestra «Leída»
+    private static WeakReference<LectorTarjetaActivity> actual = new WeakReference<>(null);
+    private final Handler mano = new Handler(Looper.getMainLooper());
+    private LinearLayout panel;
+    private TextView pTitulo, pNombre, pLineas;
+    private ToneGenerator tono;
+    private Runnable ocultarPanel, avisoPropio;
     private long inicio;
     private int lecturas = 0;
 
@@ -146,6 +180,15 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         if (viejas != null) for (File f : viejas) if (System.currentTimeMillis() - f.lastModified() > 3600_000L) f.delete();
         leerReglas(getIntent());
         armarPantalla();
+        if (continuo) {
+            actual = new WeakReference<>(this);
+            try { tono = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90); } catch (Exception e) { tono = null; }
+            getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+                @Override public void handleOnBackPressed() {
+                    Toast.makeText(LectorTarjetaActivity.this, "Para salir, mantén presionado «Mantén para salir» 3 segundos.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             terminarConError("Sin permiso para usar la cámara");
             return;
@@ -167,6 +210,9 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         String[] noCodigo = i.getStringArrayExtra(EXTRA_NO_CODIGO);
         if (noCodigo != null && noCodigo.length > 0) reglas.noCodigo.addAll(AnalizadorTarjeta.Reglas.conjunto(noCodigo));
         conFoto = i.getBooleanExtra(EXTRA_FOTO, true);
+        continuo = i.getBooleanExtra(EXTRA_CONTINUO, false);
+        tipoContinuo = "salida".equals(i.getStringExtra(EXTRA_TIPO)) ? "salida" : "entrada";
+        esperaNombreMs = Math.max(0, Math.min(3000, i.getIntExtra(EXTRA_ESPERA_NOMBRE, 1500)));
         camaraPedida = "frontal".equalsIgnoreCase(i.getStringExtra(EXTRA_CAMARA)) ? "frontal" : "trasera";
         SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
         String elegida = camaraPedida.equals(sp.getString(PREF_PEDIDA, "")) ? sp.getString(PREF_ELEGIDA, camaraPedida) : camaraPedida;
@@ -204,8 +250,9 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         // Arriba: qué hacer
         LinearLayout arriba = new LinearLayout(this);
         arriba.setOrientation(LinearLayout.VERTICAL);
-        arriba.setBackgroundColor(Color.argb(150, 11, 37, 69));
-        TextView tTitulo = texto(getIntent().getStringExtra(EXTRA_TITULO), 20, true, BLANCO);
+        arriba.setBackgroundColor(continuo ? colorDe("salida".equals(tipoContinuo) ? "azul" : "verde", 235) : Color.argb(150, 11, 37, 69));
+        TextView tTitulo = texto(getIntent().getStringExtra(EXTRA_TITULO), continuo ? 30 : 20, true, BLANCO);
+        if (continuo) tTitulo.setGravity(Gravity.CENTER_HORIZONTAL);
         TextView tSub = texto(getIntent().getStringExtra(EXTRA_SUBTITULO), 14, false, Color.argb(225, 255, 255, 255));
         arriba.addView(tTitulo);
         arriba.addView(tSub);
@@ -216,7 +263,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         LinearLayout abajo = new LinearLayout(this);
         abajo.setOrientation(LinearLayout.VERTICAL);
         abajo.setBackgroundColor(Color.argb(190, 11, 37, 69));
-        tEstado = texto("Buscando el nombre y el ID…", 17, true, BLANCO);
+        tEstado = texto(continuo ? "Acerca tu credencial al recuadro" : "Buscando el nombre y el ID…", 17, true, BLANCO);
         tTexto = texto("", 12, false, Color.argb(190, 255, 255, 255));
         tTexto.setMaxLines(3);
         tTexto.setEllipsize(TextUtils.TruncateAt.END);
@@ -241,6 +288,12 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         bCambiar = boton("Cambiar cámara", Color.argb(60, 255, 255, 255));
         bCambiar.setVisibility(View.GONE);                          // sólo si el teléfono tiene las dos
         bCambiar.setOnClickListener(v -> cambiarCamara());
+        if (continuo) {                                           // equipo fijo: salir manteniendo 3 s; sin «Escribir ID»
+            bCancelar.setText("Mantén para salir");
+            bCancelar.setOnClickListener(null);
+            salirManteniendo(bCancelar);
+            bEscribir.setVisibility(View.GONE);
+        }
         fila.addView(bCancelar, peso());
         fila.addView(bEscribir, peso());
         fila.addView(bLinterna, peso());
@@ -254,6 +307,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             abajo.addView(bSimular, ps);
         }
         raiz.addView(abajo, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
+        if (continuo) armarPanel(raiz);
 
         // Márgenes para la barra de estado y la de navegación (pantalla de borde a borde)
         ViewCompat.setOnApplyWindowInsetsListener(raiz, (v, insets) -> {
@@ -405,8 +459,9 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         if (confirmado != null) {
             // El código ya es seguro: se entrega en cuanto hay nombre (o tras un momento sin él)
             String nombre = estab.nombreProbable(confirmado.codigo);
-            if (nombre != null || SystemClock.elapsedRealtime() - confirmadoEn > ESPERA_NOMBRE_MS) {
-                entregar(confirmado.codigo, nombre, false, false);
+            if (nombre != null || SystemClock.elapsedRealtime() - confirmadoEn >= esperaNombreMs) {
+                if (continuo) entregarContinuo(confirmado.codigo, nombre);
+                else entregar(confirmado.codigo, nombre, false, false);
                 return;
             }
             tEstado.setText("ID " + confirmado.codigo + " — falta leer el nombre…");
@@ -546,6 +601,150 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         super.onDestroy();
         if (lector != null) lector.close();
         if (hilo != null) hilo.shutdown();
+        if (continuo) {
+            mano.removeCallbacksAndMessages(null);
+            if (actual.get() == this) actual = new WeakReference<>(null);
+            if (tono != null) tono.release();
+            avisarCerrado();
+        }
+    }
+
+    /* ══ Lectura continua (equipo fijo de entrada o de salida) ══════════════ */
+
+    /** Manda la credencial leída a la página y queda lista para la siguiente. */
+    private void entregarContinuo(String codigo, String nombre) {
+        long ahora = SystemClock.elapsedRealtime();
+        if (codigo.equals(ultimoEnviado) && ahora - ultimoEnviadoEn < MISMA_CREDENCIAL_MS) {
+            ultimoEnviadoEn = ahora;                                 // sigue frente a la cámara: no se reenvía
+            reiniciarLectura();
+            return;
+        }
+        ultimoEnviado = codigo;
+        ultimoEnviadoEn = ahora;
+        JSObject d = new JSObject();
+        d.put("codigo", codigo);
+        d.put("nombre", nombre == null ? "" : nombre);
+        d.put("texto", ultimoTexto);
+        d.put("manual", false);
+        d.put("continuo", true);
+        d.put("tipo", tipoContinuo);
+        d.put("lecturas", lecturas);
+        d.put("ms", ahora - inicio);
+        d.put("camara", frontal ? "frontal" : "trasera");
+        if (conFoto) {
+            byte[] f = fotoDe(codigo);
+            if (f != null && f.length > 0) d.put("foto", Base64.encodeToString(f, Base64.NO_WRAP));
+        }
+        LectorTarjetaPlugin.emitir("lectura", d);
+        marco.performHapticFeedback(Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.LONG_PRESS);
+        // Si la página no contesta a tiempo (sin señal no importa: registra en el teléfono), se avisa aquí
+        final String cod = codigo, nom = nombre == null ? "" : nombre;
+        if (avisoPropio != null) mano.removeCallbacks(avisoPropio);
+        avisoPropio = () -> pintarPanel(("salida".equals(tipoContinuo) ? "SALIDA" : "ENTRADA") + " LEÍDA", nom, "ID " + cod,
+                "salida".equals(tipoContinuo) ? "azul" : "verde", 2500, "ok");
+        mano.postDelayed(avisoPropio, AVISO_PROPIO_MS);
+        tEstado.setText("ID " + codigo + " — registrando…");
+        tEstado.setTextColor(VERDE);
+        marco.color(VERDE);
+        reiniciarLectura();
+    }
+
+    /** Lista para la siguiente persona: se olvida lo leído (menos la última credencial enviada). */
+    private void reiniciarLectura() {
+        confirmado = null;
+        int confirmar = Math.max(1, Math.min(6, getIntent().getIntExtra(EXTRA_CONFIRMAR, 3)));
+        estab = new AnalizadorTarjeta.Estabilizador(confirmar, Math.max(6, confirmar * 2));
+        fotoPorId.clear();
+        fotoConNombre.clear();
+        fotoReciente = null;
+        leyoId = false;
+        faltaFoto = false;
+        inicio = SystemClock.elapsedRealtime();
+        lecturas = 0;
+    }
+
+    /** La página dice qué mostrar de la lectura (desde LectorTarjetaPlugin.mostrar). */
+    static boolean mostrarEnPantalla(JSObject d) {
+        LectorTarjetaActivity a = actual.get();
+        if (a == null || a.isFinishing()) return false;
+        a.runOnUiThread(() -> a.mostrarResultado(d));
+        return true;
+    }
+    static void detenerContinuo() {
+        LectorTarjetaActivity a = actual.get();
+        if (a != null) a.runOnUiThread(a::finish);
+    }
+    private void mostrarResultado(JSObject d) {
+        if (avisoPropio != null) mano.removeCallbacks(avisoPropio);
+        StringBuilder lineas = new StringBuilder();
+        JSONArray l = d.optJSONArray("lineas");
+        if (l != null) for (int i = 0; i < l.length(); i++) { if (lineas.length() > 0) lineas.append('\n'); lineas.append(l.optString(i, "")); }
+        long ms = (long) Math.max(800, Math.min(8000, d.optDouble("segundos", 2.5) * 1000));
+        pintarPanel(d.optString("titulo", ""), d.optString("nombre", ""), lineas.toString(), d.optString("color", "verde"), ms, d.optString("sonido", "ok"));
+    }
+    private void pintarPanel(String titulo, String nombre, String lineas, String color, long ms, String sonido) {
+        if (panel == null) return;
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(colorDe(color, 242));
+        g.setCornerRadius(dp(22));
+        panel.setBackground(g);
+        pTitulo.setText(titulo);
+        pNombre.setText(nombre);
+        pNombre.setVisibility(nombre.isEmpty() ? View.GONE : View.VISIBLE);
+        pLineas.setText(lineas);
+        pLineas.setVisibility(lineas.isEmpty() ? View.GONE : View.VISIBLE);
+        panel.setVisibility(View.VISIBLE);
+        if (tono != null) {
+            try { tono.startTone("aviso".equals(sonido) ? ToneGenerator.TONE_PROP_NACK : ToneGenerator.TONE_PROP_ACK, 220); } catch (Exception ignorada) { }
+        }
+        if (ocultarPanel != null) mano.removeCallbacks(ocultarPanel);
+        ocultarPanel = () -> {
+            panel.setVisibility(View.GONE);
+            tEstado.setText("Acerca tu credencial al recuadro");
+            tEstado.setTextColor(BLANCO);
+            marco.color(BLANCO);
+        };
+        mano.postDelayed(ocultarPanel, ms);
+    }
+    private static int colorDe(String c, int alfa) {
+        switch (c == null ? "" : c) {
+            case "azul":     return Color.argb(alfa, 24, 95, 165);
+            case "amarillo": return Color.argb(alfa, 180, 83, 9);
+            case "rojo":     return Color.argb(alfa, 163, 45, 45);
+            default:         return Color.argb(alfa, 47, 107, 30);   // verde
+        }
+    }
+    /** El recuadro grande con el resultado, sobre la cámara. */
+    private void armarPanel(FrameLayout raiz) {
+        panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setGravity(Gravity.CENTER_HORIZONTAL);
+        panel.setPadding(dp(20), dp(22), dp(20), dp(22));
+        pTitulo = texto("", 28, true, BLANCO);
+        pNombre = texto("", 23, true, BLANCO);
+        pLineas = texto("", 18, false, BLANCO);
+        for (TextView t : new TextView[] { pTitulo, pNombre, pLineas }) { t.setGravity(Gravity.CENTER_HORIZONTAL); panel.addView(t); }
+        pNombre.setPadding(0, dp(10), 0, dp(4));
+        pLineas.setLineSpacing(0, 1.15f);
+        panel.setVisibility(View.GONE);
+        FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        pp.setMargins(dp(18), 0, dp(18), 0);
+        raiz.addView(panel, pp);
+    }
+    /** «Mantén para salir»: hay que tenerlo presionado 3 segundos (que nadie lo cierre por accidente). */
+    @SuppressLint("ClickableViewAccessibility")
+    private void salirManteniendo(Button b) {
+        final Runnable salir = () -> { avisarCerrado(); finish(); };
+        b.setOnTouchListener((v, ev) -> {
+            if (ev.getAction() == MotionEvent.ACTION_DOWN) { b.setText("Sigue presionando…"); mano.postDelayed(salir, 3000); }
+            else if (ev.getAction() == MotionEvent.ACTION_UP || ev.getAction() == MotionEvent.ACTION_CANCEL) { b.setText("Mantén para salir"); mano.removeCallbacks(salir); }
+            return true;
+        });
+    }
+    private void avisarCerrado() {
+        if (cerradoAvisado) return;
+        cerradoAvisado = true;
+        LectorTarjetaPlugin.emitir("cerrado", new JSObject());
     }
 
     /** Sombra alrededor de un recuadro del tamaño de una tarjeta (85.6 × 54 mm), de pie o acostada.

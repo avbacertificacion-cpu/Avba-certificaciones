@@ -23,6 +23,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.lang.ref.WeakReference;
 
 /**
  * Lector de tarjetas de identificación para la pantalla del guardia.
@@ -35,6 +36,14 @@ import java.io.InputStream;
  *
  * Capacitor.Plugins.LectorTarjeta.abrir({ url }) abre una dirección https fuera
  * de la app (por ejemplo, el PDF de entradas y salidas en el visor del teléfono).
+ *
+ * Lectura continua (equipo fijo de entrada o de salida):
+ *   LectorTarjeta.addListener('lectura', fn)   cada credencial leída {codigo, nombre, foto, …}
+ *   LectorTarjeta.addListener('cerrado', fn)   se salió de la lectura continua
+ *   LectorTarjeta.continuo({ tipo: 'entrada'|'salida', titulo, … })   abre la cámara y no la cierra
+ *   LectorTarjeta.mostrar({ titulo, nombre, lineas: [], color, segundos, sonido })   el resultado en grande
+ *   LectorTarjeta.detener()
+ * disponible() responde continuo: true en las versiones que lo traen.
  */
 @CapacitorPlugin(
     name = "LectorTarjeta",
@@ -42,12 +51,64 @@ import java.io.InputStream;
 )
 public class LectorTarjetaPlugin extends Plugin {
 
+    private static WeakReference<LectorTarjetaPlugin> instancia = new WeakReference<>(null);
+
+    @Override
+    public void load() {
+        instancia = new WeakReference<>(this);
+    }
+
+    /** Avisa a la página (lectura continua): «lectura» con cada credencial, «cerrado» al salir. */
+    static void emitir(String evento, JSObject datos) {
+        LectorTarjetaPlugin p = instancia.get();
+        if (p != null) p.notifyListeners(evento, datos, true);
+    }
+
     @PluginMethod
     public void disponible(PluginCall call) {
         JSObject r = new JSObject();
         r.put("disponible", true);
         r.put("local", true);
+        r.put("continuo", true);
         call.resolve(r);
+    }
+
+    @PluginMethod
+    public void continuo(PluginCall call) {
+        if (getPermissionState("camera") != PermissionState.GRANTED) {
+            requestPermissionForAlias("camera", call, "alPermisoContinuo");
+            return;
+        }
+        abrirContinuo(call);
+    }
+
+    @PermissionCallback
+    private void alPermisoContinuo(PluginCall call) {
+        if (getPermissionState("camera") == PermissionState.GRANTED) abrirContinuo(call);
+        else call.reject("Se necesita permiso de la cámara para leer las credenciales.", "SIN_PERMISO");
+    }
+
+    private void abrirContinuo(PluginCall call) {
+        Intent i = intentLector(call);
+        i.putExtra(LectorTarjetaActivity.EXTRA_CONTINUO, true);
+        i.putExtra(LectorTarjetaActivity.EXTRA_TIPO, "salida".equals(call.getString("tipo", "entrada")) ? "salida" : "entrada");
+        getActivity().startActivity(i);
+        JSObject r = new JSObject();
+        r.put("iniciado", true);
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void mostrar(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("mostrado", LectorTarjetaActivity.mostrarEnPantalla(call.getData()));
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void detener(PluginCall call) {
+        LectorTarjetaActivity.detenerContinuo();
+        call.resolve();
     }
 
     @PluginMethod
@@ -80,6 +141,11 @@ public class LectorTarjetaPlugin extends Plugin {
     }
 
     private void abrirLector(PluginCall call) {
+        startActivityForResult(call, intentLector(call), "alTerminar");
+    }
+
+    /** La pantalla del lector con las reglas que manda la página. */
+    private Intent intentLector(PluginCall call) {
         Intent i = new Intent(getContext(), LectorTarjetaActivity.class);
         i.putExtra(LectorTarjetaActivity.EXTRA_TITULO, call.getString("titulo", "Leer la tarjeta"));
         i.putExtra(LectorTarjetaActivity.EXTRA_SUBTITULO, call.getString("subtitulo", "Acomoda la credencial dentro del recuadro. Se lee en este teléfono, sin internet."));
@@ -96,7 +162,8 @@ public class LectorTarjetaPlugin extends Plugin {
         i.putExtra(LectorTarjetaActivity.EXTRA_CLAVES, textos(call.getArray("claves")));
         i.putExtra(LectorTarjetaActivity.EXTRA_NO_NOMBRE, textos(call.getArray("noNombre")));
         i.putExtra(LectorTarjetaActivity.EXTRA_NO_CODIGO, textos(call.getArray("noCodigo")));
-        startActivityForResult(call, i, "alTerminar");
+        i.putExtra(LectorTarjetaActivity.EXTRA_ESPERA_NOMBRE, entero(call, "esperaNombre", 1500));   // 0: sólo el ID (el nombre sale de la base)
+        return i;
     }
 
     @ActivityCallback

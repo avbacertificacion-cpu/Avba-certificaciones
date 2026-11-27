@@ -1,0 +1,147 @@
+// Equipo fijo (lectura continua) en la pantalla del guardia, con la app simulada: la página abre la
+// lectura continua sola, registra cada credencial que llega del lector, ignora a quien se registró
+// hace menos de 2 min, le dice a la app qué mostrar (nombre de la base, permisos, avisos), funciona
+// sin señal, se reanuda con el botón, el carril de salida, la app vieja (sin lectura continua),
+// Cuentas y el guardia con botones. API real local; personas e IDs inventados.
+const { chromium } = require('playwright');
+const { execSync } = require('child_process');
+const B = 'http://localhost:8794/';
+const A = B + 'api/index.php';
+const D = __dirname + '/';
+let fallas = 0;
+const ok = (c, m) => { if (!c) fallas++; console.log((c ? 'OK   ' : 'FALLA') + ' ' + m); };
+const sql = q => execSync(`mariadb --default-character-set=utf8mb4 -N -B -uprueba -pprueba -h127.0.0.1 ca_prueba -e "${q}"`).toString().trim();
+const post = async (accion, tok, payload = {}) => (await fetch(A, {
+  method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ action: accion, payload })
+})).json();
+const ses = (u, modo) => ({ token: 'tok-' + u, rol: 'ACCESOS', usuario: u, nombre: u.toUpperCase(), turno: '', modo });
+
+// La app simulada: lectura continua con eventos, y lo que la página le pide mostrar
+function app(conContinuo) {
+    window.__ev = {}; window.__mostrados = []; window.__continuo = []; window.__leer = [];
+    window.__emitir = (ev, d) => (window.__ev[ev] || []).forEach(f => f(d));
+    const L = {
+      disponible: () => Promise.resolve(conContinuo ? { disponible: true, local: true, continuo: true } : { disponible: true, local: true }),
+      mostrar: d => { window.__mostrados.push(d); return Promise.resolve({ mostrado: true }); },
+      detener: () => Promise.resolve(),
+      addListener: (ev, fn) => { (window.__ev[ev] = window.__ev[ev] || []).push(fn); return Promise.resolve({ remove() {} }); },
+      leer: o => { window.__leer.push(o); return Promise.resolve({ cancelado: true }); },
+      abrir: () => Promise.resolve({})
+    };
+    if (conContinuo) L.continuo = o => { window.__continuo.push(o); return Promise.resolve({ iniciado: true }); };
+    window.Capacitor = { isNativePlatform: () => true, Plugins: { LectorTarjeta: L } };
+}
+async function telefono(b, s, conContinuo = true) {
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, timezoneId: 'America/Mexico_City' });
+  await ctx.addInitScript(s => { if (!sessionStorage.getItem('ya')) { localStorage.setItem('ca_sesion', JSON.stringify(s)); sessionStorage.setItem('ya', '1'); } }, s);
+  await ctx.addInitScript(app, conContinuo);
+  const p = await ctx.newPage();
+  p.errores = []; p.on('pageerror', e => p.errores.push(e.message)); p.on('dialog', d => d.accept());
+  await p.goto(B + 'accesos.html'); await p.waitForTimeout(2500);
+  return { ctx, p };
+}
+const leer = (p, codigo, nombre) => p.evaluate(([c, n]) => window.__emitir('lectura', { codigo: c, nombre: n, continuo: true, ms: 600 }), [codigo, nombre]);
+const ultimo = p => p.evaluate(() => window.__mostrados[window.__mostrados.length - 1] || null);
+const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE TRIM(LEADING '0' FROM codigo) = '${cod}' AND tipo = '${tipo}'`);
+
+(async () => {
+  // La base del personal (inventada): Ramiro con permiso de celular; Ana con uno vencido
+  await post('PADRON_GUARDAR', 'tok-admin', { codigo: '00287', nombre: 'Ramiro Esteban Villarreal Duarte', empresa: 'Montajes del Golfo' });
+  await post('PADRON_GUARDAR', 'tok-admin', { codigo: '00412', nombre: 'Ana Sofia Ruiz Paez' });
+  await post('PADRON_GUARDAR', 'tok-admin', { codigo: '00316', nombre: 'Pedro Vega Cruz' });
+  await post('PERMISO_AGREGAR', 'tok-admin', { codigo: '287', tipos: ['CELULAR'], detalle: 'Celular Samsung A54' });
+  await post('PERMISO_AGREGAR', 'tok-admin', { codigo: '412', tipos: ['HERRAMIENTA'], detalle: 'Taladro', vigencia: '2020-01-31' });
+  const b = await chromium.launch();
+
+  // ══ Carril de ENTRADA ══
+  let { ctx, p } = await telefono(b, ses('fijo.entrada', 'E'));
+  const op = await p.evaluate(() => window.__continuo);
+  ok(op.length === 1 && op[0].tipo === 'entrada' && op[0].titulo === 'ENTRADA', 'al entrar, la lectura continua empieza sola (de ENTRADA)');
+  ok(op[0] && op[0].esperaNombre === 0 && op[0].camara === 'frontal', 'con la base del personal, el lector sólo espera el ID (esperaNombre 0) y usa la cámara frontal');
+  ok(/Equipo fijo de ENTRADA/.test(await p.textContent('#fijo-tit')) && /Leyendo credenciales/.test(await p.textContent('#fijo-estado')), 'la pantalla dice «Equipo fijo de ENTRADA · Leyendo credenciales»');
+  ok(await p.isVisible('.cap.ent') && await p.isHidden('.cap.sal') && await p.isHidden('.cap.inc'), 'sólo queda el botón de ENTRADA (sin SALIDA ni INCIDENCIA)');
+  ok(/Equipo fijo de entrada/.test(await p.textContent('#sub-usuario')) && !/Turno de/.test(await p.textContent('#sub-usuario')), 'encabezado: ' + await p.textContent('#sub-usuario'));
+
+  // Llega Ramiro (nombre mal leído): se registra con el de la base y la app muestra su permiso
+  await leer(p, '00287', 'RAMRO VILARREAL');
+  await p.waitForTimeout(1800);
+  let m = await ultimo(p);
+  ok(m && m.titulo === 'ENTRADA REGISTRADA' && m.nombre === 'RAMIRO ESTEBAN VILLARREAL DUARTE' && m.color === 'verde' && m.sonido === 'ok', 'la app muestra en verde: ' + (m && m.titulo + ' · ' + m.nombre));
+  ok(m && m.lineas.some(x => /^ID 00287 · \d\d:\d\d$/.test(x)) && m.lineas.some(x => /Permiso de celular/.test(x)), 'con su ID, la hora y su permiso de celular: ' + (m && m.lineas.join(' | ')));
+  ok(cuenta('287', 'entrada') === '1' && sql("SELECT nombre FROM accesos_registros WHERE codigo='00287'") === 'RAMIRO ESTEBAN VILLARREAL DUARTE', 'la entrada quedó registrada con el nombre de la base');
+  // Lo lee otra vez (se regresó): no se registra dos veces
+  await leer(p, '287', 'RAMIRO'); await p.waitForTimeout(800);
+  m = await ultimo(p);
+  ok(m && m.titulo === 'ENTRADA YA REGISTRADA' && m.color === 'amarillo' && /registrada a las \d\d:\d\d/.test(m.lineas[0]) && cuenta('287', 'entrada') === '1', 'leída de nuevo: «ENTRADA YA REGISTRADA» en amarillo, sin duplicar');
+  // Permiso vencido y un ID fuera de la base
+  await leer(p, '00412', 'ANA'); await p.waitForTimeout(800);
+  m = await ultimo(p);
+  ok(m && m.color === 'amarillo' && m.lineas.some(x => /Resguardo de herramienta · VENCIDO/.test(x)), 'permiso vencido: se registra y avisa en amarillo');
+  await leer(p, '00999', 'ALGUIEN NUEVO'); await p.waitForTimeout(800);
+  m = await ultimo(p);
+  ok(m && m.color === 'amarillo' && m.nombre === 'ALGUIEN NUEVO' && m.lineas.some(x => /No está en la base/.test(x)) && cuenta('999', 'entrada') === '1', 'ID fuera de la base: se registra y avisa «pasa con el guardia»');
+  // Una tras otra (una persona cada 10 s es de sobra: aquí cada medio segundo)
+  for (const [c, n] of [['00501', 'LUIS'], ['00502', 'MARIA'], ['00503', 'JOSUE'], ['00504', 'KARLA']]) { await leer(p, c, n); await p.waitForTimeout(500); }
+  await p.waitForTimeout(3000);
+  ok(['501', '502', '503', '504'].every(c => cuenta(c, 'entrada') === '1'), 'cuatro personas seguidas: las cuatro registradas');
+  // Sin señal
+  await ctx.setOffline(true);
+  await leer(p, '00316', 'PEDRO'); await p.waitForTimeout(700);
+  m = await ultimo(p);
+  ok(m && m.titulo === 'ENTRADA REGISTRADA' && m.nombre === 'PEDRO VEGA CRUZ', 'sin señal la app muestra la entrada al instante (nombre de la copia de la base)');
+  ok(cuenta('316', 'entrada') === '0', 'todavía no llega al servidor');
+  await ctx.setOffline(false); await p.evaluate(() => window.dispatchEvent(new Event('online'))); await p.waitForTimeout(4000);
+  ok(cuenta('316', 'entrada') === '1', 'al volver la señal se envía');
+  ok(sql("SELECT COUNT(DISTINCT turno) FROM accesos_registros WHERE usuario='fijo.entrada'") === '1', 'todas con el turno del reloj');
+  // Se sale de la lectura continua: queda el botón para reanudarla
+  await p.evaluate(() => window.__emitir('cerrado', {})); await p.waitForTimeout(300);
+  ok(/detenida/.test(await p.textContent('#fijo-estado')) && await p.isVisible('#btn-fijo'), 'al salir de la lectura continua: «detenida» y el botón para reanudar');
+  await p.click('#btn-fijo'); await p.waitForTimeout(3500);
+  ok((await p.evaluate(() => window.__continuo.length)) === 2 && /Leyendo credenciales/.test(await p.textContent('#fijo-estado')), 'el botón vuelve a abrir la lectura continua');
+  await p.screenshot({ path: D + 'fijo_entrada.png', fullPage: true });
+  ok(!p.errores.length, 'sin errores de JavaScript (entrada)' + (p.errores.length ? ': ' + p.errores.join(' | ') : ''));
+  await ctx.close();
+
+  // ══ Carril de SALIDA ══
+  ({ ctx, p } = await telefono(b, ses('fijo.salida', 'S')));
+  ok((await p.evaluate(() => window.__continuo[0] && window.__continuo[0].tipo)) === 'salida' && await p.isVisible('.cap.sal') && await p.isHidden('.cap.ent'), 'el carril de salida abre la lectura continua de SALIDA');
+  await leer(p, '00287', 'RAMIRO'); await p.waitForTimeout(1500);
+  m = await ultimo(p);
+  ok(m && m.titulo === 'SALIDA REGISTRADA' && m.color === 'azul' && cuenta('287', 'salida') === '1', 'salida registrada (en azul)');
+  ok(!p.errores.length, 'sin errores de JavaScript (salida)' + (p.errores.length ? ': ' + p.errores.join(' | ') : ''));
+  await ctx.close();
+
+  // ══ App vieja (sin lectura continua) ══
+  ({ ctx, p } = await telefono(b, ses('fijo.entrada', 'E'), false));
+  ok(/Instala la versión nueva/.test(await p.textContent('#fijo-estado')) && await p.isHidden('#btn-fijo') && await p.isVisible('.cap.ent'), 'app vieja: pide instalar la nueva y deja el botón ENTRADA');
+  await p.click('.cap.ent'); await p.waitForTimeout(500);
+  ok((await p.evaluate(() => window.__leer.length)) === 1, 'el botón lee una credencial a la vez, como antes');
+  await ctx.close();
+
+  // ══ Guardia con botones: todo como antes, sin la tarjeta del equipo fijo ══
+  ({ ctx, p } = await telefono(b, { token: 'tok-punto1', rol: 'ACCESOS', usuario: 'punto1', nombre: 'CASETA PUNTO 1', turno: 'D' }));
+  ok(await p.isHidden('#tarjeta-fijo') && await p.isVisible('.cap.ent') && await p.isVisible('.cap.sal') && await p.isVisible('.cap.inc'), 'el guardia con botones no cambia');
+  ok((await p.evaluate(() => window.__continuo.length)) === 0, 'y no abre la lectura continua');
+  await p.click('.cap.ent'); await p.waitForTimeout(400);
+  ok((await p.evaluate(() => window.__leer[0] && window.__leer[0].esperaNombre)) === 0, 'su lector tampoco espera el nombre (sale de la base)');
+  await ctx.close();
+
+  // ══ Cuentas: crear un equipo fijo desde la pantalla ══
+  const ca = await b.newContext({ viewport: { width: 1100, height: 900 } });
+  await ca.addInitScript(() => localStorage.setItem('ca_sesion', JSON.stringify({ token: 'tok-admin', rol: 'ADMIN', usuario: 'admin', nombre: 'ADMINISTRACION' })));
+  const pa = await ca.newPage();
+  await pa.goto(B + 'cuentas.html'); await pa.waitForTimeout(900);
+  ok(/Equipo fijo · Entradas/.test(await pa.textContent('#lista')), 'la lista de cuentas marca los equipos fijos');
+  await pa.click('#b-nueva');
+  await pa.fill('#c-nombre', 'Tableta carril 2'); await pa.fill('#c-usuario', 'carril2.entrada'); await pa.selectOption('#c-rol', 'ACCESOS');
+  await pa.fill('#c-pass', 'contrasena-larga');
+  ok(await pa.isVisible('#campo-turno'), 'con botones pide el turno');
+  await pa.selectOption('#c-modo', 'E');
+  ok(await pa.isHidden('#campo-turno') && /reloj/.test(await pa.textContent('#s-modo')), 'equipo fijo: sin turno (va por el reloj)');
+  await pa.click('#b-guardar'); await pa.waitForTimeout(900);
+  ok(sql("SELECT CONCAT(modo,'|',IFNULL(turno,'-')) FROM usuarios WHERE usuario='carril2.entrada'") === 'E|-', 'cuenta de equipo fijo creada desde Cuentas');
+  await pa.screenshot({ path: D + 'fijo_cuentas.png', fullPage: true });
+  await b.close();
+  console.log(fallas ? fallas + ' FALLAS' : 'TODO BIEN');
+  process.exit(fallas ? 1 : 0);
+})().catch(e => { console.error('FALLO', e); process.exit(1); });

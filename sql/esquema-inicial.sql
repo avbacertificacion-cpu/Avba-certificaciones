@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   nombre         VARCHAR(150) NOT NULL,
   activo         TINYINT(1)   NOT NULL DEFAULT 1,
   turno          CHAR(1)      NULL,          -- guardias: D (día) | N (noche); decide el turno de lo que registran
+  modo           CHAR(1)      NULL,          -- equipo fijo: E (sólo entradas) | S (sólo salidas); sin turno: va por el reloj
   fecha_alta     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   ultimo_acceso  DATETIME     NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

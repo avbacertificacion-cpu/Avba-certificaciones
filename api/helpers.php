@@ -53,8 +53,9 @@ function generarToken(): string {
 function validarToken(PDO $pdo, ?string $token): ?array {
     $token = trim((string)$token);
     if ($token === '' || strlen($token) > 100) return null;
-    // Con el turno de la cuenta (guardias de día o de noche); sin esa columna todavía, sin él.
-    foreach (['u.turno', 'NULL AS turno'] as $colTurno) {
+    // Con el turno (guardias de día o de noche) y el modo (equipos fijos de entrada o salida) de la
+    // cuenta; si una base vieja todavía no tiene esas columnas, sin ellos.
+    foreach (['u.turno, u.modo', 'u.turno, NULL AS modo', 'NULL AS turno, NULL AS modo'] as $colTurno) {
         try {
             $st = $pdo->prepare(
                 "SELECT u.id, u.usuario, u.rol, u.nombre, $colTurno
