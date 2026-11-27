@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Días omitidos · Control de Accesos · AVBA</title>
+<link rel="icon" href="assets/logos/avba.png">
+<meta name="theme-color" content="#0B2545">
+<link rel="stylesheet" href="css/ca.css">
+<!--
+  Días omitidos (sólo Administración AVBA): lo que se registró en pruebas no se mezcla con lo
+  real. Se omite un día completo o unas horas de ese día; lo omitido no cuenta en el tablero ni
+  sus descargas, en los turnos y su PDF, en «En planta», en los movimientos por ID ni en las
+  incidencias. No se borra nada: se puede volver a contar. Servidor: api/Omitidos.php.
+-->
+<style>
+  .dia{border-top:1px solid var(--borde);padding:12px 0;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .dia:first-child{border-top:0}
+  .dia .datos{flex:1 1 240px;min-width:0}
+  .dia .datos b{font-size:15px}
+  .dia .datos .m{font-size:13px;color:var(--sub);margin-top:3px;line-height:1.45;overflow-wrap:anywhere}
+  .dia .acc{display:flex;gap:6px;flex-wrap:wrap}
+  .dia.omitido .datos b{color:var(--sub)}
+  .rango{display:flex;gap:16px;flex-wrap:wrap;margin:4px 0 14px}
+  .rango label{display:flex;gap:8px;align-items:center;font-size:14.5px;cursor:pointer}
+  .rango input[type=radio]{width:18px;height:18px;accent-color:var(--azul)}
+  .horas{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .horas .campo{flex:0 1 150px}
+  .revision{border-radius:10px;padding:12px 14px;font-size:14px;line-height:1.5;margin-bottom:14px;background:#E6F1FB;color:var(--azul-dark)}
+  .revision b{font-size:15px}
+  .otra{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .otra .campo{flex:0 1 200px;margin-bottom:0}
+  details.hist summary{cursor:pointer;font-weight:700;color:var(--azul-dark);font-size:14px}
+</style>
+</head>
+<body>
+<header class="barra">
+  <a class="atras" href="index.html" aria-label="Regresar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+  <div><h1>Días omitidos</h1><div class="sub">Control de Accesos · Administración AVBA</div></div>
+</header>
+<main class="ancho">
+  <div class="card" id="sin-permiso" hidden><p class="aviso mal">Sólo Administración AVBA omite días.</p><a class="btn sec" href="index.html">Regresar</a></div>
+
+  <div id="todo" hidden>
+    <div class="card">
+      <h2>¿Hiciste pruebas?</h2>
+      <p>Omite esos días (o sólo unas horas) para que no se mezclen con lo real. Lo omitido <b>no cuenta</b> en el tablero ni en sus Excel y PDF,
+        en los turnos y su PDF, en «En planta», en los movimientos por ID ni en las incidencias. <b>No se borra nada:</b> lo puedes volver a contar.</p>
+    </div>
+
+    <!-- Omitir un día -->
+    <form class="card" id="f-omitir" hidden autocomplete="off">
+      <h2 id="f-tit">Omitir</h2>
+      <div class="rango" role="radiogroup" aria-label="Qué se omite">
+        <label><input type="radio" name="rango" value="dia" checked> Todo el día</label>
+        <label><input type="radio" name="rango" value="horas"> Sólo unas horas</label>
+      </div>
+      <div class="horas" id="f-horas" hidden>
+        <div class="campo"><label for="f-desde">De</label><input id="f-desde" type="time" value="08:00"></div>
+        <div class="campo"><label for="f-hasta">A</label><input id="f-hasta" type="time" value="12:00"></div>
+      </div>
+      <p class="aviso info" id="f-hoy" hidden></p>
+      <div class="campo"><label for="f-motivo">Motivo</label><input id="f-motivo" maxlength="150" value="Pruebas" placeholder="Ej. Pruebas del lector con el equipo nuevo"></div>
+      <div class="revision" id="f-rev" aria-live="polite">Revisando…</div>
+      <div class="aviso mal" id="f-err" hidden role="alert"></div>
+      <div class="fila"><button class="btn" type="submit" id="b-omitir" disabled>Omitir</button><button class="btn sec" type="button" id="b-cancelar">Cancelar</button></div>
+    </form>
+
+    <div class="card">
+      <h2>Omitidos ahora</h2>
+      <div id="omitidos"><p>Cargando…</p></div>
+    </div>
+
+    <div class="card">
+      <h2>Días con registros</h2>
+      <p style="font-size:13px;margin-bottom:6px">Los últimos 60 días. Fíjate en las cuentas y las horas para reconocer los de prueba.</p>
+      <div id="dias"><p>Cargando…</p></div>
+      <div class="otra" style="margin-top:12px">
+        <div class="campo"><label for="otra-fecha">Otra fecha</label><input id="otra-fecha" type="date"></div>
+        <button class="btn sec" type="button" id="b-otra">Omitir…</button>
+      </div>
+    </div>
+
+    <div class="card" id="c-hist" hidden>
+      <details class="hist"><summary>Se volvieron a contar</summary><div id="historial"></div></details>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="js/destinos.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var API = 'api/index.php', CLAVE = window.CA_SESION || 'ca_sesion';
+  var ses = null;
+  try { ses = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) {}
+  if (!ses || !ses.token) { location.replace('login.html?volver=omitidos.html'); return; }
+  if (ses.rol !== 'ADMIN') { $('sin-permiso').hidden = false; return; }
+  $('todo').hidden = false;
+
+  var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  var MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  var datos = null, fecha = '', tRev = null, pedido = 0;
+
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function diaTxt(f) {
+    var d = new Date(f + 'T12:00:00');
+    return DIAS[d.getDay()] + ' ' + d.getDate() + ' ' + MESES[d.getMonth()] + (f.slice(0, 4) !== String(new Date().getFullYear()) ? ' ' + f.slice(0, 4) : '');
+  }
+  function cuando(t) { return t ? diaTxt(t.slice(0, 10)) + ' ' + t.slice(11, 16) : ''; }
+  function n(c, uno, varios) { return c + ' ' + (c === 1 ? uno : varios); }
+  function cuantos(x) {
+    var p = [n(x.entradas, 'entrada', 'entradas'), n(x.salidas, 'salida', 'salidas')];
+    if (x.incidencias) p.push(n(x.incidencias, 'incidencia', 'incidencias'));
+    return p.join(' · ');
+  }
+  var tToast;
+  function toast(t, err) { var el = $('toast'); el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 4000); }
+  function api(accion, payload, metodo) {
+    var h = { Authorization: 'Bearer ' + ses.token };
+    var p = metodo === 'GET'
+      ? fetch(API + '?action=' + accion, { headers: h })
+      : fetch(API, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, h), body: JSON.stringify({ action: accion, payload: payload || {} }) });
+    return p.then(function (r) {
+      if (r.status === 401) { location.replace('login.html?volver=omitidos.html'); throw new Error('Tu sesión venció.'); }
+      return r.json();
+    });
+  }
+
+  function cargar() {
+    return api('OMITIDOS_LISTAR', null, 'GET').then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo leer la lista.');
+      datos = r; pintar();
+    }).catch(function (e) { $('dias').innerHTML = $('omitidos').innerHTML = '<p class="aviso mal">' + esc(e.message) + '</p>'; });
+  }
+  function rangoTxt(o) {
+    var d = o.desde.slice(0, 10), h = o.hasta.slice(0, 10);
+    if (o.dia_completo) return diaTxt(d) + ' · todo el día';
+    if (d === h) return diaTxt(d) + ' · de ' + o.desde.slice(11, 16) + ' a ' + o.hasta.slice(11, 16);
+    return 'Del ' + cuando(o.desde) + ' al ' + cuando(o.hasta);
+  }
+  function pintar() {
+    $('otra-fecha').max = datos.hoy;
+    var om = datos.omitidos || [];
+    $('omitidos').innerHTML = om.length ? om.map(function (o) {
+      return '<div class="dia"><div class="datos"><b>' + esc(rangoTxt(o)) + '</b> <span class="etq gris">' + esc(o.motivo) + '</span>' +
+        '<div class="m">' + esc(cuantos(o)) + (o.personas ? ' · ' + n(o.personas, 'persona', 'personas') : '') +
+        (o.cuentas ? '<br>Registrado con: ' + esc(o.cuentas) : '') +
+        '<br>Omitido por ' + esc(o.por || '—') + ' el ' + esc(cuando(o.creado)) + '</div></div>' +
+        '<div class="acc"><button class="btn sec chico" type="button" data-contar="' + o.id + '">Volver a contar</button></div></div>';
+    }).join('') : '<p>No hay días omitidos: todo cuenta.</p>';
+
+    var ds = datos.dias || [];
+    $('dias').innerHTML = ds.length ? ds.map(function (d) {
+      var total = d.entradas + d.salidas + d.incidencias, omit = d.omitidos + d.inc_omitidas;
+      var todo = total > 0 && omit >= total;
+      var estado = todo ? ' <span class="etq gris">Omitido</span>' : omit ? ' <span class="etq">Omitido en parte (' + omit + ' de ' + total + ')</span>' : '';
+      return '<div class="dia' + (todo ? ' omitido' : '') + '"><div class="datos"><b>' + esc(diaTxt(d.fecha)) + (d.fecha === datos.hoy ? ' · hoy' : '') + '</b>' + estado +
+        '<div class="m">' + esc(cuantos(d)) + (d.primero ? ' · de ' + esc(d.primero) + ' a ' + esc(d.ultimo) : '') +
+        (d.cuentas ? '<br>Cuentas: ' + esc(d.cuentas) : '') + '</div></div>' +
+        (todo ? '' : '<div class="acc"><button class="btn sec chico" type="button" data-omitir="' + d.fecha + '">Omitir…</button></div>') + '</div>';
+    }).join('') : '<p>No hay registros en los últimos 60 días.</p>';
+
+    var hi = datos.historial || [];
+    $('c-hist').hidden = !hi.length;
+    $('historial').innerHTML = hi.map(function (o) {
+      return '<div class="dia"><div class="datos"><b>' + esc(rangoTxt(o)) + '</b> <span class="etq gris">' + esc(o.motivo) + '</span>' +
+        '<div class="m">Omitido por ' + esc(o.por || '—') + ' el ' + esc(cuando(o.creado)) + ' · vuelto a contar por ' + esc(o.quitado_por || '—') + ' el ' + esc(cuando(o.quitado)) + '</div></div></div>';
+    }).join('');
+  }
+
+  /* ── Omitir un día: primero dice cuánto se dejaría de contar ── */
+  function abrir(f) {
+    fecha = f;
+    $('f-tit').textContent = 'Omitir el ' + diaTxt(f) + (f === datos.hoy ? ' (hoy)' : '');
+    document.querySelector('input[name=rango][value=dia]').checked = true;
+    $('f-horas').hidden = true;
+    $('f-motivo').value = 'Pruebas';
+    $('f-hoy').hidden = f !== datos.hoy;
+    $('f-hoy').textContent = 'Hoy se omite sólo hasta ahora (' + datos.ahora + '): lo que se registre después sí cuenta.';
+    $('f-omitir').hidden = false;
+    $('f-omitir').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    revisar();
+  }
+  function rango() {
+    var horas = document.querySelector('input[name=rango]:checked').value === 'horas';
+    return { fecha: fecha, desde: horas ? $('f-desde').value : '', hasta: horas ? $('f-hasta').value : '', motivo: $('f-motivo').value };
+  }
+  function revisar() {
+    clearTimeout(tRev);
+    $('b-omitir').disabled = true; $('f-err').hidden = true;
+    $('f-rev').hidden = false; $('f-rev').textContent = 'Revisando…';
+    var mio = ++pedido;
+    tRev = setTimeout(function () {
+      api('OMITIR', rango()).then(function (r) {
+        if (mio !== pedido) return;
+        if (!r || r.status !== 'success') {
+          $('f-rev').hidden = true;
+          $('f-err').textContent = (r && r.message) || 'No se pudo revisar.'; $('f-err').hidden = false; return;
+        }
+        $('f-rev').innerHTML = 'Se dejarán de contar: <b>' + esc(cuantos(r)) + '</b>' + (r.personas ? ' (' + n(r.personas, 'persona', 'personas') + ')' : '') +
+          ', de ' + esc(r.desde.slice(11, 16)) + ' a ' + esc(r.hasta.slice(11, 16)) + '.' + (r.cuentas ? '<br>Registrado con: ' + esc(r.cuentas) : '');
+        $('b-omitir').disabled = false;
+      }).catch(function (e) { if (mio === pedido) { $('f-rev').hidden = true; $('f-err').textContent = e.message; $('f-err').hidden = false; } });
+    }, 250);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('input[name=rango]'), function (x) {
+    x.addEventListener('change', function () { $('f-horas').hidden = rango().desde === ''; revisar(); });
+  });
+  $('f-desde').addEventListener('change', revisar);
+  $('f-hasta').addEventListener('change', revisar);
+  $('b-cancelar').addEventListener('click', function () { $('f-omitir').hidden = true; pedido++; });
+  $('f-omitir').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var d = rango(); d.aplicar = true;
+    $('b-omitir').disabled = true;
+    api('OMITIR', d).then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo omitir.');
+      $('f-omitir').hidden = true; toast(r.message); cargar();
+    }).catch(function (e) { $('b-omitir').disabled = false; $('f-err').textContent = e.message; $('f-err').hidden = false; });
+  });
+  $('b-otra').addEventListener('click', function () {
+    var f = $('otra-fecha').value;
+    if (!f) { $('otra-fecha').focus(); toast('Elige la fecha.', true); return; }
+    abrir(f);
+  });
+
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.omitir) { abrir(b.dataset.omitir); return; }
+    if (b.dataset.contar) {
+      var o = (datos.omitidos || []).filter(function (x) { return String(x.id) === b.dataset.contar; })[0]; if (!o) return;
+      if (!confirm('¿Volver a contar ' + rangoTxt(o) + '? Sus registros vuelven al tablero, los turnos, el PDF y En planta.')) return;
+      b.disabled = true;
+      api('OMITIDO_QUITAR', { id: o.id }).then(function (r) {
+        if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo.');
+        toast(r.message); cargar();
+      }).catch(function (e) { b.disabled = false; toast(e.message, true); });
+    }
+  });
+  cargar();
+})();
+</script>
+</body>
+</html>

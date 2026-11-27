@@ -101,7 +101,8 @@ try {
     $soloPost = ['CAMBIAR_MI_CONTRASENA', 'CUENTA_CREAR', 'CUENTA_EDITAR', 'ACCESO_REGISTRAR', 'ACCESO_ELIMINAR',
                  'ACCESO_INCIDENCIA', 'INCIDENCIA_ELIMINAR',
                  'ACCESOS_PDF', 'ACCESOS_PDF_DATOS', 'ACCESOS_DAR_SALIDA', 'TABLERO_EXCEL', 'TABLERO_PDF',
-                 'PADRON_GUARDAR', 'PADRON_ELIMINAR', 'PADRON_IMPORTAR', 'PADRON_EXCEL', 'PERMISO_AGREGAR', 'PERMISO_QUITAR'];
+                 'PADRON_GUARDAR', 'PADRON_ELIMINAR', 'PADRON_IMPORTAR', 'PADRON_EXCEL', 'PERMISO_AGREGAR', 'PERMISO_QUITAR',
+                 'OMITIR', 'OMITIDO_QUITAR'];
     if ($metodo !== 'POST' && in_array($accion, $soloPost, true)) respuesta(['status' => 'error', 'message' => 'Método no permitido.'], 405);
 
     $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
@@ -150,6 +151,11 @@ try {
         case 'PADRON_ELIMINAR':   respuesta((new Personal($pdo))->eliminar($datos, $usr));
         case 'PADRON_IMPORTAR':   respuesta((new Personal($pdo))->importar($datos, $_FILES['archivo'] ?? [], $usr));
         case 'PADRON_EXCEL':      respuesta((new Personal($pdo))->excel($usr));
+
+        // ── Días omitidos (Omitidos.php): lo de las pruebas no cuenta. Sólo Administración AVBA ──
+        case 'OMITIDOS_LISTAR':   respuesta((new Omitidos($pdo))->listar($usr));
+        case 'OMITIR':            respuesta((new Omitidos($pdo))->omitir($datos, $usr));
+        case 'OMITIDO_QUITAR':    respuesta((new Omitidos($pdo))->quitar($datos, $usr));
 
         // ── Tablero (Tablero.php): gráficas, Excel y PDF. Cliente, planta y Administración ──
         case 'TABLERO':

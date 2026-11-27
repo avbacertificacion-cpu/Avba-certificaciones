@@ -31,6 +31,7 @@
    ══════════════════════════════════════════════════════════════ */
 
 require_once __DIR__ . '/Personal.php';      // la base del personal: el nombre correcto de cada ID
+require_once __DIR__ . '/Omitidos.php';      // días omitidos (pruebas): no cuentan en ningún lado
 
 class ControlAccesos {
     private PDO $pdo;
@@ -433,6 +434,7 @@ class ControlAccesos {
         $st = $this->pdo->prepare(
             "SELECT tipo, codigo, turno_fecha, turno FROM accesos_registros
               WHERE codigo <> '' AND (codigo = ? OR TRIM(LEADING '0' FROM codigo) = ?) AND capturado <= ? AND capturado >= ?
+                AND " . Omitidos::fuera($this->pdo) . "
               ORDER BY capturado DESC, id DESC LIMIT 10"
         );
         $st->execute([$codigo, $clave, $cap, $desde]);
@@ -448,7 +450,7 @@ class ControlAccesos {
         self::asegurarTabla($this->pdo);
         $cols = self::conTarjeta($this->pdo) ? 'nombre, codigo, origen' : "'' AS nombre, '' AS codigo, 'foto' AS origen";
         $sql = "SELECT id, uid, tipo, capturado, lugar, nota, foto, foto_mini, usuario, usuario_nombre, $cols
-                  FROM accesos_registros WHERE turno_fecha = ? AND turno = ?";
+                  FROM accesos_registros WHERE turno_fecha = ? AND turno = ? AND " . Omitidos::fuera($this->pdo);
         $args = [$fecha, $t];
         if ($lugar !== '') { $sql .= " AND lugar = ?"; $args[] = $lugar; }
         $st = $this->pdo->prepare($sql . " ORDER BY capturado, id");
@@ -509,6 +511,7 @@ class ControlAccesos {
         $donde = "($condT)";
         if ($lugar !== '') { $donde .= " AND lugar = ?"; $args[] = $lugar; }
         if ($caseta) { $donde .= " AND usuario = ?"; $args[] = (string)$usr['usuario']; }
+        $donde .= " AND " . Omitidos::fuera($this->pdo);       // lo de los días omitidos (pruebas) no cuenta
 
         $tot = [];
         foreach ($turnos as $t) $tot[$t[0] . '-' . $t[1]] = ['entrada' => 0, 'salida' => 0];
@@ -521,7 +524,7 @@ class ControlAccesos {
 
         $lugares = [];
         if (!$caseta) {
-            $st = $this->pdo->prepare("SELECT DISTINCT lugar FROM accesos_registros WHERE ($condT) ORDER BY lugar");
+            $st = $this->pdo->prepare("SELECT DISTINCT lugar FROM accesos_registros WHERE ($condT) AND " . Omitidos::fuera($this->pdo) . " ORDER BY lugar");
             $st->execute(array_merge(...array_map(fn($t) => [$t[0], $t[1]], $turnos)));
             $lugares = $st->fetchAll(PDO::FETCH_COLUMN);
         }
@@ -538,8 +541,9 @@ class ControlAccesos {
         $num = "(SELECT COUNT(*) FROM accesos_registros b WHERE b.turno_fecha = a.turno_fecha AND b.turno = a.turno AND b.tipo = a.tipo"
              . ($lugar !== '' ? " AND b.lugar = a.lugar" : '')
              . ($caseta ? " AND b.usuario = a.usuario" : '')
+             . " AND " . Omitidos::fuera($this->pdo, 'b.capturado')
              . " AND (b.capturado < a.capturado OR (b.capturado = a.capturado AND b.id <= a.id)))";
-        $dondeA = preg_replace('/\b(turno_fecha|turno|lugar|usuario)\b/', 'a.$1', $donde);
+        $dondeA = preg_replace('/\b(turno_fecha|turno|lugar|usuario|capturado)\b/', 'a.$1', $donde);
         $st = $this->pdo->prepare(
             "SELECT a.id, a.uid, a.tipo, a.capturado, a.recibido, a.lugar, a.nota, a.usuario, a.usuario_nombre,
                     a.turno_fecha, a.turno, " . (self::conTarjeta($this->pdo) ? "a.nombre AS persona, a.codigo, a.origen" : "'' AS persona, '' AS codigo, 'foto' AS origen") . ",
@@ -759,7 +763,7 @@ class ControlAccesos {
         self::asegurarIncidencias($this->pdo);
         $condT = implode(' OR ', array_fill(0, count($turnos), '(turno_fecha = ? AND turno = ?)'));
         $args = array_merge(...array_map(fn($t) => [$t[0], $t[1]], $turnos));
-        $sql = "SELECT * FROM accesos_incidencias WHERE ($condT)";
+        $sql = "SELECT * FROM accesos_incidencias WHERE ($condT) AND " . Omitidos::fuera($this->pdo);
         if ($lugar !== '') { $sql .= " AND lugar = ?"; $args[] = $lugar; }
         if (self::esCaseta($usr)) { $sql .= " AND usuario = ?"; $args[] = (string)$usr['usuario']; }
         $st = $this->pdo->prepare($sql . " ORDER BY capturado DESC, id DESC LIMIT 200");
@@ -993,7 +997,7 @@ class ControlAccesos {
         $st = $this->pdo->prepare(
             "SELECT id, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre, (foto <> '') AS con_foto
                FROM accesos_registros
-              WHERE codigo <> '' AND fecha >= ? AND capturado >= ?
+              WHERE codigo <> '' AND fecha >= ? AND capturado >= ? AND " . Omitidos::fuera($this->pdo) . "
               ORDER BY capturado, id"
         );
         $st->execute([substr($desde, 0, 10), $desde]);
@@ -1031,6 +1035,7 @@ class ControlAccesos {
         self::asegurarIncidencias($this->pdo);
         $st = $this->pdo->prepare(
             "SELECT * FROM accesos_incidencias WHERE fecha >= ? AND codigo <> '' AND (codigo = ? OR TRIM(LEADING '0' FROM codigo) = ?)
+                AND " . Omitidos::fuera($this->pdo) . "
               ORDER BY capturado DESC, id DESC LIMIT 100");
         $st->execute([date('Y-m-d', time() - $dias * 86400), $raw, $clave]);
         $incidencias = array_values(array_map(fn($f) => $this->filaIncidencia($f, $usr),
@@ -1042,6 +1047,7 @@ class ControlAccesos {
             "SELECT id, uid, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre, (foto <> '') AS con_foto
                FROM accesos_registros
               WHERE fecha >= ? AND codigo <> '' AND (codigo = ? OR TRIM(LEADING '0' FROM codigo) = ?)
+                AND " . Omitidos::fuera($this->pdo) . "
               ORDER BY capturado, id"
         );
         $st->execute([date('Y-m-d', time() - $dias * 86400), $raw, $clave]);

@@ -158,5 +158,22 @@ CREATE TABLE IF NOT EXISTS ca_ajustes (
   actualizado DATETIME     NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── Días omitidos (pruebas): lo que se leyó entre «desde» y «hasta» no cuenta en el tablero,
+--    los turnos, el PDF, En planta, los movimientos por ID ni las incidencias. No se borra nada:
+--    volver a contar = activo 0 (queda el historial). Sólo Administración AVBA. ──
+CREATE TABLE IF NOT EXISTS accesos_omitidos (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  desde          DATETIME     NOT NULL,
+  hasta          DATETIME     NOT NULL,
+  motivo         VARCHAR(150) NOT NULL DEFAULT '',
+  usuario        VARCHAR(50)  NOT NULL DEFAULT '',
+  usuario_nombre VARCHAR(150) NOT NULL DEFAULT '',
+  creado         DATETIME     NOT NULL,
+  activo         TINYINT(1)   NOT NULL DEFAULT 1,
+  quitado_por    VARCHAR(150) NOT NULL DEFAULT '',
+  quitado        DATETIME     NULL,
+  KEY idx_activo (activo, desde)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- (Ya no hay tabla de puntos de control: la planta tiene un solo acceso y los guardias
 --  registran a la vez desde cualquier teléfono. Una base de antes conserva la suya, sin uso.)

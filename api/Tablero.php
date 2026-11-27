@@ -96,7 +96,7 @@ class Tablero {
         $st = $this->pdo->prepare(
             "SELECT id, tipo, capturado, turno, lugar, $cols, (foto <> '') AS con_foto
                FROM accesos_registros
-              WHERE fecha BETWEEN ? AND ? AND capturado BETWEEN ? AND ?
+              WHERE fecha BETWEEN ? AND ? AND capturado BETWEEN ? AND ? AND " . Omitidos::fuera($this->pdo) . "
               ORDER BY capturado, id");
         $st->execute([substr($a, 0, 10), substr($b, 0, 10), $a, $b]);
         $filas = $st->fetchAll(PDO::FETCH_ASSOC);
@@ -203,7 +203,7 @@ class Tablero {
         $st = $this->pdo->prepare(
             "SELECT id, tipo, detalle, capturado, codigo, nombre, usuario_nombre
                FROM accesos_incidencias
-              WHERE fecha BETWEEN ? AND ? AND capturado BETWEEN ? AND ?
+              WHERE fecha BETWEEN ? AND ? AND capturado BETWEEN ? AND ? AND " . Omitidos::fuera($this->pdo) . "
               ORDER BY capturado DESC, id DESC");
         $st->execute([$desde, $hasta, $ini, $fin]);
         $incidencias = [];

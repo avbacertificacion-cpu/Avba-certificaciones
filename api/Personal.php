@@ -261,7 +261,8 @@ class Personal {
         if (!self::puedeAdministrar($usr)) return self::sinPermiso();
         $dias = max(1, min(90, (int)($p['dias'] ?? 30)));
         if (!ControlAccesos::conTarjeta($this->pdo)) return ['status' => 'success', 'ids' => [], 'dias' => $dias];
-        $st = $this->pdo->prepare("SELECT codigo, nombre, capturado FROM accesos_registros WHERE codigo <> '' AND fecha >= ? ORDER BY capturado");
+        $st = $this->pdo->prepare("SELECT codigo, nombre, capturado FROM accesos_registros WHERE codigo <> '' AND fecha >= ? AND "
+                                  . Omitidos::fuera($this->pdo) . " ORDER BY capturado");
         $st->execute([date('Y-m-d', time() - $dias * 86400)]);
         $porClave = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) $porClave[ControlAccesos::claveId((string)$f['codigo'])][] = $f;
