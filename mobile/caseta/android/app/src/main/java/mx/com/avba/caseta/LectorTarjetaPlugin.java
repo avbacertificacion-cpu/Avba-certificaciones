@@ -43,8 +43,9 @@ import java.lang.ref.WeakReference;
  *   LectorTarjeta.continuo({ tipo: 'entrada'|'salida', titulo, … })   abre la cámara y no la cierra
  *   LectorTarjeta.mostrar({ titulo, nombre, lineas: [], color, segundos, sonido })   el resultado en grande
  *   LectorTarjeta.detener()
- * disponible() responde continuo: true en las versiones que lo traen, y rayas: true en las que leen
- * credenciales con rayas de la impresora (reglas digitosId e ids: los IDs de la base del personal).
+ * disponible() responde continuo: true en las versiones que lo traen, rayas: true en las que leen
+ * credenciales con rayas de la impresora (reglas digitosId e ids: los IDs de la base del personal) y
+ * version (el número de versión de la app; la página pide actualizar si es menor que la regla appMinima).
  */
 @CapacitorPlugin(
     name = "LectorTarjeta",
@@ -72,6 +73,12 @@ public class LectorTarjetaPlugin extends Plugin {
         r.put("local", true);
         r.put("continuo", true);
         r.put("rayas", true);            // lee credenciales con rayas de la impresora (digitosId, ids de la base)
+        long version = 0;                // la página avisa si hay una más nueva (regla appMinima)
+        try {
+            android.content.pm.PackageInfo pi = getContext().getPackageManager().getPackageInfo(getContext().getPackageName(), 0);
+            version = androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(pi);
+        } catch (Exception ignorada) { }
+        r.put("version", version);
         call.resolve(r);
     }
 

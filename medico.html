@@ -96,6 +96,7 @@
 
   <div id="todo" hidden>
     <div class="senal" id="senal"><span class="punto"></span><span id="senal-tx">Con señal</span></div>
+    <p class="aviso info" id="nota-app" hidden>Hay una <b>versión nueva de la app</b> que lee mejor el ID de las credenciales (también las que tienen rayas de la impresora). Instálala desde gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk</p>
 
     <!-- 1. ¿Quién es? -->
     <section class="card" id="c-ident">
@@ -403,7 +404,8 @@
     var pend = COLA.length, sin = !enLinea();
     $('senal').className = 'senal' + (sin || pend ? ' sin' : '');
     $('senal-tx').innerHTML = (sin ? 'Sin señal: las tomas se guardan en este equipo' : 'Con señal') +
-      (pend ? ' · <b>' + pend + (pend === 1 ? ' toma por enviar' : ' tomas por enviar') + '</b>' : sin ? '' : ' · todo enviado');
+      (pend ? ' · <b>' + pend + (pend === 1 ? ' toma por enviar' : ' tomas por enviar') + '</b>' : sin ? '' : ' · todo enviado') +
+      (typeof VERSION_APP !== 'undefined' && VERSION_APP ? ' · app ' + VERSION_APP : '');
   }
   function pintarLista() {
     var l = todas().filter(function (t) { return t.capturado.slice(0, 10) === hoy(); });
@@ -434,8 +436,18 @@
     api('LOGOUT', {}).then(fuera, fuera);
   });
 
-  pintarSenal(); pintarLista();
-  actualizar().then(function () { return enviar(); }).then(cargarHoy);
+  /* La versión de la app: si es anterior a la regla appMinima, se pide instalar la nueva */
+  var VERSION_APP = 0;
+  function revisarVersion() {
+    if (!LECTOR || !LECTOR.disponible) return;
+    Promise.resolve(LECTOR.disponible()).then(function (r) {
+      VERSION_APP = (r && +r.version) || 0;
+      $('nota-app').hidden = VERSION_APP >= (+(leer('ca_tarjeta_reglas', {}) || {}).appMinima || 0);
+      pintarSenal();
+    }, function () {});
+  }
+  pintarSenal(); pintarLista(); revisarVersion();
+  actualizar().then(revisarVersion).then(function () { return enviar(); }).then(cargarHoy);
   if (!LECTOR) $('id').focus();
 })();
 </script>

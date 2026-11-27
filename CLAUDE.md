@@ -58,7 +58,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `omitidos.html` | **Días omitidos** (sólo ADMIN): los días con registros de los últimos 60 (cuántos, de qué hora a qué hora, con qué cuentas) para reconocer los de **prueba**; omitir un día completo o unas horas (antes dice cuánto se deja de contar; **hoy sólo hasta ahora**), volver a contar e historial. |
 | `api/Omitidos.php` | Tabla `accesos_omitidos` (desde, hasta, motivo, quién; volver a contar = `activo` 0). **No borra nada:** `Omitidos::fuera($pdo, 'col')` es la condición SQL que deja fuera lo leído (`capturado`) en un periodo omitido y va en **todas** las consultas que cuentan: turnos y su PDF, `listar` (totales y numeración), En planta, movimientos por ID, incidencias, tablero y sus descargas, IDs fuera de la base, entrada abierta. **No** se filtra `ACCESOS_EXISTEN` ni la búsqueda por uid (la cola del teléfono). Acciones `OMITIDOS_LISTAR`, `OMITIR` (sin `aplicar` sólo revisa), `OMITIDO_QUITAR`. |
 | `api/lib/xlsx_lector.php` | Lee .xlsx (abre el ZIP con zlib, sin extensión zip) y .csv (también los de Excel en Windows); regresa los renglones con su número de Excel. |
-| `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. `digitosId` 5 y `minDigitos` 5: el ID impreso trae 5 dígitos (corrige las rayas de la impresora y nunca toma un pedazo del número). |
+| `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. `digitosId` 5 y `minDigitos` 5: el ID impreso trae 5 dígitos (corrige las rayas de la impresora y nunca toma un pedazo del número). `appMinima`: versión de la app desde la que el lector trae lo último (la caseta y el servicio médico piden instalar la nueva si `disponible().version` es menor). |
 | `api/lib/qrcode.php` | Generador de códigos QR (lo usa la portada de la maqueta). |
 | `demo/` | **La maqueta** que hay que volver real: `control-accesos.html` (panel), `caseta.html` (guardia), `demo-datos.js` (datos ficticios y reglas), `index.html` (portada), `sala.php` (sincroniza la demo entre equipos). **Sólo Administración:** `solo-admin.js` regresa a su inicio a quien entre con otro perfil (sin sesión sí abre, para el teléfono que entra con el QR de la portada). |
 | `mobile/caseta/` | App Android «AVBA Control de Accesos» (Capacitor): abre `accesos.html` y agrega el lector nativo de la credencial (CameraX + ML Kit sin internet, `AnalizadorTarjeta.java` con sus pruebas). Cámara frontal o trasera según la regla `camara`; el botón «Cambiar cámara» pasa a la otra y el teléfono la recuerda mientras la regla no cambie. `esperaNombre` (0 con la base del personal): tras confirmar el ID no espera el nombre. **Lectura continua** (`continuo`, eventos `lectura`/`cerrado`, `mostrar`, `detener`; `disponible()` responde `continuo: true`): la cámara no se cierra, cada credencial se avisa a la página, la misma credencial frente a la cámara no se reenvía (6 s), muestra en grande lo que dice la página (o «Leída» si no contesta en 2.5 s), con tono; salir = mantener 3 s. |
@@ -99,7 +99,13 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
    los pedazos del número («0 0287», «0028 7»), quita la raya leída como «|», «I» o un «1» de más,
    lee el dígito cortado como la letra a la que se parece («4» → «A», «0» → «C», «7» → «T»),
    **nunca toma un pedazo** (sería otra persona) y, si queda en duda, decide con los IDs de la
-   base que le manda la página (`ids`); sin base no adivina. «N SS» partida no se toma como «N.»
+   base que le manda la página (`ids`); sin base no adivina. La raya sólo AGREGA blanco (nunca repite
+   un «0»): cae pegada a la izquierda del 2.º número y a la derecha del último, así que un «1» junto a
+   otro «1» («011287») o al final («012871») se quita primero; un «1» al principio, no. Se confirma con
+   3 lecturas iguales entre las últimas 10 imágenes (tolera las borrosas) y, si no se distingue, la
+   cámara dice qué lee en el recuadro («En el recuadro leo «…»»: `Lectura.enRecuadro`). Se probó
+   también quitar las rayas de la imagen antes de leer: a la escala de la cámara frontal dañaba el
+   «3» y no se usa. «N SS» partida no se toma como «N.»
    de número. La página además corrige con la base una lectura de la app anterior con un dígito
    de más (`corregirConBase`). La app nueva responde `rayas: true` en `disponible()`.
 4. **Turnos por cuenta:** lo que registra un guardia va a **su** turno (el de su cuenta), a

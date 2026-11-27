@@ -39,11 +39,14 @@ public final class AnalizadorTarjeta {
         }
     }
 
-    /** Lo que se encontró en una lectura. */
+    /** Lo que se encontró en una lectura. «enRecuadro»: el texto que se leyó junto a «ID:» (para decirle al guardia qué ve). */
     public static final class Lectura {
-        public final String codigo, nombre;
+        public final String codigo, nombre, enRecuadro;
         public final int puntaje;
-        public Lectura(String codigo, String nombre, int puntaje) { this.codigo = codigo; this.nombre = nombre; this.puntaje = puntaje; }
+        public Lectura(String codigo, String nombre, int puntaje) { this(codigo, nombre, puntaje, null); }
+        public Lectura(String codigo, String nombre, int puntaje, String enRecuadro) {
+            this.codigo = codigo; this.nombre = nombre; this.puntaje = puntaje; this.enRecuadro = enRecuadro;
+        }
         @Override public String toString() { return "codigo=" + codigo + " nombre=" + nombre + " puntaje=" + puntaje; }
     }
 
@@ -192,16 +195,23 @@ public final class AnalizadorTarjeta {
             // Un «|» que completa los dígitos puede ser la raya en lugar de un dígito borrado: sólo vale si está en la base
             return costo.contains(1) && !r.enBase(s) ? null : s;
         }
-        for (int i = 0; i < s.length(); i++)                    // un dígito repetido junto a su gemelo también puede sobrar
-            if (costo.get(i) == 0 && ((i > 0 && s.charAt(i - 1) == s.charAt(i)) || (i + 1 < s.length() && s.charAt(i + 1) == s.charAt(i))))
-                costo.set(i, 3);
+        // La raya de la impresora sólo AGREGA una línea blanca (se lee «|», «I», «l» o «1»); nunca repite otro dígito.
+        // Cae pegada a un número: un «1» junto a otro «1» («0|1287» → «011287») o al final, pegado al último número
+        // («01287|» → «012871»), es más probablemente la raya que un «1» suelto en medio o al principio.
+        for (int i = 0; i < s.length(); i++) {
+            if (costo.get(i) == 0) continue;
+            boolean pegado = (i > 0 && costo.get(i - 1) > 0) || (i + 1 < s.length() && costo.get(i + 1) > 0);
+            boolean alFinal = i == s.length() - 1;
+            if (pegado || alFinal) costo.set(i, Math.min(costo.get(i), 2));
+        }
         Map<String, Integer> opciones = new HashMap<>();        // número posible → lo menos que cuesta llegar a él
         for (int a = 0; a < s.length(); a++) {
             if (costo.get(a) == 0) continue;
             if (sobran == 1) { guardarOpcion(opciones, s.substring(0, a) + s.substring(a + 1), costo.get(a)); continue; }
             for (int b = a + 1; b < s.length(); b++)
-                if (costo.get(b) > 0)
-                    guardarOpcion(opciones, s.substring(0, a) + s.substring(a + 1, b) + s.substring(b + 1), costo.get(a) + costo.get(b));
+                if (costo.get(b) > 0)                         // dos rayas juntas en el mismo «11» es poco probable
+                    guardarOpcion(opciones, s.substring(0, a) + s.substring(a + 1, b) + s.substring(b + 1),
+                                  costo.get(a) + costo.get(b) + (b == a + 1 ? 3 : 0));
         }
         String elegido = elegirOpcion(opciones, r, true);
         return elegido != null ? elegido : elegirOpcion(opciones, r, false);
@@ -451,6 +461,7 @@ public final class AnalizadorTarjeta {
         String mejorCodigo = null; int mejorPuntaje = Integer.MIN_VALUE;
         // 1) El renglón del ID: «ID:» y todo lo leído a su derecha en esa fila (el número puede venir en pedazos)
         Set<Linea> filaDelId = new HashSet<>();
+        String enRecuadro = null;
         if (r.patron == null) {
             for (Linea l : orden) {
                 if (filaDelId.contains(l)) continue;
@@ -463,6 +474,7 @@ public final class AnalizadorTarjeta {
                 for (Linea y : derecha) resto.append(' ').append(y.texto);
                 filaDelId.add(l);
                 filaDelId.addAll(derecha);
+                if (enRecuadro == null && resto.toString().matches(".*\\d.*")) enRecuadro = resto.toString().trim();
                 String c = codigoDelId(resto.toString(), objetivo, r);
                 if (c == null) continue;
                 int n = c.length();
@@ -494,9 +506,13 @@ public final class AnalizadorTarjeta {
                     if (todosLargos) cands.add(g.replaceAll("\\D", ""));                  // «0012 3456» es un solo número
                     else for (String p : partes) cands.add(p);
                 }
-                // Un renglón que sólo trae el número, quizá partido por una raya («0 0287», «0|0287»)
-                if (objetivo > 0 && etiquetaJunta(l.texto).isEmpty()) {
-                    String c = codigoDelId(l.texto, objetivo, r);
+                // Un renglón que sólo trae el número, quizá partido por una raya («0 0287», «0|0287»), o con una etiqueta
+                // corta que no se leyó bien («IO: 0 0287»): todo lo que sigue es el número
+                String et = etiquetaJunta(l.texto);
+                if (objetivo > 0 && et.length() <= 3 && !r.noCodigo.contains(et)) {
+                    int ini = 0;
+                    while (ini < l.texto.length() && !Character.isDigit(l.texto.charAt(ini))) ini++;
+                    String c = codigoDelId(et.isEmpty() ? l.texto : l.texto.substring(ini), objetivo, r);
                     if (c != null && !cands.contains(c)) cands.add(c);
                 }
             }
@@ -560,7 +576,7 @@ public final class AnalizadorTarjeta {
             if ((a.texto + b.texto).equals((a.texto + b.texto).toUpperCase(Locale.ROOT))) p += 6;
             if (p > mejorN) { mejorN = p; mejorNombre = limpio; }
         }
-        return new Lectura(mejorCodigo, mejorNombre, mejorCodigo == null ? 0 : mejorPuntaje);
+        return new Lectura(mejorCodigo, mejorNombre, mejorCodigo == null ? 0 : mejorPuntaje, enRecuadro);
     }
 
     /* En una palabra que es casi toda letras, el reconocimiento a veces pone un número: «C0RONA», «MARR0QUIN».

@@ -275,6 +275,7 @@
   .btn.carril small{font-size:12px;font-weight:600;opacity:.9} .btn.carril b{font-size:21px;letter-spacing:.5px}
   .fijo-estado{font-size:14px;color:var(--texto-sub);margin:12px 4px;line-height:1.5}
   .nota-app{display:block;margin-top:8px;font-size:13px;color:var(--texto);overflow-wrap:anywhere}
+  .ver-app{display:block;margin-top:6px;font-size:12px;color:var(--texto-sub)}
   .fijo-estado b{color:var(--texto)}
   #v-foto{z-index:110}
   .mov-fotos{display:flex;gap:10px;margin-top:6px}
@@ -573,10 +574,10 @@
      internet (la imagen no sale del equipo) y el registro queda guardado al
      instante, sin foto. En el navegador sigue la foto de la identificación. */
   var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
-  var REGLAS_TARJETA = { minDigitos: 5, maxDigitos: 12, longitud: 0, digitosId: 5, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal', repetirSeg: 120 };
+  var REGLAS_TARJETA = { minDigitos: 5, maxDigitos: 12, longitud: 0, digitosId: 5, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal', repetirSeg: 120, appMinima: 0 };
   function mezclarReglas(g) {
     if (!g || typeof g !== 'object') return;
-    ['minDigitos', 'maxDigitos', 'longitud', 'digitosId', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara', 'repetirSeg', 'esperaNombre'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+    ['minDigitos', 'maxDigitos', 'longitud', 'digitosId', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara', 'repetirSeg', 'esperaNombre', 'appMinima'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
   }
   /** Credenciales con rayas blancas de la impresora: la app anterior puede leer la raya como un dígito de
    *  más («0|0287» → «010287»). Si ese ID no está en la base, se prueba quitando un «1» o un dígito
@@ -2082,7 +2083,7 @@
      Cuentas) no elige: siempre es lo suyo. Aquí se registra (misma cola sin señal), se ignora
      a la misma persona si ya se registró hace poco (regla repetirSeg, 2 min) y se le dice a
      la app qué mostrar en grande: nombre de la base, permisos o avisos. */
-  var CONTINUO = { soportado: null, rayas: null, activo: false, escuchando: false, auto: true };
+  var CONTINUO = { soportado: null, rayas: null, version: 0, activo: false, escuchando: false, auto: true };
   var CLAVE_CARRIL = 'ca_accesos_carril', CARRIL = '';   // lo que eligió el guardia en este equipo
   var LEIDAS_FIJO = {};                            // clave|tipo → hora del último registro en este equipo
   function carril() { return MODO_FIJO || CARRIL; }
@@ -2136,14 +2137,16 @@
       e.innerHTML = 'Si este equipo se queda fijo en el acceso, elige dónde está: la cámara queda abierta y cada credencial se registra sola, sin tocar la pantalla.';
       el.hidden = false;
     }
-    if (LECTOR && CONTINUO.soportado && CONTINUO.rayas === false)
-      e.innerHTML += '<span class="nota-app">Hay una <b>versión nueva de la app</b> que lee las credenciales con rayas de la impresora: instálala (gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk).</span>';
+    if (LECTOR && CONTINUO.soportado && CONTINUO.version < (+REGLAS_TARJETA.appMinima || 0))
+      e.innerHTML += '<span class="nota-app">Hay una <b>versión nueva de la app</b> que lee mejor el ID de las credenciales (también las que tienen rayas de la impresora): instálala (gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk).</span>';
+    if (LECTOR && CONTINUO.version) e.innerHTML += '<span class="ver-app">App versión ' + CONTINUO.version + '</span>';
   }
   function soportaContinuo() {
     if (CONTINUO.soportado !== null) return Promise.resolve(CONTINUO.soportado);
     if (!LECTOR || !LECTOR.disponible || !LECTOR.continuo) return Promise.resolve(CONTINUO.soportado = false);
     return Promise.resolve(LECTOR.disponible()).then(function (r) {
       CONTINUO.rayas = !!(r && r.rayas);           // la versión que lee credenciales con rayas de la impresora
+      CONTINUO.version = (r && +r.version) || 0;   // su número de versión (las de antes no lo dicen: 0)
       return (CONTINUO.soportado = !!(r && r.continuo));
     }, function () { return (CONTINUO.soportado = false); });
   }

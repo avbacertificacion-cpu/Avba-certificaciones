@@ -224,7 +224,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         String elegida = camaraPedida.equals(sp.getString(PREF_PEDIDA, "")) ? sp.getString(PREF_ELEGIDA, camaraPedida) : camaraPedida;
         frontal = "frontal".equals(elegida);
         int confirmar = Math.max(1, Math.min(6, i.getIntExtra(EXTRA_CONFIRMAR, 3)));
-        estab = new AnalizadorTarjeta.Estabilizador(confirmar, Math.max(6, confirmar * 2));
+        estab = new AnalizadorTarjeta.Estabilizador(confirmar, Math.max(10, confirmar * 3));   // tolera imágenes borrosas entre las buenas
     }
 
     /* ── Pantalla: cámara a todo lo alto, recuadro de la tarjeta, textos y botones ── */
@@ -481,6 +481,12 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             tEstado.setText("ID " + l.codigo + (l.nombre != null ? " · " + l.nombre : "") + " — confirmando…");
             tEstado.setTextColor(AMARILLO);
             marco.color(AMARILLO);
+        } else if (l.enRecuadro != null) {
+            // Se ve el recuadro del ID pero el número no es seguro: se dice qué se lee (ayuda a saber qué pasa)
+            tEstado.setText("En el recuadro leo «" + l.enRecuadro + "»: no se distingue el ID. "
+                    + (frontal ? "Mantenla quieta, sin reflejos" : "Acércala o enfoca") + ", o toca «Escribir ID».");
+            tEstado.setTextColor(AMARILLO);
+            marco.color(BLANCO);
         } else if (l.nombre != null) {
             tEstado.setText(l.nombre + (frontal ? " — falta el ID; mantenla quieta, sin reflejos" : " — falta el ID; acércala o enfoca"));
             tEstado.setTextColor(BLANCO);
@@ -661,7 +667,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
     private void reiniciarLectura() {
         confirmado = null;
         int confirmar = Math.max(1, Math.min(6, getIntent().getIntExtra(EXTRA_CONFIRMAR, 3)));
-        estab = new AnalizadorTarjeta.Estabilizador(confirmar, Math.max(6, confirmar * 2));
+        estab = new AnalizadorTarjeta.Estabilizador(confirmar, Math.max(10, confirmar * 3));   // tolera imágenes borrosas entre las buenas
         fotoPorId.clear();
         fotoConNombre.clear();
         fotoReciente = null;

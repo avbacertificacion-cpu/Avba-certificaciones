@@ -95,6 +95,21 @@ public class AnalizadorTarjetaTest {
         assertEquals("12345", ok.codigo);
     }
 
+    /** La cámara a ratos da imágenes borrosas o con reflejo (sin ID): 3 lecturas iguales entre 10 bastan (antes, entre 6). */
+    @Test public void toleraImagenesBorrosasEntreLasBuenas() {
+        AnalizadorTarjeta.Estabilizador e = new AnalizadorTarjeta.Estabilizador(3, 10);
+        AnalizadorTarjeta.Lectura nada = new AnalizadorTarjeta.Lectura(null, null, 0), buena = new AnalizadorTarjeta.Lectura("01287", null, 60);
+        AnalizadorTarjeta.Lectura[] serie = { buena, nada, nada, nada, buena, nada, nada, nada, buena };
+        AnalizadorTarjeta.Lectura ok = null;
+        for (AnalizadorTarjeta.Lectura l : serie) ok = e.agregar(l);
+        assertNotNull("3 buenas entre 9 imágenes", ok);
+        assertEquals("01287", ok.codigo);
+        AnalizadorTarjeta.Estabilizador seis = new AnalizadorTarjeta.Estabilizador(3, 6);
+        ok = null;
+        for (AnalizadorTarjeta.Lectura l : serie) ok = seis.agregar(l);
+        assertNull("con 6 no alcanzaba", ok);
+    }
+
     @Test public void nombreLeidoSinElCodigoTambienCuenta() {
         AnalizadorTarjeta.Estabilizador e = new AnalizadorTarjeta.Estabilizador(2, 6);
         e.agregar(new AnalizadorTarjeta.Lectura(null, "Juan Pérez López", 0));
@@ -266,7 +281,7 @@ public class AnalizadorTarjetaTest {
     /** La raya dentro del recuadro: se lee como «|», «I», espacio o un dígito repetido; el ID sale completo. */
     @Test public void idConRayasDeLaImpresora() {
         String[] lecturas = { "ID: 00287", "ID: 0 0287", "ID: 0|0287", "ID: 0I0287", "ID: 0028 7", "ID: 002|87",
-                              "ID: 00287 |", "ID:| 00287", "1D: 0 0287", "ID: 000287", "ID: 010287" };
+                              "ID: 00287 |", "ID:| 00287", "1D: 0 0287", "ID: 010287" };
         for (String t : lecturas) {
             AnalizadorTarjeta.Lectura le = AnalizadorTarjeta.analizar(conRayas(ln(t, 825, 560, 70, 370)), credencial());
             assertEquals("ID leído como «" + t + "»", "00287", le.codigo);
@@ -287,6 +302,27 @@ public class AnalizadorTarjetaTest {
         assertEquals("00287", AnalizadorTarjeta.analizar(conRayas(ln("ID: 0028T", 825, 560, 70, 370)), credencial()).codigo);
         // «4» que quedó como «L»: falta un dígito; aunque 28 esté en la base, no se toma
         assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 0|028L", 825, 560, 70, 370)), credencial("28", "284")).codigo);
+    }
+
+    /** La raya sólo agrega una línea blanca: nunca repite un «0». Un «0» de más no se adivina. */
+    @Test public void unCeroDeMasNoSeAdivina() {
+        assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 000287", 825, 560, 70, 370)), credencial()).codigo);
+    }
+
+    /** Como en la credencial real: una raya pegada a la izquierda del «1» (2.º número) y otra pegada a la derecha del
+     *  último. Leídas como «1», «l» o «|» de más, sin la base del personal (la persona puede no estar). ID inventado. */
+    @Test public void rayasPegadasAlUnoYAlUltimo() {
+        for (String t : new String[] { "ID: 01287", "ID: 011287", "ID: 012871", "ID: 0112871", "ID: 0l12871", "ID: 0|12871",
+                                       "ID: 0 12871", "ID: 0I1287I", "ID: 01287|", "ID: 0|1287|" }) {
+            AnalizadorTarjeta.Lectura le = AnalizadorTarjeta.analizar(conRayas(ln(t, 825, 560, 70, 370)), credencial());
+            assertEquals("ID leído como «" + t + "»", "01287", le.codigo);
+        }
+        // Lo que se leyó en el recuadro queda para decírselo al guardia
+        assertEquals("0112871", AnalizadorTarjeta.analizar(conRayas(ln("ID: 0112871", 825, 560, 70, 370)), credencial()).enRecuadro);
+        // La etiqueta «ID» mal leída («IO:») con el número partido por la raya
+        assertEquals("01287", AnalizadorTarjeta.analizar(conRayas(ln("IO: 0 1287", 825, 560, 70, 370)), credencial()).codigo);
+        // Un «1» real al principio no se quita por estar en la orilla: 10213 con un «1» de más en medio sigue en duda
+        assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 101213", 825, 560, 70, 370)), credencial()).codigo);
     }
 
     /** Si la raya se lee como un «1» y no se sabe cuál es, decide la base del personal; sin base no se adivina. */
