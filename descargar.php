@@ -41,6 +41,7 @@ $usr = validarToken($pdo, tokenDePeticion());
 if (!$usr || !ControlAccesos::permitido($usr)) fallo(401, 'Tu sesión venció. Vuelve a iniciar sesión.');
 
 if (ControlAccesos::esCliente($usr) && $tipo !== 'reporte') fallo(403, 'Esta cuenta sólo descarga los reportes del tablero.');
+if (Medico::esMedico($usr)) fallo(403, 'Esta cuenta sólo registra tomas del servicio médico.');
 
 if ($tipo === 'acceso_foto' || $tipo === 'incidencia_foto') {
     $ca = new ControlAccesos($pdo);

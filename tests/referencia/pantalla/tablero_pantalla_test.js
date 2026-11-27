@@ -26,7 +26,7 @@ const dia = n => new Date(new Date(hoy + 'T12:00:00Z').getTime() - n * 86400e3).
   ok(await p.getAttribute('[data-p="7"]', 'aria-pressed') === 'true' && /7 días/.test(await p.textContent('#periodo-txt')), 'empieza con los últimos 7 días');
   const kpis = await p.$$eval('.kpi', l => l.map(x => x.innerText.replace(/\s+/g, ' ')));
   ok(kpis.length === 6 && /^Dentro de la planta ahora \d+/.test(kpis[0]) && /Entradas \d/.test(kpis[1]) && /Incidencias \d/.test(kpis[5]), 'seis cifras: ' + kpis[0] + ' | ' + kpis[1]);
-  const graficas = async () => p.$$eval('.graf[data-g]', l => l.filter(c => !c.hidden).map(c => ({ g: c.dataset.g, chart: !!Chart.getChart(c.querySelector('canvas')), vacio: !c.querySelector('.vacio').hidden })));
+  const graficas = async () => p.$$eval('#v-accesos .graf[data-g]', l => l.filter(c => !c.hidden).map(c => ({ g: c.dataset.g, chart: !!Chart.getChart(c.querySelector('canvas')), vacio: !c.querySelector('.vacio').hidden })));
   let g = await graficas();
   ok(g.length === 6 && g.every(x => x.chart && !x.vacio), 'seis gráficas dibujadas: ' + g.map(x => x.g).join(', '));
   ok(/Máximo en cada hora/.test(await p.textContent('[data-g="ocupacion"] [data-sub]')), 'con 7 días, las personas dentro van hora por hora');

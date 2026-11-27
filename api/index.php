@@ -90,9 +90,16 @@ try {
         ], true)) {
         respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo puede registrar entradas y salidas.'], 403);
     }
-    // El cliente sólo consulta el tablero y descarga sus reportes
+    // El servicio médico sólo toma la tensión arterial (con la copia de la base y las reglas del lector)
+    if (Medico::esMedico($usr) && !in_array($accion, [
+            'SESION', 'CAMBIAR_MI_CONTRASENA', 'PADRON_CAJA', 'ACCESOS_TARJETA_REGLAS',
+            'MEDICO_REGISTRAR', 'MEDICO_EXISTEN', 'MEDICO_LISTAR', 'MEDICO_PERSONA', 'MEDICO_REGLAS',
+        ], true)) {
+        respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo registra tomas del servicio médico.'], 403);
+    }
+    // El cliente sólo consulta el tablero y descarga sus reportes (también los del servicio médico)
     if (ControlAccesos::esCliente($usr) && !in_array($accion, [
-            'SESION', 'CAMBIAR_MI_CONTRASENA', 'TABLERO', 'TABLERO_EXCEL', 'TABLERO_PDF',
+            'SESION', 'CAMBIAR_MI_CONTRASENA', 'TABLERO', 'TABLERO_EXCEL', 'TABLERO_PDF', 'MEDICO_TABLERO', 'MEDICO_EXCEL', 'MEDICO_PDF',
         ], true)) {
         respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo consulta el tablero y sus reportes.'], 403);
     }
@@ -102,7 +109,7 @@ try {
                  'ACCESO_INCIDENCIA', 'INCIDENCIA_ELIMINAR',
                  'ACCESOS_PDF', 'ACCESOS_PDF_DATOS', 'ACCESOS_DAR_SALIDA', 'TABLERO_EXCEL', 'TABLERO_PDF',
                  'PADRON_GUARDAR', 'PADRON_ELIMINAR', 'PADRON_IMPORTAR', 'PADRON_EXCEL', 'PERMISO_AGREGAR', 'PERMISO_QUITAR',
-                 'OMITIR', 'OMITIDO_QUITAR'];
+                 'OMITIR', 'OMITIDO_QUITAR', 'MEDICO_REGISTRAR', 'MEDICO_EXCEL', 'MEDICO_PDF'];
     if ($metodo !== 'POST' && in_array($accion, $soloPost, true)) respuesta(['status' => 'error', 'message' => 'Método no permitido.'], 405);
 
     $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
@@ -156,6 +163,21 @@ try {
         case 'OMITIDOS_LISTAR':   respuesta((new Omitidos($pdo))->listar($usr));
         case 'OMITIR':            respuesta((new Omitidos($pdo))->omitir($datos, $usr));
         case 'OMITIDO_QUITAR':    respuesta((new Omitidos($pdo))->quitar($datos, $usr));
+
+        // ── Servicio médico (Medico.php): tomas de tensión arterial ──
+        case 'MEDICO_REGLAS':     respuesta(Medico::reglasPublicas());
+        case 'MEDICO_REGISTRAR':  respuesta((new Medico($pdo))->registrar($datos, $usr));
+        case 'MEDICO_EXISTEN':    respuesta((new Medico($pdo))->existen((array)($datos['uids'] ?? [])));
+        case 'MEDICO_LISTAR':     respuesta((new Medico($pdo))->listar($datos, $usr));
+        case 'MEDICO_PERSONA':    respuesta((new Medico($pdo))->persona($datos, $usr));
+        case 'MEDICO_TABLERO':
+        case 'MEDICO_EXCEL':
+        case 'MEDICO_PDF':
+            if (!Tablero::puede($usr)) respuesta(['status' => 'error', 'message' => 'Tu cuenta no tiene acceso al tablero.'], 403);
+            $md = new Medico($pdo);
+            if ($accion === 'MEDICO_TABLERO') respuesta($md->tablero($datos, $usr));
+            if ($accion === 'MEDICO_EXCEL') respuesta($md->excel($datos, $usr));
+            respuesta($md->pdf($datos, $usr));
 
         // ── Tablero (Tablero.php): gráficas, Excel y PDF. Cliente, planta y Administración ──
         case 'TABLERO':

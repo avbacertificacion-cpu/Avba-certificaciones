@@ -81,6 +81,7 @@
       if (rol === 'ACCESOS' && v !== 'accesos.html') v = '';            // el guardia sólo usa accesos.html
       if (v === 'cuentas.html' && rol !== 'ADMIN') v = '';
       if (rol === 'CLIENTE' && v !== 'tablero.html' && v !== 'index.html') v = '';   // el cliente sólo usa el tablero
+      if (rol === 'MEDICO' && v !== 'medico.html') v = '';             // el servicio médico sólo usa su pantalla
       if (v) return v;
     }
     return (window.CA_DESTINOS || {})[rol] || 'index.html';

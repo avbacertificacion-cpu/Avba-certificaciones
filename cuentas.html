@@ -47,6 +47,7 @@
             <option value="ACCESOS">Guardia de caseta (sólo registra entradas y salidas)</option>
             <option value="PLANTA">Administrador de accesos de la planta</option>
             <option value="CLIENTE">Cliente (sólo ve el tablero y descarga Excel y PDF)</option>
+            <option value="MEDICO">Servicio médico (toma de tensión arterial: escanea o escribe el ID)</option>
             <option value="ADMIN">Administración AVBA (todo, incluidas las cuentas)</option>
           </select></div>
         <div class="campo"><label for="c-pass" id="l-pass">Contraseña</label><input id="c-pass" type="text" autocomplete="new-password" minlength="8">
@@ -88,11 +89,11 @@
   if (ses.rol !== 'ADMIN') { $('sin-permiso').hidden = false; return; }
   $('todo').hidden = false;
 
-  var ROLES = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de la planta', ACCESOS: 'Guardia de caseta', CLIENTE: 'Cliente' };
+  var ROLES = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de la planta', ACCESOS: 'Guardia de caseta', CLIENTE: 'Cliente', MEDICO: 'Servicio médico' };
   var TURNO = { D: 'Turno de día', N: 'Turno de noche' };
   var MODO = { E: 'Equipo fijo · Entradas', S: 'Equipo fijo · Salidas' };
 
-  var COLOR = { ADMIN: 'azul', PLANTA: 'verde', ACCESOS: '', CLIENTE: 'gris' };
+  var COLOR = { ADMIN: 'azul', PLANTA: 'verde', ACCESOS: '', CLIENTE: 'gris', MEDICO: 'verde' };
   var cuentas = [], editando = null;
 
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }

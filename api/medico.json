@@ -1,0 +1,12 @@
+{
+  "_nota": "Reglas del servicio médico (toma de tensión arterial). Se ajustan aquí sin tocar el código. Apto: la sistólica entre minSistolica y maxSistolica Y la diastólica entre minDiastolica y maxDiastolica (mmHg, ambos incluidos); fuera de eso, No apto. La clasificación (óptima, normal, normal alta, hipertensión grado 1, 2 y 3) es la de la NOM-030-SSA2-2009; abajo del mínimo es presión baja. frecuenciaMin y frecuenciaMax: la frecuencia cardiaca fuera de ese rango sólo se avisa (no cambia el resultado). titulo y subtitulo: encabezado de la bitácora en el PDF y el Excel.",
+  "titulo": "Bitácora de toma de tensión arterial",
+  "subtitulo": "Paro de planta 2026",
+  "norma": "NOM-030-SSA2-2009",
+  "maxSistolica": 139,
+  "maxDiastolica": 89,
+  "minSistolica": 100,
+  "minDiastolica": 60,
+  "frecuenciaMin": 60,
+  "frecuenciaMax": 100
+}

@@ -59,6 +59,7 @@
   /* Gráficas */
   .rejilla{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
   .rejilla .ancha{grid-column:1 / -1}
+  .rejilla>*{min-width:0}                    /* una gráfica no ensancha su columna (Chart.js en una rejilla) */
   @media (max-width:860px){ .rejilla{grid-template-columns:1fr} }
   .graf{margin:0;display:flex;flex-direction:column}
   .g-tit{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-bottom:8px}
@@ -87,6 +88,12 @@
   .cargando .kpis,.cargando .rejilla,.cargando .listas{opacity:.55;transition:opacity .15s}
   .pie{font-size:12px;color:var(--sub);line-height:1.5;margin-top:4px}
   #fuera-pdf{position:fixed;left:-10000px;top:0;width:540px;height:290px}
+  /* Pestañas: Accesos | Servicio médico */
+  .vistas{display:flex;gap:4px;background:#e4eaf2;border-radius:12px;padding:4px;margin-bottom:12px;width:max-content;max-width:100%}
+  .vistas button{border:0;background:none;border-radius:9px;padding:9px 16px;font:inherit;font-size:14px;font-weight:700;color:var(--sub);cursor:pointer}
+  .vistas button[aria-selected="true"]{background:#fff;color:var(--azul-dark);box-shadow:0 1px 3px rgba(11,37,69,.12)}
+  .etq.apto{background:var(--verde-claro);color:var(--verde)}
+  .etq.noapto{background:var(--rojo-claro);color:var(--rojo)}
 </style>
 </head>
 <body>
@@ -98,6 +105,10 @@
 </header>
 
 <main class="tab" id="todo">
+  <div class="vistas" role="tablist" aria-label="Qué ver">
+    <button type="button" role="tab" data-v="accesos" aria-selected="true" aria-controls="v-accesos">Accesos</button>
+    <button type="button" role="tab" data-v="medico" aria-selected="false" aria-controls="v-medico">Servicio médico</button>
+  </div>
   <section class="card filtros" aria-label="Periodo y descargas">
     <div class="periodos" id="periodos" role="group" aria-label="Periodo">
       <button type="button" data-p="hoy">Hoy</button>
@@ -121,6 +132,7 @@
   <div class="aviso" id="msg" hidden role="status"></div>
   <p class="periodo-txt" id="periodo-txt"></p>
 
+  <div id="v-accesos" role="tabpanel">
   <div class="kpis" id="kpis"></div>
 
   <div class="rejilla">
@@ -169,6 +181,43 @@
       <div class="tabla-env" id="t-incs"></div>
     </section>
     <p class="pie">Cada persona se identifica por el ID de su credencial de acceso (el número del recuadro azul). El Excel trae todo el detalle del periodo: movimientos de cada persona, horas por persona, por día, por hora e incidencias.</p>
+  </div>
+  </div>
+
+  <!-- Servicio médico: toma de tensión arterial (api/Medico.php) -->
+  <div id="v-medico" role="tabpanel" hidden>
+    <div class="kpis" id="kpis-m"></div>
+    <div class="rejilla">
+      <section class="card graf ancha" data-g="mdia">
+        <div class="g-tit"><h2>Aptos y no aptos por día</h2><span data-sub></span></div>
+        <div class="lienzo"><canvas role="img" aria-label="Personas aptas y no aptas de cada día"></canvas><div class="vacio" hidden></div></div>
+        <p class="nota-g">Cada persona cuenta una vez por día, con el resultado de su última toma.</p>
+        <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+      </section>
+      <section class="card graf" data-g="mclase">
+        <div class="g-tit"><h2>Clasificación de la tensión arterial</h2><span data-sub></span></div>
+        <div class="lienzo"><canvas role="img" aria-label="Cuántas personas en cada clasificación de la tensión arterial"></canvas><div class="vacio" hidden></div></div>
+        <p class="nota-g" id="nota-limites"></p>
+        <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+      </section>
+      <section class="card graf" data-g="mempresa">
+        <div class="g-tit"><h2>Por compañía</h2><span data-sub></span></div>
+        <div class="lienzo alto"><canvas role="img" aria-label="Personas evaluadas y no aptas de cada compañía"></canvas><div class="vacio" hidden></div></div>
+        <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
+      </section>
+    </div>
+    <div class="listas">
+      <section class="card" id="c-noaptos">
+        <div class="lista-cab"><h2>No aptos del periodo</h2><span class="etq noapto" id="n-noaptos"></span></div>
+        <div class="tabla-env" id="t-noaptos"></div>
+      </section>
+      <section class="card" id="c-bitacora">
+        <div class="lista-cab"><h2>Bitácora de toma de tensión arterial</h2><span class="etq gris" id="n-bitacora"></span>
+          <input type="search" id="buscar-bitacora" placeholder="Buscar por ID, nombre o compañía" aria-label="Buscar en la bitácora"></div>
+        <div class="tabla-env" id="t-bitacora"></div>
+      </section>
+      <p class="pie">El servicio médico identifica a cada persona con su credencial de acceso (o su ID) y registra la tensión arterial y la frecuencia cardiaca; el resultado apto o no apto sale de los límites de la norma. El Excel y el PDF traen la bitácora completa del periodo, como la de papel.</p>
+    </div>
   </div>
 </main>
 <div id="fuera-pdf" aria-hidden="true"></div>
@@ -371,6 +420,59 @@
         tabla: { cols: ['ID', 'Nombre', 'Visitas', 'Días', 'Horas'], num: [2, 3, 4], id: 0,
                  filas: t.map(function (x) { return [x.id, x.nombre || 'Sin nombre leído', num(x.visitas), num(x.dias), (Math.round(x.minutos / 6) / 10).toFixed(1)]; }) }
       };
+    },
+
+    /* ── Servicio médico (DATOS_M) ── */
+    mdia: function (d) {
+      if (d.dias < 2) return null;                                   // un solo día: lo dicen las cifras
+      var p = d.por_dia;
+      if (!p.some(function (x) { return x.evaluados; })) return { vacio: 'Sin tomas de tensión arterial en este periodo.' };
+      return {
+        sub: d.dias + ' días',
+        cfg: { type: 'bar', data: { labels: p.map(function (x) { return x.fecha; }), datasets: [
+                 barra('Aptos', p.map(function (x) { return x.aptos; }), C.s1), barra('No aptos', p.map(function (x) { return x.no_aptos; }), C.s2)] },
+               options: opciones({ plugins: { legend: LEYENDA, tooltip: { callbacks: { title: function (it) { return fechaLarga(it[0].label); } } } },
+                 scales: ejes({ x: { ticks: { color: C.tinta, maxRotation: 0, autoSkip: true, maxTicksLimit: 10,
+                   callback: function (v) { return diaCorto(this.getLabelForValue(v)); } } } }) }) },
+        tabla: { cols: ['Día', 'Tomas', 'Personas evaluadas', 'Aptos', 'No aptos'], num: [1, 2, 3, 4],
+                 filas: p.map(function (x) { return [fechaLarga(x.fecha), num(x.tomas), num(x.evaluados), num(x.aptos), num(x.no_aptos)]; }) }
+      };
+    },
+    mclase: function (d) {
+      var c = d.clasificacion, total = c.reduce(function (s, x) { return s + x.n; }, 0);
+      if (!total) return { vacio: 'Sin tomas de tensión arterial en este periodo.' };
+      var dentro = { OPTIMA: 1, NORMAL: 1, ALTA: 1 };                // dentro del rango permitido: apto
+      var corto = { BAJA: 'Baja', OPTIMA: 'Óptima', NORMAL: 'Normal', ALTA: 'Normal alta', HTA1: 'HTA 1', HTA2: 'HTA 2', HTA3: 'HTA 3' };
+      return {
+        sub: num(total) + ' personas evaluadas',
+        cfg: { type: 'bar', data: { labels: c.map(function (x) { return corto[x.categoria] || x.nombre; }), datasets: [
+                 barra('Dentro del rango (apto)', c.map(function (x) { return dentro[x.categoria] ? x.n : null; }), C.s1, { maxBarThickness: 40, stack: 'u' }),
+                 barra('Fuera del rango (no apto)', c.map(function (x) { return dentro[x.categoria] ? null : x.n; }), C.s2, { maxBarThickness: 40, stack: 'u' })] },
+               options: opciones({ plugins: { legend: LEYENDA, tooltip: { filter: function (it) { return it.raw != null; }, callbacks: {
+                   title: function (it) { return c[it[0].dataIndex].nombre; },
+                   label: function (x) { return ' ' + num(x.raw) + (x.raw === 1 ? ' persona' : ' personas') + ' (' + Math.round(x.raw / total * 100) + ' %)'; } } } },
+                 scales: ejes({ x: { stacked: true }, y: { stacked: true } }) }) },
+        tabla: { cols: ['Clasificación', 'Personas', '%', 'Resultado'], num: [1, 2],
+                 filas: c.map(function (x) { return [x.nombre, num(x.n), Math.round(x.n / total * 100) + ' %', dentro[x.categoria] ? 'Apto' : 'No apto']; }) }
+      };
+    },
+    mempresa: function (d, ancho) {
+      var e = d.por_empresa || [];
+      if (!e.length) return { vacio: 'Sin tomas de tensión arterial en este periodo.' };
+      var largo = ancho < 450 ? 14 : ancho < 600 ? 20 : 30;
+      var nombre = function (x) { return x.empresa.length > largo ? x.empresa.slice(0, largo - 1) + '…' : x.empresa; };
+      return {
+        sub: e.some(function (x) { return x.no_aptos; }) ? 'Primero las que tienen no aptos' : 'Nadie salió no apto',
+        cfg: { type: 'bar', data: { labels: e.map(nombre), datasets: [
+                 barra('Evaluados', e.map(function (x) { return x.evaluados; }), C.s1, { maxBarThickness: 14 }),
+                 barra('No aptos', e.map(function (x) { return x.no_aptos; }), C.s2, { maxBarThickness: 14 })] },
+               options: opciones({ indexAxis: 'y', interaction: { mode: 'index', intersect: false, axis: 'y' },
+                 plugins: { legend: LEYENDA, tooltip: { callbacks: { title: function (it) { return e[it[0].dataIndex].empresa; } } } },
+                 scales: { x: { beginAtZero: true, grid: { color: C.rejilla }, border: { display: false }, ticks: { color: C.tinta, precision: 0 } },
+                           y: { grid: { display: false }, border: { color: C.eje }, ticks: { color: C.texto, autoSkip: false, font: { size: ancho < 450 ? 11 : 12 } } } } }) },
+        tabla: { cols: ['Compañía', 'Evaluados', 'No aptos', '% no aptos'], num: [1, 2, 3],
+                 filas: e.map(function (x) { return [x.empresa, num(x.evaluados), num(x.no_aptos), (x.evaluados ? Math.round(x.no_aptos / x.evaluados * 100) : 0) + ' %']; }) }
+      };
     }
   };
 
@@ -381,8 +483,8 @@
       t.filas.map(function (f) { return '<tr>' + f.map(function (v, i) { return '<td' + (n.indexOf(i) >= 0 ? ' class="n"' : (t.id === i ? ' class="id"' : '')) + '>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') +
       '</tbody></table>';
   }
-  function dibujar(d) {
-    document.querySelectorAll('.graf[data-g]').forEach(function (card) {
+  function dibujar(d, raiz) {
+    raiz.querySelectorAll('.graf[data-g]').forEach(function (card) {
       var g = card.dataset.g, def = DEF[g](d, window.innerWidth);
       ACTUAL[g] = def;
       if (GRAF[g]) { GRAF[g].destroy(); delete GRAF[g]; }
@@ -399,9 +501,11 @@
       ver.textContent = tabla.hidden ? 'Ver datos' : 'Ocultar datos';
     });
   }
-  document.querySelector('.rejilla').addEventListener('click', function (ev) {
-    var b = ev.target.closest('.ver'); if (!b) return;
-    var t = b.nextElementSibling; t.hidden = !t.hidden; b.textContent = t.hidden ? 'Ver datos' : 'Ocultar datos';
+  document.querySelectorAll('.rejilla').forEach(function (r) {
+    r.addEventListener('click', function (ev) {
+      var b = ev.target.closest('.ver'); if (!b) return;
+      var t = b.nextElementSibling; t.hidden = !t.hidden; b.textContent = t.hidden ? 'Ver datos' : 'Ocultar datos';
+    });
   });
 
   /* ══ Cifras y listas ══ */
@@ -442,21 +546,86 @@
       }).join('') + '</tbody></table>' + (d.kpis.incidencias > l.length ? '<p class="pie">Se muestran las ' + l.length + ' más recientes; todas vienen en el Excel.</p>' : '');
   }
 
+  /* ══ Servicio médico: cifras, no aptos y bitácora ══ */
+  function ta(x) { return x.sistolica + '/' + x.diastolica; }
+  function cifrasMedico(d) {
+    var k = d.kpis;
+    var caja = function (l, v, s, hero) { return '<div class="kpi' + (hero ? ' hero' : '') + '"><div class="l">' + l + '</div><div class="v">' + v + '</div><div class="s">' + s + '</div></div>'; };
+    $('kpis-m').innerHTML =
+      caja('Personas evaluadas', num(k.evaluados), num(k.tomas) + (k.tomas === 1 ? ' toma' : ' tomas') + ' · ' + num(k.personas) + ' personas distintas', true) +
+      caja('Aptos', num(k.aptos), 'Con su última toma del día') +
+      caja('No aptos', num(k.no_aptos), k.no_aptos ? '<span class="estado">' + ICO_AVISO + k.pct_no_apto + ' % de los evaluados</span>' : 'Nadie fuera del rango permitido') +
+      caja('Más de una toma', num(k.retomas), k.retomas ? num(k.recuperados) + (k.recuperados === 1 ? ' apto' : ' aptos') + ' en la siguiente toma' : 'Nadie necesitó otra toma');
+    var r = d.reglas;
+    $('nota-limites').textContent = 'Apto: de ' + r.minSistolica + '/' + r.minDiastolica + ' a ' + r.maxSistolica + '/' + r.maxDiastolica + ' mmHg (' + r.norma + '). HTA: hipertensión.';
+  }
+  function pintarNoAptos(d) {
+    var l = d.no_aptos || [];
+    $('n-noaptos').textContent = num(l.length);
+    $('t-noaptos').innerHTML = !l.length ? '<p class="pie">Ninguna persona salió no apta en este periodo.</p>' :
+      '<table class="t"><thead><tr><th>Fecha</th><th>ID</th><th>Nombre</th><th>Compañía</th><th class="n">T. A.</th><th class="n">F. C.</th><th>Clasificación</th><th>Observaciones</th><th>Tomó</th></tr></thead><tbody>' +
+      l.map(function (x) {
+        return '<tr><td style="white-space:nowrap">' + esc(fechaHora(x.capturado)) + '</td><td class="id">' + esc(x.codigo) + '</td><td>' + esc(x.nombre) + '</td><td>' + esc(x.empresa) +
+          '</td><td class="n">' + esc(ta(x)) + '</td><td class="n">' + esc(x.frecuencia == null ? '' : x.frecuencia) + '</td><td>' + esc(x.nombre_categoria) +
+          (x.tomas_dia > 1 ? ' <span class="pie">(' + x.tomas_dia + ' tomas)</span>' : '') + '</td><td>' + esc(x.observaciones) + '</td><td>' + esc(x.tomo) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  var BITACORA = [];
+  function pintarBitacora() {
+    var d = DATOS_M; if (!d) return;
+    var q = $('buscar-bitacora').value.trim().toUpperCase(), qId = q.replace(/^0+/, '');
+    var l = BITACORA.filter(function (x) { return !q || (x.nombre || '').toUpperCase().indexOf(q) >= 0 || (x.empresa || '').toUpperCase().indexOf(q) >= 0 || (x.codigo && x.codigo.replace(/^0+/, '').indexOf(qId) === 0); });
+    $('n-bitacora').textContent = num(d.bitacora_total) + (d.bitacora_total === 1 ? ' toma' : ' tomas');
+    $('t-bitacora').innerHTML = !BITACORA.length ? '<p class="pie">Sin tomas de tensión arterial en este periodo.</p>' : !l.length ? '<p class="pie">Nadie coincide con «' + esc(q) + '».</p>' :
+      '<table class="t"><thead><tr><th class="n">N.º</th><th>Fecha</th><th>ID</th><th>Nombre del trabajador</th><th>Compañía</th><th class="n">T. A. (mmHg)</th><th class="n">F. C. (lpm)</th><th>Resultado</th><th>Observaciones</th><th>Tomó</th></tr></thead><tbody>' +
+      l.map(function (x) {
+        return '<tr><td class="n">' + x.n + '</td><td style="white-space:nowrap">' + esc(fechaHora(x.capturado)) + '</td><td class="id">' + esc(x.codigo) + '</td><td>' + esc(x.nombre) +
+          '</td><td>' + esc(x.empresa) + '</td><td class="n">' + esc(ta(x)) + '</td><td class="n">' + esc(x.frecuencia == null ? '' : x.frecuencia) + '</td><td>' +
+          (x.resultado === 'A' ? '<span class="etq apto">APTO</span>' : '<span class="etq noapto">NO APTO</span>') + (x.toma > 1 ? ' <span class="pie">' + x.toma + '.ª toma</span>' : '') +
+          '</td><td>' + esc(x.observaciones) + '</td><td>' + esc(x.tomo) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      (d.bitacora_total > BITACORA.length ? '<p class="pie">Se muestran las ' + num(BITACORA.length) + ' más recientes de ' + num(d.bitacora_total) + '; todas vienen en el Excel y el PDF.</p>' : '');
+  }
+  $('buscar-bitacora').addEventListener('input', pintarBitacora);
+
+  /* ══ Pestañas ══ */
+  var CLAVE_VISTA = 'ca_tablero_vista', VISTA = 'accesos';
+  try { if (localStorage.getItem(CLAVE_VISTA) === 'medico') VISTA = 'medico'; } catch (e) {}
+  function ponerVista(v, recargar) {
+    VISTA = v;
+    try { localStorage.setItem(CLAVE_VISTA, v); } catch (e) {}
+    document.querySelectorAll('.vistas button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.v === v ? 'true' : 'false'); });
+    $('v-accesos').hidden = v !== 'accesos'; $('v-medico').hidden = v !== 'medico';
+    $('sub').textContent = (ses.nombre || ses.usuario || '') + ' · ' + (PERFIL[ses.rol] || '') + (v === 'medico' ? ' · Servicio médico' : '');
+    if (recargar) cargar();
+  }
+  document.querySelector('.vistas').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-v]'); if (!b || b.dataset.v === VISTA) return;
+    ponerVista(b.dataset.v, true);
+  });
+
   /* ══ Cargar ══ */
-  var DATOS = null, pedido = 0;
+  var DATOS = null, DATOS_M = null, pedido = 0;
   function cargar() {
     var r = rango(P.p), yo = ++pedido;
     try { localStorage.setItem(CLAVE_PERIODO, JSON.stringify(P)); } catch (e) {}
     $('todo').classList.add('cargando');
-    return api('TABLERO&desde=' + r[0] + '&hasta=' + r[1]).then(function (d) {
+    var medico = VISTA === 'medico';
+    return api((medico ? 'MEDICO_TABLERO' : 'TABLERO') + '&desde=' + r[0] + '&hasta=' + r[1]).then(function (d) {
       if (yo !== pedido) return;
       $('todo').classList.remove('cargando');
       if (!d || d.status !== 'success') { aviso(esc((d && d.message) || 'No se pudo cargar el tablero.'), 'mal'); return; }
       if ($('msg').classList.contains('mal')) aviso('');
-      DATOS = d;
       $('periodo-txt').innerHTML = '<b>' + (d.desde === d.hasta ? fechaLarga(d.desde) : 'Del ' + fechaLarga(d.desde) + ' al ' + fechaLarga(d.hasta)) + '</b>' +
         '<span>' + d.dias + (d.dias === 1 ? ' día' : ' días') + '</span><span>Actualizado ' + d.generado.slice(11, 16) + '</span>';
-      cifras(d); dibujar(d);
+      if (medico) {
+        DATOS_M = d;
+        cifrasMedico(d); dibujar(d, $('v-medico'));
+        pintarNoAptos(d); BITACORA = d.bitacora || []; pintarBitacora();
+        return;
+      }
+      DATOS = d;
+      cifras(d); dibujar(d, $('v-accesos'));
       DENTRO = d.en_planta || []; pintarPlanta(); pintarIncidencias(d);
     }).catch(function (e) {
       if (yo !== pedido) return;
@@ -465,7 +634,7 @@
     });
   }
   // Con el periodo hasta hoy, se actualiza solo cada 5 minutos
-  setInterval(function () { if (!document.hidden && DATOS && DATOS.hasta === iso(new Date())) cargar(); }, 5 * 60 * 1000);
+  setInterval(function () { var d = VISTA === 'medico' ? DATOS_M : DATOS; if (!document.hidden && d && d.hasta === iso(new Date())) cargar(); }, 5 * 60 * 1000);
 
   /* ══ Descargas ══ */
   function bajar(url, archivo) {
@@ -477,12 +646,12 @@
   /** Las gráficas como imágenes para el PDF: se dibujan aparte, a un tamaño fijo (media hoja), con letra
    *  un poco más grande y fondo blanco. */
   var PDF_ANCHO = 540, PDF_ALTO = 290;
-  function imagenesPdf() {
+  function imagenesPdf(raiz, datos) {
     var out = [], caja = $('fuera-pdf'), letra = Chart.defaults.font.size;
     Chart.defaults.font.size = 13;
     try {
-      document.querySelectorAll('.graf[data-g]').forEach(function (card) {
-        var g = card.dataset.g, def = DATOS && DEF[g](DATOS, PDF_ANCHO);
+      raiz.querySelectorAll('.graf[data-g]').forEach(function (card) {
+        var g = card.dataset.g, def = datos && DEF[g](datos, PDF_ANCHO);
         if (!def || def.vacio) return;
         var cv = document.createElement('canvas'); cv.width = PDF_ANCHO; cv.height = PDF_ALTO; caja.appendChild(cv);
         var cfg = { type: def.cfg.type, data: def.cfg.data, options: Object.assign({}, def.cfg.options, { responsive: false, devicePixelRatio: 2, animation: false }), plugins: [FONDO] };
@@ -494,11 +663,12 @@
     return out;
   }
   function descargar(boton, accion, extra, nombre) {
-    if (!DATOS) return;
+    var D = VISTA === 'medico' ? DATOS_M : DATOS;
+    if (!D) return;
     var antes = boton.textContent;
     boton.disabled = true; boton.textContent = 'Preparando…';
     aviso('Preparando el ' + nombre + '…', 'info');
-    var payload = { desde: DATOS.desde, hasta: DATOS.hasta };
+    var payload = { desde: D.desde, hasta: D.hasta };
     var mas = extra ? extra() : {};
     for (var k in mas) payload[k] = mas[k];
     api(accion, payload).then(function (r) {
@@ -512,10 +682,12 @@
       aviso(esc(e && e.message ? e.message : 'No se pudo conectar con el servidor.'), 'mal');
     });
   }
-  $('b-excel').addEventListener('click', function () { descargar(this, 'TABLERO_EXCEL', null, 'Excel'); });
+  $('b-excel').addEventListener('click', function () { descargar(this, VISTA === 'medico' ? 'MEDICO_EXCEL' : 'TABLERO_EXCEL', null, 'Excel'); });
   $('b-pdf').addEventListener('click', function () {
-    var imgs = null;
-    descargar(this, 'TABLERO_PDF', function () { if (!imgs) imgs = imagenesPdf(); return { graficas: imgs }; }, 'PDF');
+    var medico = VISTA === 'medico';
+    descargar(this, medico ? 'MEDICO_PDF' : 'TABLERO_PDF', function () {
+      return { graficas: medico ? imagenesPdf($('v-medico'), DATOS_M) : imagenesPdf($('v-accesos'), DATOS) };
+    }, 'PDF');
   });
 
   $('b-salir').addEventListener('click', function () {
@@ -524,6 +696,7 @@
   });
 
   marcar();
+  ponerVista(VISTA, false);
   cargar();
 })();
 </script>

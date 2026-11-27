@@ -158,6 +158,37 @@ CREATE TABLE IF NOT EXISTS ca_ajustes (
   actualizado DATETIME     NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── Servicio médico: tomas de tensión arterial (Medico.php; reglas en api/medico.json) ──
+-- resultado: A apto | N no apto (lo que marcó quien tomó); calculado: lo que dicen los límites.
+-- toma: 1.ª, 2.ª… del día para esa persona. en_base: el ID estaba en la base del personal.
+CREATE TABLE IF NOT EXISTS medico_tomas (
+  id             INT AUTO_INCREMENT PRIMARY KEY,
+  uid            VARCHAR(64)  NOT NULL,
+  fecha          DATE         NOT NULL,
+  capturado      DATETIME     NOT NULL,
+  recibido       DATETIME     NOT NULL,
+  codigo         VARCHAR(32)  NOT NULL DEFAULT '',
+  clave          VARCHAR(32)  NOT NULL DEFAULT '',
+  nombre         VARCHAR(150) NOT NULL DEFAULT '',
+  empresa        VARCHAR(150) NOT NULL DEFAULT '',
+  cargo          VARCHAR(150) NOT NULL DEFAULT '',
+  en_base        TINYINT(1)   NOT NULL DEFAULT 0,
+  sistolica      SMALLINT     NOT NULL,
+  diastolica     SMALLINT     NOT NULL,
+  frecuencia     SMALLINT     NULL,
+  categoria      VARCHAR(10)  NOT NULL DEFAULT '',
+  calculado      CHAR(1)      NOT NULL DEFAULT 'A',
+  resultado      CHAR(1)      NOT NULL DEFAULT 'A',
+  toma           TINYINT      NOT NULL DEFAULT 1,
+  observaciones  VARCHAR(500) NOT NULL DEFAULT '',
+  origen         VARCHAR(12)  NOT NULL DEFAULT 'manual',
+  usuario        VARCHAR(50)  NOT NULL DEFAULT '',
+  usuario_nombre VARCHAR(150) NOT NULL DEFAULT '',
+  UNIQUE KEY uk_uid (uid),
+  KEY idx_fecha (fecha),
+  KEY idx_clave (clave, fecha)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── Días omitidos (pruebas): lo que se leyó entre «desde» y «hasta» no cuenta en el tablero,
 --    los turnos, el PDF, En planta, los movimientos por ID ni las incidencias. No se borra nada:
 --    volver a contar = activo 0 (queda el historial). Sólo Administración AVBA. ──

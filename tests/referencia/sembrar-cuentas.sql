@@ -23,6 +23,10 @@ INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
 INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
   ('fijo.entrada', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'EQUIPO FIJO ENTRADA'),
   ('fijo.salida',  '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'ACCESOS', 'EQUIPO FIJO SALIDA');
+-- Servicio médico: dos cuentas (cada toma guarda quién la tomó).
+INSERT IGNORE INTO usuarios (usuario, password_hash, rol, nombre) VALUES
+  ('medico',  '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'MEDICO', 'ENF. LAURA MEDINA'),
+  ('medico2', '$2y$10$2ubHb4pnvaQ5SBPhqcp3QueSIXFPTcuECuANuPGZAFXyEwZY8UfE6', 'MEDICO', 'DR. HUGO SALAS');
 UPDATE usuarios SET modo = 'E' WHERE usuario = 'fijo.entrada';
 UPDATE usuarios SET modo = 'S' WHERE usuario = 'fijo.salida';
 UPDATE usuarios SET turno = 'D' WHERE usuario IN ('punto1', 'punto2', 'punto3', 'punto4');

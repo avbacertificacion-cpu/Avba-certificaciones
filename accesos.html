@@ -557,6 +557,7 @@
   var ses = sesion();
   if (!ses.token) { location.replace('login.html?volver=accesos.html'); return; }
   if (ses.rol === 'CLIENTE') { location.replace('tablero.html'); return; }      // el cliente sólo ve el tablero
+  if (ses.rol === 'MEDICO') { location.replace('medico.html'); return; }        // la app abre aquí: el servicio médico va a lo suyo
   if (ROLES.indexOf(ses.rol) < 0) {
     document.querySelector('main').innerHTML = '<div class="tarjeta"><p class="nota mal">Tu cuenta no tiene acceso al control de accesos.</p></div>';
     return;

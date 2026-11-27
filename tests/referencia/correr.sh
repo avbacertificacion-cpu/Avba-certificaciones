@@ -88,6 +88,7 @@ correr nueva api/tablero         "node $T/pantalla/api_tablero_test.mjs"
 correr nueva api/personal        "node $T/pantalla/api_personal_test.mjs"
 correr nueva api/fijo            "node $T/pantalla/api_fijo_test.mjs"
 correr nueva api/omitidos        "node $T/pantalla/api_omitidos_test.mjs"
+correr nueva api/medico          "node $T/pantalla/api_medico_test.mjs"
 correr nueva pantalla/sesion     "node $T/pantalla/sesion_pantalla_test.js"
 correr nueva pantalla/simultaneos "node $T/pantalla/simultaneos_pantalla_test.js"
 correr nueva pantalla/pendientes "node $T/pantalla/pendientes_test.js"
@@ -100,6 +101,7 @@ correr nueva pantalla/tablero    "php $T/php/sembrar_tablero.php && node $T/pant
 correr nueva pantalla/personal   "node $T/pantalla/personal_pantalla_test.js"
 correr nueva pantalla/fijo       "node $T/pantalla/fijo_pantalla_test.js"
 correr nueva pantalla/omitidos   "node $T/pantalla/omitidos_pantalla_test.js"
+correr nueva pantalla/medico     "node $T/pantalla/medico_pantalla_test.js"
 
 echo
 [ $FALLAS -eq 0 ] && echo "══ TODAS LAS PRUEBAS PASARON ══" || echo "══ $FALLAS PRUEBA(S) FALLARON ══"

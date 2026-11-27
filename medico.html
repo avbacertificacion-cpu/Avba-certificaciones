@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Servicio médico · Control de Accesos · AVBA</title>
+<link rel="icon" href="assets/logos/avba.png">
+<meta name="theme-color" content="#0B2545">
+<link rel="stylesheet" href="css/ca.css">
+<!--
+  Servicio médico (perfil MEDICO; también Administración): toma de tensión arterial.
+  1) Se identifica a la persona escaneando su credencial con la app (o escribiendo el ID; sin
+     credencial, con su nombre). Nombre y compañía salen de la copia de la base del personal.
+  2) Sistólica / diastólica, frecuencia cardiaca y observaciones. Apto / No apto sale solo con los
+     límites de api/medico.json (NOM-030: 100/60 a 139/89 mmHg); otro resultado pide la razón.
+     La hora y quién tomó se guardan solos.
+  3) Funciona sin señal: las tomas esperan en el teléfono (ca_medico_cola) y se mandan solas.
+  Servidor: api/Medico.php. Las gráficas y la bitácora están en el Tablero (Servicio médico).
+-->
+<style>
+  header.barra{gap:10px}
+  header.barra .tit{min-width:0;flex:1}
+  header.barra .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.barra .salir{background:rgba(255,255,255,.12);color:#fff;border:0;border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+  main.ancho{max-width:760px}
+  .senal{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--sub);margin:0 2px 10px}
+  .senal .punto{width:9px;height:9px;border-radius:50%;background:var(--verde);display:inline-block}
+  .senal.sin .punto{background:var(--ambar)}
+  .senal b{color:var(--texto)}
+  .paso{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .paso .n{width:26px;height:26px;border-radius:50%;background:var(--azul);color:#fff;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;flex:none}
+  .paso h2{margin:0}
+  .btn.grande{width:100%;min-height:64px;font-size:18px;border-radius:14px}
+  .btn.grande svg{width:26px;height:26px}
+  .o{display:flex;align-items:center;gap:10px;color:var(--sub);font-size:12.5px;margin:12px 0}
+  .o:before,.o:after{content:"";flex:1;border-top:1px solid var(--borde)}
+  .buscar{display:flex;gap:8px}
+  .buscar input{flex:1;min-width:0;padding:13px 14px;border:1.5px solid var(--borde);border-radius:12px;font:inherit;font-size:20px;font-weight:700;letter-spacing:1px}
+  .buscar input:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 3px rgba(24,95,165,.12)}
+  .link{background:none;border:0;color:var(--azul);font:inherit;font-size:14px;font-weight:700;cursor:pointer;padding:8px 0;text-align:left}
+  .per{border:1.5px solid var(--borde);border-radius:12px;padding:12px 14px;background:#fbfcfe;margin-top:12px}
+  .per .pid{display:inline-block;background:var(--azul);color:#fff;font-weight:800;border-radius:8px;padding:3px 10px;font-size:15px;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+  .per .pn{font-size:18px;font-weight:800;margin-top:6px;line-height:1.25;overflow-wrap:anywhere}
+  .per .pe{font-size:14px;color:var(--sub);margin-top:2px;overflow-wrap:anywhere}
+  .per .prev{font-size:13.5px;margin-top:8px;padding:8px 10px;border-radius:9px;background:#E6F1FB;color:var(--azul-dark);line-height:1.45}
+  .per .fuera{font-size:13.5px;margin-top:8px;padding:8px 10px;border-radius:9px;background:var(--ambar-claro);color:var(--ambar);line-height:1.45}
+  .ta{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap}
+  .ta .campo{flex:0 1 130px;margin-bottom:0}
+  .ta .campo input{font-size:28px;font-weight:800;text-align:center;padding:10px 8px;font-variant-numeric:tabular-nums}
+  .ta .sep{font-size:30px;font-weight:300;color:var(--sub);padding-bottom:10px}
+  .ta .u{font-size:14px;color:var(--sub);padding-bottom:16px}
+  .ta .fc{flex:0 1 150px;margin-left:auto}
+  @media (max-width:430px){ .ta .campo{flex:1 1 90px} .ta .fc{flex:1 1 100%;margin-left:0} }
+  .clasif{margin:14px 0 4px;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;background:#eef2f7;color:var(--sub);font-size:14px;line-height:1.4}
+  .clasif svg{width:28px;height:28px;flex:none}
+  .clasif b{display:block;font-size:20px;letter-spacing:.3px}
+  .clasif.A{background:var(--verde-claro);color:var(--verde)}
+  .clasif.N{background:var(--rojo-claro);color:var(--rojo)}
+  .resultado{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 6px}
+  .resultado button{border:2px solid var(--borde);background:#fff;border-radius:12px;padding:12px;font:inherit;font-size:16px;font-weight:800;cursor:pointer;color:var(--sub)}
+  .resultado button[aria-pressed=true][data-r=A]{border-color:var(--verde);background:var(--verde-claro);color:var(--verde)}
+  .resultado button[aria-pressed=true][data-r=N]{border-color:var(--rojo);background:var(--rojo-claro);color:var(--rojo)}
+  textarea{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;font:inherit;font-size:15px;min-height:64px;resize:vertical}
+  textarea:focus{outline:none;border-color:var(--azul)}
+  .quien{font-size:12.5px;color:var(--sub);margin-top:10px}
+  /* Resultado guardado */
+  .hecho{text-align:center;padding:22px 16px}
+  .hecho .grande{font-size:30px;font-weight:900;letter-spacing:.5px;margin:6px 0}
+  .hecho.A{background:var(--verde-claro);border-color:#bcd9ad} .hecho.A .grande{color:var(--verde)}
+  .hecho.N{background:var(--rojo-claro);border-color:#efc3c3} .hecho.N .grande{color:var(--rojo)}
+  .hecho .tx{font-size:15px;line-height:1.5}
+  .hecho .acc{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+  /* Tomas de hoy */
+  .lista-cab{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-bottom:6px}
+  .lista-cab h2{margin:0}
+  .lista-cab input{margin-left:auto;padding:8px 10px;border:1.5px solid var(--borde);border-radius:10px;font:inherit;font-size:14px;min-width:0;flex:0 1 220px}
+  .toma{border-top:1px solid var(--borde);padding:10px 0;display:flex;gap:10px;align-items:flex-start}
+  .toma:first-child{border-top:0}
+  .toma .h{font-weight:800;font-variant-numeric:tabular-nums;min-width:44px;padding-top:1px}
+  .toma .d{flex:1;min-width:0}
+  .toma .d b{overflow-wrap:anywhere}
+  .toma .m{font-size:12.5px;color:var(--sub);margin-top:2px;line-height:1.4;overflow-wrap:anywhere}
+  .toma .ta2{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+  .etq.no{background:var(--rojo-claro);color:var(--rojo)}
+  .etq.si{background:var(--verde-claro);color:var(--verde)}
+</style>
+</head>
+<body>
+<header class="barra">
+  <a class="atras" href="index.html" aria-label="Menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+  <div class="tit"><h1>Servicio médico</h1><div class="sub" id="sub">Toma de tensión arterial</div></div>
+  <button class="salir" type="button" id="b-salir">Salir</button>
+</header>
+<main class="ancho">
+  <div class="card" id="sin-permiso" hidden><p class="aviso mal">Esta pantalla es del servicio médico.</p><a class="btn sec" href="index.html">Regresar</a></div>
+
+  <div id="todo" hidden>
+    <div class="senal" id="senal"><span class="punto"></span><span id="senal-tx">Con señal</span></div>
+
+    <!-- 1. ¿Quién es? -->
+    <section class="card" id="c-ident">
+      <div class="paso"><span class="n">1</span><h2>¿Quién es?</h2></div>
+      <div id="ident">
+        <button class="btn grande" type="button" id="b-escanear" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V5a1 1 0 011-1h3M16 4h3a1 1 0 011 1v3M20 16v3a1 1 0 01-1 1h-3M8 20H5a1 1 0 01-1-1v-3"/><rect x="8" y="7" width="8" height="10" rx="1"/></svg>
+          Escanear credencial</button>
+        <div class="o" id="o-sep" hidden>o escribe el ID</div>
+        <form class="buscar" id="f-id" autocomplete="off">
+          <input id="id" inputmode="numeric" maxlength="12" placeholder="ID de la credencial" aria-label="ID de la credencial">
+          <button class="btn" type="submit">Buscar</button>
+        </form>
+        <button class="link" type="button" id="b-sin">No trae credencial: escribir su nombre</button>
+      </div>
+      <div class="per" id="per" hidden></div>
+      <div id="per-datos" hidden>
+        <div class="fila" style="margin-top:12px">
+          <div class="campo"><label for="p-nombre">Nombre del trabajador</label><input id="p-nombre" maxlength="150" autocapitalize="characters"></div>
+          <div class="campo"><label for="p-empresa">Compañía</label><input id="p-empresa" maxlength="150" autocapitalize="characters"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. La toma -->
+    <form class="card" id="f-toma" hidden autocomplete="off" novalidate>
+      <div class="paso"><span class="n">2</span><h2>Toma de tensión arterial</h2></div>
+      <div class="ta">
+        <div class="campo"><label for="sis">Sistólica</label><input id="sis" inputmode="numeric" maxlength="3" placeholder="120"></div>
+        <span class="sep">/</span>
+        <div class="campo"><label for="dia">Diastólica</label><input id="dia" inputmode="numeric" maxlength="3" placeholder="80"></div>
+        <span class="u">mmHg</span>
+        <div class="campo fc"><label for="fc">Frecuencia cardiaca</label><input id="fc" inputmode="numeric" maxlength="3" placeholder="lpm"></div>
+      </div>
+      <div class="clasif" id="clasif" aria-live="polite">Escribe la sistólica y la diastólica.</div>
+      <div class="resultado" role="group" aria-label="Resultado de aptitud">
+        <button type="button" data-r="A" aria-pressed="false">APTO</button>
+        <button type="button" data-r="N" aria-pressed="false">NO APTO</button>
+      </div>
+      <p class="aviso info" id="r-nota" hidden></p>
+      <div class="campo" style="margin-top:8px"><label for="obs">Observaciones</label><textarea id="obs" maxlength="500" placeholder="Opcional. Ej. reposo de 10 minutos, toma medicamento…"></textarea></div>
+      <div class="aviso mal" id="t-err" hidden role="alert"></div>
+      <div class="fila"><button class="btn" type="submit" id="b-guardar">Guardar toma</button><button class="btn sec" type="button" id="b-cancelar">Cancelar</button></div>
+      <p class="quien" id="quien"></p>
+    </form>
+
+    <!-- Guardada -->
+    <section class="card hecho" id="hecho" hidden aria-live="assertive">
+      <div class="tx" id="h-quien"></div>
+      <div class="grande" id="h-res"></div>
+      <div class="tx" id="h-ta"></div>
+      <div class="acc"><button class="btn" type="button" id="b-siguiente">Siguiente persona</button>
+        <button class="btn sec" type="button" id="b-repetir">Volver a tomarle</button></div>
+    </section>
+
+    <!-- Tomas de hoy -->
+    <section class="card">
+      <div class="lista-cab"><h2>Tomas de hoy</h2><span class="etq gris" id="n-hoy"></span>
+        <input type="search" id="q" placeholder="Buscar por ID o nombre" aria-label="Buscar en las tomas de hoy"></div>
+      <div id="lista"><p>Cargando…</p></div>
+      <p class="quien">Las gráficas, la bitácora completa y su Excel y PDF están en el Tablero, en «Servicio médico».</p>
+    </section>
+  </div>
+</main>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="js/destinos.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var API = 'api/index.php', CLAVE = window.CA_SESION || 'ca_sesion';
+  var CLAVE_COLA = 'ca_medico_cola', CLAVE_HOY = 'ca_medico_hoy', CLAVE_REGLAS = 'ca_medico_reglas', CLAVE_PADRON = 'ca_padron';
+  var ses = null;
+  try { ses = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) {}
+  if (!ses || !ses.token) { location.replace('login.html?volver=medico.html'); return; }
+  if (ses.rol !== 'MEDICO' && ses.rol !== 'ADMIN') { $('sin-permiso').hidden = false; return; }
+  $('todo').hidden = false;
+  $('sub').textContent = (ses.nombre || ses.usuario) + ' · Toma de tensión arterial';
+  $('quien').textContent = 'La hora y quién tomó se guardan solos: ' + (ses.nombre || ses.usuario) + '.';
+
+  var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
+  function leer(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+  function guardar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function dos(n) { return (n < 10 ? '0' : '') + n; }
+  function ahora() { var d = new Date(); return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()) + ' ' + dos(d.getHours()) + ':' + dos(d.getMinutes()) + ':' + dos(d.getSeconds()); }
+  function hoy() { return ahora().slice(0, 10); }
+  function clave(c) { var x = String(c || '').trim().toUpperCase(); return /^\d+$/.test(x) ? (x.replace(/^0+/, '') || '0') : x; }
+  function mayus(t) { return String(t || '').replace(/\s+/g, ' ').trim().toUpperCase(); }
+  function enLinea() { return navigator.onLine !== false; }
+  var tToast;
+  function toast(t, err) { var el = $('toast'); el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3500); }
+  function api(accion, payload, metodo) {
+    var h = { Authorization: 'Bearer ' + ses.token };
+    var p = metodo === 'GET'
+      ? fetch(API + '?action=' + accion + (payload ? '&' + new URLSearchParams(payload) : ''), { headers: h })
+      : fetch(API, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, h), body: JSON.stringify({ action: accion, payload: payload || {} }) });
+    return p.then(function (r) { return r.json(); }).then(function (r) {
+      if (r && r.codigo === 'SIN_SESION') { try { localStorage.removeItem(CLAVE); } catch (e) {} location.replace('login.html?volver=medico.html'); throw new Error(r.message); }
+      return r;
+    });
+  }
+
+  /* ── Reglas (límites de la NOM-030) y la copia de la base del personal ── */
+  var R = Object.assign({ maxSistolica: 139, maxDiastolica: 89, minSistolica: 100, minDiastolica: 60, frecuenciaMin: 60, frecuenciaMax: 100 }, leer(CLAVE_REGLAS, {}));
+  var CAT = { BAJA: 'Presión baja', OPTIMA: 'Óptima', NORMAL: 'Normal', ALTA: 'Normal alta', HTA1: 'Hipertensión grado 1', HTA2: 'Hipertensión grado 2', HTA3: 'Hipertensión grado 3' };
+  function categoria(s, d) {
+    if (s < R.minSistolica || d < R.minDiastolica) return 'BAJA';
+    if (s >= 180 || d >= 110) return 'HTA3';
+    if (s >= 160 || d >= 100) return 'HTA2';
+    if (s >= 140 || d >= 90) return 'HTA1';
+    if (s >= 130 || d >= 85) return 'ALTA';
+    if (s >= 120 || d >= 80) return 'NORMAL';
+    return 'OPTIMA';
+  }
+  function aptitud(s, d) { return s >= R.minSistolica && s <= R.maxSistolica && d >= R.minDiastolica && d <= R.maxDiastolica ? 'A' : 'N'; }
+  var PADRON = leer(CLAVE_PADRON, null) || { version: '', total: 0, personas: {} };
+  function enBase(c) { var x = PADRON.personas && PADRON.personas[clave(c)]; return x ? { codigo: x[0], nombre: x[1], empresa: x[2] || '' } : null; }
+  function actualizar() {
+    if (!enLinea()) return Promise.resolve();
+    var a = api('MEDICO_REGLAS', null, 'GET').then(function (r) { if (r && r.status === 'success') { Object.assign(R, r.reglas); guardar(CLAVE_REGLAS, r.reglas); } }).catch(function () {});
+    // Las reglas del lector de la credencial (la app abre accesos.html, que trae aquí antes de pedirlas)
+    var c = api('ACCESOS_TARJETA_REGLAS', null, 'GET').then(function (r) { if (r && r.status === 'success' && r.reglas) guardar('ca_tarjeta_reglas', r.reglas); }).catch(function () {});
+    var b = api('PADRON_CAJA', { version: PADRON.version || '' }, 'GET').then(function (r) {
+      if (!r || r.status !== 'success' || r.sin_cambios) return;
+      PADRON = { version: String(r.version || ''), total: r.total || 0, personas: r.personas || {}, permisos: r.permisos || {} };
+      guardar(CLAVE_PADRON, PADRON);
+    }).catch(function () {});
+    return Promise.all([a, b, c]);
+  }
+
+  /* ── 1. ¿Quién es? ── */
+  var P = null;                     // {codigo, nombre, empresa, enBase, origen}
+  if (LECTOR) { $('b-escanear').hidden = false; $('o-sep').hidden = false; }
+  function reglasLector() {
+    var o = Object.assign({ minDigitos: 5, maxDigitos: 12, longitud: 0, digitosId: 5, confirmar: 3, orientacion: 'vertical', camara: 'frontal' }, leer('ca_tarjeta_reglas', {}));
+    o.titulo = 'SERVICIO MÉDICO'; o.subtitulo = 'Acomoda la credencial dentro del recuadro, sin reflejos.';
+    o.simular = false; o.foto = false; o.esperaNombre = PADRON.total ? 0 : 1500;
+    o.ids = Object.keys(PADRON.personas || {}).slice(0, 30000);
+    return o;
+  }
+  $('b-escanear').addEventListener('click', function () {
+    var b = this; b.disabled = true;
+    Promise.resolve(LECTOR.leer(reglasLector())).then(function (r) {
+      b.disabled = false;
+      if (!r || r.cancelado) { if (r && r.error) toast(r.error, true); return; }
+      identificar(r.codigo, r.nombre, r.manual ? 'manual' : 'tarjeta');
+    }, function (e) { b.disabled = false; toast((e && e.message) || 'No se pudo abrir el lector.', true); });
+  });
+  $('f-id').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var c = $('id').value.replace(/[^0-9A-Za-z-]/g, '').toUpperCase();
+    if (!c) { $('id').focus(); return; }
+    identificar(c, '', 'manual');
+  });
+  $('b-sin').addEventListener('click', function () { identificar('', '', 'manual'); $('p-nombre').focus(); });
+
+  function tomasDeHoy(p) {
+    var k = p.codigo ? 'I' + clave(p.codigo) : 'N' + mayus(p.nombre);
+    return todas().filter(function (t) { return t.capturado.slice(0, 10) === hoy() && (t.codigo ? 'I' + clave(t.codigo) : 'N' + mayus(t.nombre)) === k; });
+  }
+  function identificar(codigo, leido, origen) {
+    var b = codigo ? enBase(codigo) : null;
+    P = { codigo: b ? b.codigo : codigo, nombre: b ? b.nombre : mayus(leido), empresa: b ? b.empresa : '', enBase: !!b, origen: origen };
+    $('ident').hidden = true;
+    var h = '';
+    if (P.codigo) h += '<span class="pid">ID ' + esc(P.codigo) + '</span>';
+    if (b) h += '<div class="pn">' + esc(P.nombre) + '</div><div class="pe">' + esc(P.empresa || 'Sin compañía en la base') + '</div>';
+    else if (P.codigo) h += '<div class="fuera">⚠ Este ID no está en la base del personal' + (PADRON.total ? '' : ' (todavía no se descarga la base)') + '. Escribe su nombre y su compañía.</div>';
+    else h += '<div class="pn">Sin credencial</div><div class="pe">Escribe su nombre y su compañía.</div>';
+    var previas = tomasDeHoy(P);
+    if (previas.length) {
+      var u = previas[0];
+      h += '<div class="prev">Hoy ya tiene ' + previas.length + (previas.length === 1 ? ' toma' : ' tomas') + ': la última a las ' + esc(u.capturado.slice(11, 16)) + ', ' +
+        u.sistolica + '/' + u.diastolica + ' · <b>' + (u.resultado === 'A' ? 'APTO' : 'NO APTO') + '</b>. Esta será la ' + (previas.length + 1) + '.ª.</div>';
+    }
+    h += '<button class="link" type="button" id="b-cambiar">Cambiar persona</button>';
+    $('per').innerHTML = h; $('per').hidden = false; $('c-ident').hidden = false;
+    $('per-datos').hidden = !!b;
+    $('p-nombre').value = b ? '' : P.nombre; $('p-empresa').value = '';
+    $('b-cambiar').onclick = reiniciar;
+    $('hecho').hidden = true;
+    $('f-toma').hidden = false;
+    limpiarToma();
+    if (b) $('sis').focus(); else $('p-nombre').focus();
+    $('f-toma').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function reiniciar() {
+    P = null;
+    $('ident').hidden = false; $('per').hidden = true; $('per-datos').hidden = true; $('f-toma').hidden = true; $('hecho').hidden = true; $('c-ident').hidden = false;
+    $('id').value = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── 2. La toma: el resultado sale solo con la norma ── */
+  var RES = '', CALC = '';
+  function num(el) { var v = el.value.replace(/\D/g, ''); return v ? parseInt(v, 10) : NaN; }
+  function limpiarToma() {
+    ['sis', 'dia', 'fc', 'obs'].forEach(function (k) { $(k).value = ''; });
+    RES = ''; CALC = ''; $('t-err').hidden = true; $('r-nota').hidden = true;
+    pintarClasif();
+  }
+  var ICO_SI = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M7.5 12.5l3 3 6-6.5"/></svg>';
+  var ICO_NO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7"/></svg>';
+  function pintarClasif() {
+    var s = num($('sis')), d = num($('dia')), fc = num($('fc')), el = $('clasif');
+    var valido = s >= 50 && s <= 300 && d >= 30 && d <= 200 && s > d;
+    if (!valido) {
+      el.className = 'clasif'; CALC = '';
+      el.innerHTML = isNaN(s) || isNaN(d) ? 'Escribe la sistólica y la diastólica.' : s <= d ? 'La sistólica (arriba) debe ser mayor que la diastólica.' : 'Revisa los números.';
+    } else {
+      var nuevo = aptitud(s, d), cat = categoria(s, d);
+      if (CALC !== nuevo) { CALC = nuevo; RES = nuevo; }             // el resultado sigue a la norma hasta que lo cambien
+      el.className = 'clasif ' + CALC;
+      el.innerHTML = (CALC === 'A' ? ICO_SI : ICO_NO) + '<div><b>' + (CALC === 'A' ? 'APTO' : 'NO APTO') + '</b>' + esc(CAT[cat]) +
+        (CALC === 'A' ? '' : ' · fuera de ' + R.minSistolica + '/' + R.minDiastolica + ' a ' + R.maxSistolica + '/' + R.maxDiastolica + ' mmHg') +
+        (!isNaN(fc) && (fc < R.frecuenciaMin || fc > R.frecuenciaMax) ? '<br>Frecuencia cardiaca fuera de ' + R.frecuenciaMin + '–' + R.frecuenciaMax + ' lpm' : '') + '</div>';
+    }
+    document.querySelectorAll('.resultado button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.r === RES ? 'true' : 'false'); });
+    $('r-nota').hidden = !(RES && CALC && RES !== CALC);
+    $('r-nota').textContent = 'Marcaste ' + (RES === 'A' ? 'APTO' : 'NO APTO') + ' aunque la norma dice ' + (CALC === 'A' ? 'APTO' : 'NO APTO') + ': escribe por qué en Observaciones.';
+  }
+  ['sis', 'dia', 'fc'].forEach(function (k) { $(k).addEventListener('input', function () { this.value = this.value.replace(/\D/g, ''); pintarClasif(); }); });
+  $('sis').addEventListener('input', function () { if (this.value.length === 3) $('dia').focus(); });   // 120 → pasa a la diastólica
+  document.querySelector('.resultado').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-r]'); if (!b || !CALC) return;
+    RES = b.dataset.r; pintarClasif();
+    if (RES !== CALC) $('obs').focus();
+  });
+  $('b-cancelar').addEventListener('click', reiniciar);
+
+  $('f-toma').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var err = function (m, el) { $('t-err').textContent = m; $('t-err').hidden = false; if (el) el.focus(); };
+    $('t-err').hidden = true;
+    if (!P) return;
+    var nombre = P.enBase ? P.nombre : mayus($('p-nombre').value), empresa = P.enBase ? P.empresa : mayus($('p-empresa').value);
+    if (!P.codigo && !nombre) return err('Escribe el nombre del trabajador.', $('p-nombre'));
+    if (!P.enBase) { P.nombre = nombre; P.empresa = empresa; }
+    var s = num($('sis')), d = num($('dia')), fc = num($('fc'));
+    if (!CALC) return err('Escribe la tensión arterial: sistólica y diastólica.', isNaN(s) ? $('sis') : $('dia'));
+    if (!isNaN(fc) && (fc < 20 || fc > 250)) return err('Revisa la frecuencia cardiaca (entre 20 y 250 lpm).', $('fc'));
+    var obs = $('obs').value.replace(/\s+/g, ' ').trim();
+    if (RES !== CALC && !obs) return err('Escribe en Observaciones por qué marcas ' + (RES === 'A' ? 'APTO' : 'NO APTO') + '.', $('obs'));
+    var t = { uid: 'med-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10), codigo: P.codigo, nombre: nombre, empresa: empresa,
+              sistolica: s, diastolica: d, frecuencia: isNaN(fc) ? '' : fc, resultado: RES, observaciones: obs, capturado: ahora(), origen: P.origen,
+              // para mostrarla mientras se envía
+              calculado: CALC, categoria: categoria(s, d), en_base: P.enBase, tomo: ses.nombre || ses.usuario, toma: tomasDeHoy(P).length + 1, pendiente: true };
+    COLA.push(t); guardar(CLAVE_COLA, COLA);
+    mostrarHecho(t);
+    pintarLista();
+    enviar().then(cargarHoy);
+  });
+  function mostrarHecho(t) {
+    $('f-toma').hidden = true; $('c-ident').hidden = true;
+    var h = $('hecho');
+    h.className = 'card hecho ' + t.resultado; h.hidden = false;
+    $('h-quien').innerHTML = (t.codigo ? '<b>ID ' + esc(t.codigo) + '</b> · ' : '') + esc(t.nombre || 'Sin nombre');
+    $('h-res').textContent = t.resultado === 'A' ? 'APTO' : 'NO APTO';
+    $('h-ta').innerHTML = '<b>' + t.sistolica + '/' + t.diastolica + ' mmHg</b>' + (t.frecuencia !== '' ? ' · ' + t.frecuencia + ' lpm' : '') + ' · ' + esc(CAT[t.categoria]) +
+      (t.toma > 1 ? ' · ' + t.toma + '.ª toma de hoy' : '') + '<br>' + esc(t.capturado.slice(11, 16)) + ' · tomó ' + esc(t.tomo);
+    $('b-repetir').hidden = t.resultado === 'A';
+    $('b-siguiente').focus();
+    h.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  $('b-siguiente').addEventListener('click', function () { reiniciar(); if (!LECTOR) $('id').focus(); });
+  $('b-repetir').addEventListener('click', function () {
+    if (!P) return;
+    $('hecho').hidden = true;
+    identificar(P.codigo, P.nombre, P.origen);
+    if (!P.enBase) { var u = tomasDeHoy(P)[0]; if (u) { $('p-nombre').value = u.nombre; $('p-empresa').value = u.empresa || ''; } }
+  });
+
+  /* ── 3. Sin señal: la cola de tomas ── */
+  var COLA = leer(CLAVE_COLA, []), HOY = leer(CLAVE_HOY, { fecha: '', tomas: [] }), enviando = false;
+  function todas() {
+    var srv = HOY.fecha === hoy() ? HOY.tomas : [];
+    var ya = {}; srv.forEach(function (t) { ya[t.uid] = 1; });
+    return COLA.filter(function (t) { return !ya[t.uid]; }).concat(srv).sort(function (a, b) { return a.capturado < b.capturado ? 1 : -1; });
+  }
+  function enviar() {
+    if (enviando || !COLA.length || !enLinea()) { pintarSenal(); return Promise.resolve(); }
+    enviando = true;
+    var t = COLA[0], datos = {};
+    ['uid', 'codigo', 'nombre', 'empresa', 'sistolica', 'diastolica', 'frecuencia', 'resultado', 'observaciones', 'capturado', 'origen'].forEach(function (k) { datos[k] = t[k]; });
+    return api('MEDICO_REGISTRAR', datos).then(function (r) {
+      enviando = false;
+      if (r && r.status === 'success') {
+        COLA.shift(); guardar(CLAVE_COLA, COLA);
+        return enviar();
+      }
+      // El servidor no la aceptó: se queda marcada para revisarla (no detiene las demás)
+      t.error = (r && r.message) || 'No se pudo guardar.'; COLA.push(COLA.shift()); guardar(CLAVE_COLA, COLA); pintarLista(); pintarSenal();
+    }).catch(function () { enviando = false; pintarSenal(); });
+  }
+  function cargarHoy() {
+    if (!enLinea()) { pintarLista(); return Promise.resolve(); }
+    return api('MEDICO_LISTAR', null, 'GET').then(function (r) {
+      if (r && r.status === 'success') { HOY = { fecha: r.fecha, tomas: r.tomas }; guardar(CLAVE_HOY, HOY); if (r.reglas) Object.assign(R, r.reglas); }
+      pintarLista(); pintarSenal();
+    }).catch(function () { pintarLista(); pintarSenal(); });
+  }
+  function pintarSenal() {
+    var pend = COLA.length, sin = !enLinea();
+    $('senal').className = 'senal' + (sin || pend ? ' sin' : '');
+    $('senal-tx').innerHTML = (sin ? 'Sin señal: las tomas se guardan en este equipo' : 'Con señal') +
+      (pend ? ' · <b>' + pend + (pend === 1 ? ' toma por enviar' : ' tomas por enviar') + '</b>' : sin ? '' : ' · todo enviado');
+  }
+  function pintarLista() {
+    var l = todas().filter(function (t) { return t.capturado.slice(0, 10) === hoy(); });
+    var q = mayus($('q').value), qId = clave(q);
+    var aptos = 0, no = 0, final = {};
+    l.slice().reverse().forEach(function (t) { final[(t.codigo ? 'I' + clave(t.codigo) : 'N' + mayus(t.nombre))] = t.resultado; });
+    Object.keys(final).forEach(function (k) { if (final[k] === 'A') aptos++; else no++; });
+    $('n-hoy').textContent = l.length + (l.length === 1 ? ' toma' : ' tomas') + ' · ' + aptos + (aptos === 1 ? ' apto' : ' aptos') + ' · ' + no + (no === 1 ? ' no apto' : ' no aptos');
+    var v = l.filter(function (t) { return !q || mayus(t.nombre).indexOf(q) >= 0 || (t.codigo && clave(t.codigo).indexOf(qId) === 0); });
+    $('lista').innerHTML = !l.length ? '<p>Todavía no hay tomas hoy.</p>' : !v.length ? '<p>Nadie coincide con «' + esc($('q').value) + '».</p>' : v.map(function (t) {
+      return '<div class="toma"><div class="h">' + esc(t.capturado.slice(11, 16)) + '</div><div class="d"><b>' + esc(t.nombre || 'Sin nombre') + '</b>' +
+        '<div class="m">' + (t.codigo ? 'ID ' + esc(t.codigo) + ' · ' : '') + esc(t.empresa || 'Sin compañía') + (t.toma > 1 ? ' · ' + t.toma + '.ª toma' : '') + ' · tomó ' + esc(t.tomo) +
+        (t.observaciones ? '<br>' + esc(t.observaciones) : '') + (t.pendiente ? '<br><span class="etq">' + (t.error ? 'No se guardó: ' + esc(t.error) : 'Por enviar') + '</span>' : '') + '</div></div>' +
+        '<div class="ta2">' + t.sistolica + '/' + t.diastolica + (t.frecuencia !== '' && t.frecuencia != null ? '<div class="m">' + t.frecuencia + ' lpm</div>' : '') +
+        '<div><span class="etq ' + (t.resultado === 'A' ? 'si">APTO' : 'no">NO APTO') + '</span></div></div></div>';
+    }).join('');
+  }
+  $('q').addEventListener('input', pintarLista);
+  window.addEventListener('online', function () { enviar().then(cargarHoy); actualizar(); });
+  window.addEventListener('offline', pintarSenal);
+  setInterval(function () { if (COLA.length) enviar().then(cargarHoy); }, 20000);
+  setInterval(function () { if (!document.hidden && !enviando) cargarHoy(); }, 60000);
+  setInterval(function () { if (!document.hidden) actualizar(); }, 5 * 60 * 1000);
+
+  $('b-salir').addEventListener('click', function () {
+    if (COLA.length && !confirm('Hay ' + COLA.length + ' toma(s) por enviar en este equipo. Si sales ahora se quedan aquí y se mandan cuando vuelvas a entrar. ¿Salir?')) return;
+    var fuera = function () { try { localStorage.removeItem(CLAVE); } catch (e) {} location.replace('login.html?volver=medico.html'); };
+    api('LOGOUT', {}).then(fuera, fuera);
+  });
+
+  pintarSenal(); pintarLista();
+  actualizar().then(function () { return enviar(); }).then(cargarHoy);
+  if (!LECTOR) $('id').focus();
+})();
+</script>
+</body>
+</html>

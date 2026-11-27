@@ -23,12 +23,13 @@
 class Auth {
     private PDO $pdo;
 
-    public const ROLES = ['ADMIN', 'PLANTA', 'ACCESOS', 'CLIENTE'];
+    public const ROLES = ['ADMIN', 'PLANTA', 'ACCESOS', 'CLIENTE', 'MEDICO'];
     public const NOMBRES_ROL = [
         'ADMIN'   => 'Administración AVBA',
         'PLANTA'  => 'Administrador de accesos de la planta',
         'ACCESOS' => 'Guardia de caseta',
         'CLIENTE' => 'Cliente (tablero y reportes)',
+        'MEDICO'  => 'Servicio médico',
     ];
     private const MIN_CONTRASENA = 8;
     private const MAX_INTENTOS = 5;
@@ -231,7 +232,7 @@ class Auth {
         $conModo = ControlAccesos::asegurarModoCuentas($this->pdo);
         $filas = $this->pdo->query(
             "SELECT id, usuario, rol, nombre, activo, fecha_alta, ultimo_acceso" . ($conTurno ? ", turno" : ", NULL AS turno") . ($conModo ? ", modo" : ", NULL AS modo") . "
-               FROM usuarios ORDER BY FIELD(rol, 'ADMIN', 'PLANTA', 'CLIENTE', 'ACCESOS'), FIELD(turno, 'D', 'N'), usuario"
+               FROM usuarios ORDER BY FIELD(rol, 'ADMIN', 'PLANTA', 'CLIENTE', 'MEDICO', 'ACCESOS'), FIELD(turno, 'D', 'N'), usuario"
         )->fetchAll(PDO::FETCH_ASSOC);
         $sesiones = [];
         foreach ($this->pdo->query("SELECT usuario_id, COUNT(*) n FROM sesiones_usuario WHERE expira > NOW() GROUP BY usuario_id")->fetchAll(PDO::FETCH_ASSOC) as $f) {

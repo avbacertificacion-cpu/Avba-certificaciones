@@ -74,8 +74,8 @@ class Tablero {
         }
         return [$desde, $hasta];
     }
-    private static function masDias(string $f, int $n): string { return date('Y-m-d', strtotime($f . ' 12:00:00 ' . ($n >= 0 ? '+' : '') . $n . ' days')); }
-    private static function diasEntre(string $a, string $b): int { return (int)round((strtotime($b . ' 12:00:00') - strtotime($a . ' 12:00:00')) / 86400); }
+    public static function masDias(string $f, int $n): string { return date('Y-m-d', strtotime($f . ' 12:00:00 ' . ($n >= 0 ? '+' : '') . $n . ' days')); }
+    public static function diasEntre(string $a, string $b): int { return (int)round((strtotime($b . ' 12:00:00') - strtotime($a . ' 12:00:00')) / 86400); }
 
     /* ── Cálculo ─────────────────────────────────────────────────────────── */
 
@@ -550,7 +550,7 @@ class Tablero {
     }
 
     /** La imagen PNG de una gráfica (data:image/png;base64,…), revisada. */
-    private static function pngValido(string $s): ?string {
+    public static function pngValido(string $s): ?string {
         if (!str_starts_with($s, 'data:image/png;base64,') || strlen($s) > 4_000_000) return null;
         $png = base64_decode(substr($s, 22), true);
         if ($png === false || strlen($png) < 100) return null;
@@ -566,19 +566,19 @@ class Tablero {
         ControlAccesos::protegerCarpeta();
         $dir = ControlAccesos::carpeta() . 'reportes/';
         if (!is_dir($dir)) @mkdir($dir, 0755, true);
-        foreach (array_merge(glob($dir . 'TABLERO_*') ?: [], glob($dir . 'PERSONAL_*') ?: []) as $f) if (@filemtime($f) < time() - 86400) @unlink($f);
+        foreach (array_merge(glob($dir . 'TABLERO_*') ?: [], glob($dir . 'PERSONAL_*') ?: [], glob($dir . 'MEDICO_*') ?: []) as $f) if (@filemtime($f) < time() - 86400) @unlink($f);
         foreach (glob($dir . 'tmp-*', GLOB_ONLYDIR) ?: [] as $d) if (@filemtime($d) < time() - 3600) self::borrarCarpeta($d . '/');
         return $dir;
     }
     public static function rutaReporte(string $archivo): ?string {
-        if (!preg_match('/^TABLERO_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}_[a-f0-9]{12}\.(xlsx|pdf)$/', $archivo)) return null;
+        if (!preg_match('/^(TABLERO|MEDICO)_\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}_[a-f0-9]{12}\.(xlsx|pdf)$/', $archivo)) return null;   // MEDICO_: servicio médico
         $abs = ControlAccesos::carpeta() . 'reportes/' . $archivo;
         return is_file($abs) ? $abs : null;
     }
     private static function nombreArchivo(array $c, string $ext): string {
         return 'TABLERO_' . $c['desde'] . '_' . $c['hasta'] . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
     }
-    private static function borrarCarpeta(string $dir): void {
+    public static function borrarCarpeta(string $dir): void {
         if (!is_dir($dir)) return;
         $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($it as $f) $f->isDir() ? @rmdir($f->getPathname()) : @unlink($f->getPathname());
@@ -586,8 +586,8 @@ class Tablero {
     }
 
     /* ── Textos ──────────────────────────────────────────────────────────── */
-    private static function fecha(string $f): string { return substr($f, 8, 2) . '/' . substr($f, 5, 2) . '/' . substr($f, 0, 4); }
-    private static function fechaHora(string $f): string { return $f === '' ? '' : self::fecha($f) . ' ' . substr($f, 11, 5); }
+    public static function fecha(string $f): string { return substr($f, 8, 2) . '/' . substr($f, 5, 2) . '/' . substr($f, 0, 4); }
+    public static function fechaHora(string $f): string { return $f === '' ? '' : self::fecha($f) . ' ' . substr($f, 11, 5); }
     private static function periodoTexto(array $c): string {
         return $c['desde'] === $c['hasta'] ? 'del ' . self::fecha($c['desde']) : 'del ' . self::fecha($c['desde']) . ' al ' . self::fecha($c['hasta']);
     }
