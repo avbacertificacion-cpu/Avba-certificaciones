@@ -309,13 +309,21 @@ public class AnalizadorTarjetaTest {
         assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 000287", 825, 560, 70, 370)), credencial()).codigo);
     }
 
-    /** Como en la credencial real: una raya pegada a la izquierda del «1» (2.º número) y otra pegada a la derecha del
-     *  último. Leídas como «1», «l» o «|» de más, sin la base del personal (la persona puede no estar). ID inventado. */
+    /** Como en la credencial real: una raya pegada al «1» (2.º número) y otra pegada a la derecha del último. Leídas
+     *  como «1», «l» o «|» de más, sin la base del personal (la persona puede no estar). ID inventado. */
     @Test public void rayasPegadasAlUnoYAlUltimo() {
-        for (String t : new String[] { "ID: 01287", "ID: 011287", "ID: 012871", "ID: 0112871", "ID: 0l12871", "ID: 0|12871",
-                                       "ID: 0 12871", "ID: 0I1287I", "ID: 01287|", "ID: 0|1287|" }) {
+        for (String t : new String[] { "ID: 01287", "ID: 011287", "ID: 0112871", "ID: 0l12871", "ID: 0|12871",
+                                       "ID: 0I1287I", "ID: 01287|", "ID: 0|1287|" }) {
             AnalizadorTarjeta.Lectura le = AnalizadorTarjeta.analizar(conRayas(ln(t, 825, 560, 70, 370)), credencial());
             assertEquals("ID leído como «" + t + "»", "01287", le.codigo);
+        }
+        // Sólo con la raya del final leída como «1»: sin la forma de cada carácter es una duda (01287 o 02871, con un
+        // «1» de verdad al final): sin base no se adivina; decide la base si sólo una de las dos está en ella
+        for (String t : new String[] { "ID: 012871", "ID: 0 12871" }) {
+            List<AnalizadorTarjeta.Linea> l = conRayas(ln(t, 825, 560, 70, 370));
+            assertNull("sin base, «" + t + "»", AnalizadorTarjeta.analizar(l, credencial()).codigo);
+            assertEquals("con la base, «" + t + "»", "01287", AnalizadorTarjeta.analizar(l, credencial("287", "1287")).codigo);
+            assertNull("las dos en la base, «" + t + "»", AnalizadorTarjeta.analizar(l, credencial("1287", "2871")).codigo);
         }
         // Lo que se leyó en el recuadro queda para decírselo al guardia
         assertEquals("0112871", AnalizadorTarjeta.analizar(conRayas(ln("ID: 0112871", 825, 560, 70, 370)), credencial()).enRecuadro);
@@ -337,6 +345,63 @@ public class AnalizadorTarjetaTest {
     @Test public void pedazoDelIdNoEsOtraPersona() {
         assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 0028", 825, 560, 70, 300)), credencial("28", "287")).codigo);
         assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 0028", 825, 560, 70, 150), ln("|", 825, 760, 70, 10)), credencial("28")).codigo);
+    }
+
+    /**
+     * El renglón «ID: …» con la caja de cada carácter, como la da el teléfono: los marcados con «R» en «rayas» son
+     * delgados (la raya); un «1» de verdad mide cerca de ¾ de los demás números.
+     */
+    private static AnalizadorTarjeta.Linea idConForma(String numero, String rayas) {
+        List<AnalizadorTarjeta.Simbolo> s = new ArrayList<>();
+        int y = 825, h = 70, x = 560;
+        s.add(new AnalizadorTarjeta.Simbolo('I', x, y, x + 12, y + h)); x += 20;
+        s.add(new AnalizadorTarjeta.Simbolo('D', x, y, x + 40, y + h)); x += 48;
+        s.add(new AnalizadorTarjeta.Simbolo(':', x, y + 20, x + 8, y + h)); x += 30;
+        for (int i = 0; i < numero.length(); i++) {
+            char c = numero.charAt(i);
+            int w = rayas.charAt(i) == 'R' ? 4 : "1|Il".indexOf(c) >= 0 ? 26 : 36;
+            s.add(new AnalizadorTarjeta.Simbolo(c, x, rayas.charAt(i) == 'R' ? y - 30 : y, x + w, y + h + (rayas.charAt(i) == 'R' ? 30 : 0)));
+            x += w + 6;
+        }
+        return new AnalizadorTarjeta.Linea("ID: " + numero, y, 560, h, x - 560, s);
+    }
+
+    /** Con la caja de cada carácter la raya se reconoce por su forma en cualquier ID, sin base y sin adivinar: la
+     *  misma lectura sale distinta según cuál carácter es delgado. IDs inventados. */
+    @Test public void rayaPorSuForma() {
+        AnalizadorTarjeta.Reglas r = credencial();
+        assertEquals("01287", AnalizadorTarjeta.analizar(conRayas(idConForma("0112871", ".R....R")), r).codigo);
+        assertEquals("01287", AnalizadorTarjeta.analizar(conRayas(idConForma("012871", ".....R")), r).codigo);
+        assertEquals("02871", AnalizadorTarjeta.analizar(conRayas(idConForma("012871", ".R....")), r).codigo);
+        assertEquals("00291", AnalizadorTarjeta.analizar(conRayas(idConForma("001291", "..R...")), r).codigo);
+        assertEquals("00129", AnalizadorTarjeta.analizar(conRayas(idConForma("001291", ".....R")), r).codigo);
+        assertEquals("01111", AnalizadorTarjeta.analizar(conRayas(idConForma("011l11", "...R..")), r).codigo);
+        assertEquals("00287", AnalizadorTarjeta.analizar(conRayas(idConForma("0|02|87|", ".R..R..R")), r).codigo);
+        // Sin la forma, esa misma lectura es una duda: no se adivina
+        assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 001291", 825, 560, 70, 370)), r).codigo);
+        // Una raya en el lugar de un número que no se leyó: no es el ID (sería otra persona), aunque esté en la base
+        assertNull(AnalizadorTarjeta.analizar(conRayas(idConForma("01287", ".R...")), credencial("1287")).codigo);
+        // Las cajas que no coinciden con el texto no se usan
+        AnalizadorTarjeta.Linea mal = new AnalizadorTarjeta.Linea("ID: 001291", 825, 560, 70, 370,
+                idConForma("0012", "..R.").simbolos);
+        assertNull(AnalizadorTarjeta.analizar(conRayas(mal), r).codigo);
+    }
+
+    /** La etiqueta «ID» con la raya pegada y números con la raya encima («Ø», «$»). */
+    @Test public void etiquetaYNumerosConLaRayaEncima() {
+        for (String t : new String[] { "I|D: 00287", "|ID: 00287", "IID: 00287", "ID|: 00287", "I D: 00287", "ID: 0Ø287" })
+            assertEquals("«" + t + "»", "00287", AnalizadorTarjeta.analizar(conRayas(ln(t, 825, 560, 70, 370)), credencial()).codigo);
+        assertEquals("01285", AnalizadorTarjeta.analizar(conRayas(ln("ID: 0128$", 825, 560, 70, 370)), credencial()).codigo);
+    }
+
+    /** Sin la forma, dos números posibles: decide la base sólo si uno solo está en ella y es el más probable. Si el
+     *  más probable no está en la base, puede ser alguien que todavía no está: no se le confunde con otra persona. */
+    @Test public void dudaSinLaFormaYLaBase() {
+        List<AnalizadorTarjeta.Linea> l = conRayas(ln("ID: 0|2871", 825, 560, 70, 370));   // 02871, o 01287 con «1» al final
+        assertNull("sin base", AnalizadorTarjeta.analizar(l, credencial()).codigo);
+        assertEquals("02871", AnalizadorTarjeta.analizar(l, credencial("2871", "287")).codigo);
+        assertNull("la más probable no está en la base", AnalizadorTarjeta.analizar(l, credencial("1287")).codigo);
+        assertNull("las dos están en la base", AnalizadorTarjeta.analizar(l, credencial("1287", "2871")).codigo);
     }
 
     /** «N SS:» partida no es «N.» (número): el NSS nunca es el ID, con o sin la regla de 5 dígitos. */

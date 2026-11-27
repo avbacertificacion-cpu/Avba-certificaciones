@@ -26,7 +26,7 @@ function app(conContinuo) {
     window.__emitir = (ev, d) => (window.__ev[ev] || []).forEach(f => f(d));
     const L = {
       disponible: () => Promise.resolve(conContinuo ? Object.assign({ disponible: true, local: true, continuo: true, rayas: conContinuo === 'rayas' },
-                                                                    conContinuo === 'rayas' ? { version: 114 } : {}) : { disponible: true, local: true }),
+                                                                    conContinuo === 'rayas' ? { version: 115 } : {}) : { disponible: true, local: true }),
       mostrar: d => { window.__mostrados.push(d); return Promise.resolve({ mostrado: true }); },
       detener: () => Promise.resolve(),
       addListener: (ev, fn) => { (window.__ev[ev] = window.__ev[ev] || []).push(fn); return Promise.resolve({ remove() {} }); },
@@ -118,7 +118,7 @@ const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE 
 
   // ══ Carril de SALIDA ══
   ({ ctx, p } = await telefono(b, ses('fijo.salida', 'S'), 'rayas'));
-  ok(await p.isHidden('.nota-app') && /App versión 114/.test(await p.textContent('#fijo-estado')), 'con la app nueva (versión 114): sin el aviso de actualizar y dice su versión');
+  ok(await p.isHidden('.nota-app') && /App versión 115/.test(await p.textContent('#fijo-estado')), 'con la app nueva (versión 115): sin el aviso de actualizar y dice su versión');
   ok((await p.evaluate(() => window.__continuo[0] && window.__continuo[0].tipo)) === 'salida' && await p.isVisible('.cap.sal') && await p.isHidden('.cap.ent'), 'el carril de salida abre la lectura continua de SALIDA');
   await leer(p, '00287', 'RAMIRO'); await p.waitForTimeout(1500);
   m = await ultimo(p);

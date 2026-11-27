@@ -17,7 +17,7 @@ const post = async (accion, tok, payload = {}) => (await fetch(A, {
 function app() {
   window.__leer = []; window.__lecturas = [];
   window.Capacitor = { isNativePlatform: () => true, Plugins: { LectorTarjeta: {
-    disponible: () => Promise.resolve({ disponible: true, local: true, continuo: true, rayas: true, version: window.__version === undefined ? 114 : window.__version }),
+    disponible: () => Promise.resolve({ disponible: true, local: true, continuo: true, rayas: true, version: window.__version === undefined ? 115 : window.__version }),
     leer: o => { window.__leer.push(o); return new Promise(r => setTimeout(() => r(window.__lecturas.shift() || { cancelado: true }), 200)); },
     addListener: () => Promise.resolve({ remove() {} })
   } } };
@@ -38,7 +38,7 @@ const escribe = async (p, sel, txt) => { await p.click(sel); await p.fill(sel, '
   await p.goto(B + 'accesos.html'); await p.waitForTimeout(1800);
   ok(/medico\.html$/.test(p.url()), 'la app abre accesos.html y el servicio médico pasa a su pantalla');
   ok(await p.isVisible('#b-escanear') && /ENF\. LAURA MEDINA/.test(await p.textContent('#sub')), 'con la app: botón «Escanear credencial» y quién está en sesión');
-  ok(await p.isHidden('#nota-app') && /app 114/.test(await p.textContent('#senal')), 'app al día (versión 114): sin aviso, y dice su versión');
+  ok(await p.isHidden('#nota-app') && /app 115/.test(await p.textContent('#senal')), 'app al día (versión 115): sin aviso, y dice su versión');
   await p.screenshot({ path: D + 'medico_inicio.png', fullPage: true });
 
   // ── Escanear: la base llena nombre y compañía ──
@@ -126,12 +126,12 @@ const escribe = async (p, sel, txt) => { await p.click(sel); await p.fill(sel, '
   ok(!errores.length, 'sin errores de JavaScript' + (errores.length ? ': ' + errores.join(' | ') : ''));
   await ctx.close();
 
-  // ── App anterior (versión 113): pide instalar la nueva ──
+  // ── App anterior (versión 114): pide instalar la nueva ──
   const cv = await b.newContext({ viewport: { width: 390, height: 844 } });
-  await cv.addInitScript(() => { localStorage.setItem('ca_sesion', JSON.stringify({ token: 'tok-medico', rol: 'MEDICO', usuario: 'medico', nombre: 'ENF. LAURA MEDINA' })); window.__version = 113; });
+  await cv.addInitScript(() => { localStorage.setItem('ca_sesion', JSON.stringify({ token: 'tok-medico', rol: 'MEDICO', usuario: 'medico', nombre: 'ENF. LAURA MEDINA' })); window.__version = 114; });
   await cv.addInitScript(app);
   const pv = await cv.newPage(); await pv.goto(B + 'medico.html'); await pv.waitForTimeout(1800);
-  ok(await pv.isVisible('#nota-app') && /versión nueva de la app/.test(await pv.textContent('#nota-app')), 'con la app anterior (113): pide instalar la nueva');
+  ok(await pv.isVisible('#nota-app') && /versión nueva de la app/.test(await pv.textContent('#nota-app')), 'con la app anterior (114): pide instalar la nueva');
   await cv.close();
 
   // ── Otros perfiles ──

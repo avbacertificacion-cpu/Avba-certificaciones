@@ -95,17 +95,29 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
    EMPRESA, CARGO, **NSS de 11 dígitos (nunca es el ID)**, TIPO DE SANGRE, ALERGIAS y
    abajo «CREDENCIAL DE ACCESO». El lector ya está ajustado a ese formato.
    **Credenciales con rayas de la impresora** (rayas blancas verticales que cruzan el recuadro
-   del ID y parten etiquetas: «N OMBRE», «N SS»): con la regla `digitosId` (5) el lector junta
-   los pedazos del número («0 0287», «0028 7»), quita la raya leída como «|», «I» o un «1» de más,
-   lee el dígito cortado como la letra a la que se parece («4» → «A», «0» → «C», «7» → «T»),
-   **nunca toma un pedazo** (sería otra persona) y, si queda en duda, decide con los IDs de la
-   base que le manda la página (`ids`); sin base no adivina. La raya sólo AGREGA blanco (nunca repite
-   un «0»): cae pegada a la izquierda del 2.º número y a la derecha del último, así que un «1» junto a
-   otro «1» («011287») o al final («012871») se quita primero; un «1» al principio, no. Se confirma con
-   3 lecturas iguales entre las últimas 10 imágenes (tolera las borrosas) y, si no se distingue, la
-   cámara dice qué lee en el recuadro («En el recuadro leo «…»»: `Lectura.enRecuadro`). Se probó
-   también quitar las rayas de la imagen antes de leer: a la escala de la cámara frontal dañaba el
-   «3» y no se usa. «N SS» partida no se toma como «N.»
+   del ID y parten etiquetas: «N OMBRE», «N SS»). Las rayas están siempre en el mismo lugar de la
+   credencial, pero los números no (letra proporcional: el «1» es más angosto), así que en cada ID
+   la raya cae en otro lado: entre dos números, pegada a uno o atravesándolo. Con la regla
+   `digitosId` (5) el lector junta los pedazos del número («0 0287», «0028 7») y quita lo que
+   sobra: **1) por su forma**: la app manda la caja de cada carácter (`Text.Symbol` →
+   `AnalizadorTarjeta.Simbolo`, en `Linea.simbolos`); la raya es mucho más delgada que cualquier
+   número (menos de la mitad de ancho; un «1» impreso mide cerca de ¾), sirve igual para cualquier
+   ID y decide sin base (`rayasPorForma`); una raya delgada que completa 5 caracteres ocupa el
+   lugar de un número que no se leyó: no es el ID. **2) sin la forma**, por lo que se leyó: «|»
+   casi siempre es la raya, «I»/«l» casi, un «1» pegado a otro «1» o al final más que uno suelto
+   (costos en `codigoDelId`). **3)** si quedan dos números posibles (`DUDA`), decide la base
+   (`ids`) sólo si **una sola** opción está en ella y es de las más probables (si la más probable
+   no está, puede ser alguien que aún no está en la base: no se le confunde con otra persona);
+   sin base, no adivina. **Nunca toma un pedazo** (sería otra persona). El número con la raya
+   encima se lee como la letra o el signo al que se parece («0» → «C», «Ø», «¢»; «4» → «A»;
+   «5» → «$»; «7» → «T»), y la etiqueta también con la raya pegada («I|D:», «IID:», «ID|:»).
+   `RayasSimulacionTest` lo prueba con miles de lecturas de IDs inventados, con las rayas como las de
+   la impresora real y en cualquier lugar: con la forma, todas bien y nunca otro ID; sin la forma,
+   sin base nunca otro ID (no adivina) y con la base a quien está en ella nunca se le confunde (sólo a
+   alguien que aún no está, muy rara vez). Se confirma con 3 lecturas iguales entre las últimas 10 imágenes (tolera las
+   borrosas) y, si no se distingue, la cámara dice qué lee en el recuadro («En el recuadro leo
+   «…»»: `Lectura.enRecuadro`). Se probó también quitar las rayas de la imagen antes de leer: a la
+   escala de la cámara frontal dañaba el «3» y no se usa. «N SS» partida no se toma como «N.»
    de número. La página además corrige con la base una lectura de la app anterior con un dígito
    de más (`corregirConBase`). La app nueva responde `rayas: true` en `disponible()`.
 4. **Turnos por cuenta:** lo que registra un guardia va a **su** turno (el de su cuenta), a

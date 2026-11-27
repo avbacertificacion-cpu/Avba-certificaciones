@@ -436,6 +436,28 @@ public class LectorTarjetaActivity extends AppCompatActivity {
                 .addOnCompleteListener(t -> imagen.close());
     }
 
+    /**
+     * Cada carácter del renglón con su caja en la imagen (Text.Symbol), en orden. Con ella el analizador
+     * reconoce la raya de la impresora por su forma (mucho más delgada que cualquier número). Vacío si el
+     * reconocimiento no la da: entonces se decide sólo por el texto.
+     */
+    private static List<AnalizadorTarjeta.Simbolo> simbolos(Text.Line ln) {
+        List<AnalizadorTarjeta.Simbolo> s = new ArrayList<>();
+        try {
+            for (Text.Element el : ln.getElements()) {
+                for (Text.Symbol sim : el.getSymbols()) {
+                    String t = sim.getText();
+                    Rect b = sim.getBoundingBox();
+                    if (t == null || t.length() != 1 || b == null) return new ArrayList<>();
+                    s.add(new AnalizadorTarjeta.Simbolo(t.charAt(0), b.left, b.top, b.right, b.bottom));
+                }
+            }
+        } catch (RuntimeException e) {
+            return new ArrayList<>();
+        }
+        return s;
+    }
+
     private void alLeer(Text texto, byte[] foto) {
         if (entregado || pausado || isFinishing()) return;
         if (foto != null) fotoReciente = foto;
@@ -445,7 +467,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             for (Text.Line ln : bloque.getLines()) {
                 Rect r = ln.getBoundingBox();
                 if (r == null) continue;
-                lineas.add(new AnalizadorTarjeta.Linea(ln.getText(), r.top, r.left, r.height(), r.width()));
+                lineas.add(new AnalizadorTarjeta.Linea(ln.getText(), r.top, r.left, r.height(), r.width(), simbolos(ln)));
             }
         }
         if (!lineas.isEmpty()) ultimoTexto = AnalizadorTarjeta.unir(lineas);

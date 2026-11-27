@@ -4,6 +4,7 @@ import java.text.Normalizer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,11 +33,42 @@ public final class AnalizadorTarjeta {
     public static final class Linea {
         public final String texto;
         public final int arriba, izquierda, alto, ancho;
+        /** Cada carácter del texto (sin los espacios) con su caja en la imagen; vacío si el reconocimiento no la da. */
+        public final List<Simbolo> simbolos;
         public Linea(String texto, int arriba, int izquierda, int alto) { this(texto, arriba, izquierda, alto, 0); }
-        public Linea(String texto, int arriba, int izquierda, int alto, int ancho) {
+        public Linea(String texto, int arriba, int izquierda, int alto, int ancho) { this(texto, arriba, izquierda, alto, ancho, null); }
+        public Linea(String texto, int arriba, int izquierda, int alto, int ancho, List<Simbolo> simbolos) {
             this.texto = texto == null ? "" : texto;
             this.arriba = arriba; this.izquierda = izquierda; this.alto = Math.max(1, alto); this.ancho = Math.max(0, ancho);
+            this.simbolos = simbolos == null ? Collections.<Simbolo>emptyList() : simbolos;
         }
+
+        /** La caja de cada carácter del texto, en su misma posición (null en los espacios). Si los caracteres
+         *  no coinciden con el texto, ninguna: entonces se decide sólo por el texto. */
+        List<Simbolo> cajas() {
+            Simbolo[] c = new Simbolo[texto.length()];
+            if (simbolos.isEmpty()) return Arrays.asList(c);
+            int k = 0;
+            for (int i = 0; i < texto.length(); i++) {
+                char ch = texto.charAt(i);
+                if (Character.isWhitespace(ch)) continue;
+                if (k >= simbolos.size() || simbolos.get(k).c != ch) return Arrays.asList(new Simbolo[texto.length()]);
+                c[i] = simbolos.get(k++);
+            }
+            return k == simbolos.size() ? Arrays.asList(c) : Arrays.asList(new Simbolo[texto.length()]);
+        }
+    }
+
+    /** Un carácter leído con su caja en la imagen (izquierda, arriba, derecha, abajo, en píxeles). Con ella se
+     *  reconoce la raya blanca de la impresora en cualquier ID: es mucho más delgada que cualquier número,
+     *  también que un «1» (el «1» impreso lleva su bandera y es casi tan ancho como los demás). */
+    public static final class Simbolo {
+        public final char c;
+        public final int izquierda, arriba, derecha, abajo;
+        public Simbolo(char c, int izquierda, int arriba, int derecha, int abajo) {
+            this.c = c; this.izquierda = izquierda; this.arriba = arriba; this.derecha = derecha; this.abajo = abajo;
+        }
+        int ancho() { return Math.max(0, derecha - izquierda); }
     }
 
     /** Lo que se encontró en una lectura. «enRecuadro»: el texto que se leyó junto a «ID:» (para decirle al guardia qué ve). */
@@ -132,46 +164,71 @@ public final class AnalizadorTarjeta {
     }
 
     /* ── El renglón del ID («ID: 00287», en el recuadro azul) ──
-       Algunas credenciales salen de la impresora con rayas blancas verticales que cruzan el recuadro.
-       El reconocimiento lee la raya como «|», «I», «l» o un «1» de más, o parte el número en dos
-       («0 0287», «0028 7»). Todo lo que sigue a «ID:» en esa fila es el número: se juntan los pedazos
-       y, si sobra un dígito, se quita el que parece raya. */
+       Algunas credenciales salen de la impresora con rayas blancas verticales que cruzan el recuadro. Las rayas
+       están siempre en el mismo lugar de la credencial, pero los números no (el «1» es más angosto), así que en
+       cada ID la raya cae en otro lado: entre dos números, pegada a uno o atravesándolo. El reconocimiento la
+       lee como «|», «I», «l» o un «1» de más, o parte el número en dos («0 0287», «0028 7»). Todo lo que sigue
+       a «ID:» en esa fila es el número: se juntan los pedazos y, si sobran caracteres, se quita la raya:
+        1. Por su forma, si el reconocimiento da la caja de cada carácter: la raya es mucho más delgada que
+           cualquier número, también que un «1». Sirve igual para cualquier ID.
+        2. Si no, por lo que se leyó: «|» casi siempre es la raya; «I» o «l», casi; un «1» pegado a otro o al
+           final, más que uno suelto.
+        3. Si aun así quedan dos números posibles, decide la base del personal; sin base, no se adivina. */
     /** Letras que en el recuadro del ID se leen como un dígito (ver codigoDelId). */
-    private static final String PARECE_DIGITO = "IliOoQDCSsBZzAGbTgq";
-    private static final Pattern ETIQUETA_ID = Pattern.compile("(?<![\\p{L}\\d])[I1l|!]\\s?D(?!\\p{L})\\s*[:;.,]?",
-            Pattern.CASE_INSENSITIVE);
+    private static final String PARECE_DIGITO = "IliOoQDCSsBZzAGbTgqØøßΦφθΘ";
+    /* «ID:», también con la raya pegada a la I o a la D («I|D:», «|ID:», «IID:», «ID|:») */
+    private static final Pattern ETIQUETA_ID = Pattern.compile(
+            "(?<![\\p{L}\\d])[I1l|!]{1,3}\\s?D(?!\\p{L})[|!]?\\s*[:;.,]?", Pattern.CASE_INSENSITIVE);
+
+    /* Lo que cuesta quitar cada carácter del número (0: es un número, no se quita). Por lo que se leyó: «|» o
+       «!» 2; «I», «l» o «i» 4; un «1» 6; pegado a otro «1» o al final, a lo más 4. Por su forma: delgado 1 (es
+       la raya); del ancho de un número 8 (es un «1» de verdad). Quitar dos juntos cuesta JUNTOS más. */
+    private static final int RAYA_POR_FORMA = 1, UNO_POR_FORMA = 8, JUNTOS = 3;
+    /** Una opción gana sola si cuesta al menos DUDA menos que las demás; si no, decide la base (ver elegirOpcion). */
+    private static final int DUDA = 3;
+
+    static String codigoDelId(String resto, int objetivo, Reglas r) { return codigoDelId(resto, null, objetivo, r); }
 
     /**
-     * El ID que trae «resto» (lo leído a la derecha de «ID:»), o null si no se puede saber.
-     * Con «objetivo» (los dígitos del ID) quita lo que sobra: primero lo que casi siempre es la raya
-     * («|», «!»), luego «I»/«l», al último un «1» o un dígito repetido. Si quedan dos números posibles
-     * igual de probables, decide la base del personal; sin base, no se adivina.
+     * El ID que trae «resto» (lo leído a la derecha de «ID:»), o null si no se puede saber. «cajas»: la caja de
+     * cada carácter de «resto», en su misma posición (null donde no se sabe). Con «objetivo» (los dígitos del
+     * ID) quita lo que sobra.
      */
-    static String codigoDelId(String resto, int objetivo, Reglas r) {
+    static String codigoDelId(String resto, List<Simbolo> cajas, int objetivo, Reglas r) {
         StringBuilder dig = new StringBuilder();
         List<Integer> costo = new ArrayList<>();               // lo que cuesta quitar cada dígito (0 = no se quita)
-        for (String tok : resto.trim().split("\\s+")) {
+        List<Simbolo> caja = new ArrayList<>();
+        List<Boolean> palo = new ArrayList<>();                 // se leyó «|» o «!»
+        int i = 0, n = resto.length();
+        while (i < n) {
+            while (i < n && Character.isWhitespace(resto.charAt(i))) i++;
+            int ini = i;
+            while (i < n && !Character.isWhitespace(resto.charAt(i))) i++;
+            if (ini == i) break;
+            String tok = resto.substring(ini, i);
             // Sin ningún dígito, una palabra (más de dos letras, o letras que no se confunden con números) no es
             // parte del ID: ahí acaba. Con dígitos, cada letra se lee como el número al que se parece.
             if (!tok.matches(".*\\d.*")) {
                 boolean palabra = tok.replaceAll("[^\\p{L}]", "").length() > 2;
-                for (int i = 0; i < tok.length() && !palabra; i++)
-                    palabra = Character.isLetter(tok.charAt(i)) && PARECE_DIGITO.indexOf(tok.charAt(i)) < 0;
+                for (int k = 0; k < tok.length() && !palabra; k++)
+                    palabra = Character.isLetter(tok.charAt(k)) && PARECE_DIGITO.indexOf(tok.charAt(k)) < 0;
                 if (palabra) {
                     if (dig.length() > 0) break;
                     continue;
                 }
             }
-            for (int i = 0; i < tok.length(); i++) {
-                char ch = tok.charAt(i), d; int c;
-                if (ch >= '0' && ch <= '9') { d = ch; c = ch == '1' ? 3 : 0; }
+            for (int k = ini; k < i; k++) {
+                char ch = resto.charAt(k), d; int c;
+                if (ch >= '0' && ch <= '9') { d = ch; c = ch == '1' ? 6 : 0; }
                 else switch (ch) {
-                    case '|': case '!': d = '1'; c = 1; break;              // casi siempre es la raya
-                    case 'I': case 'l': case 'i': d = '1'; c = 2; break;
-                    // Un dígito cortado por la raya se parece a una letra: «0» → C, «4» → A, «6» → G/b, «7» → T, «9» → g/q
-                    case 'O': case 'o': case 'Q': case 'D': case 'C': d = '0'; c = 0; break;
-                    case 'S': case 's': d = '5'; c = 0; break;
-                    case 'B': d = '8'; c = 0; break;
+                    case '|': case '!': d = '1'; c = 2; break;              // casi siempre es la raya
+                    case 'I': case 'l': case 'i': d = '1'; c = 4; break;
+                    // Un número con la raya encima se parece a una letra o a un signo: «0» → C, Ø, ¢; «4» → A;
+                    // «5» → $; «6» → G, b; «7» → T; «8» → ß; «9» → g, q
+                    case 'O': case 'o': case 'Q': case 'D': case 'C':
+                    case 'Ø': case 'ø': case '¢': case 'Φ': case 'φ': case 'θ': case 'Θ': d = '0'; c = 0; break;
+                    case 'S': case 's': case '$': d = '5'; c = 0; break;
+                    case 'B': case 'ß': d = '8'; c = 0; break;
                     case 'Z': case 'z': d = '2'; c = 0; break;
                     case 'A': d = '4'; c = 0; break;
                     case 'G': case 'b': d = '6'; c = 0; break;
@@ -179,56 +236,109 @@ public final class AnalizadorTarjeta {
                     case 'g': case 'q': d = '9'; c = 0; break;
                     default: continue;               // signo u otra letra: se salta (si faltan dígitos, no se adivina)
                 }
-                dig.append(d); costo.add(c);
+                dig.append(d); costo.add(c); palo.add(ch == '|' || ch == '!');
+                caja.add(cajas != null && k < cajas.size() ? cajas.get(k) : null);
             }
         }
         String s = dig.toString();
         if (s.isEmpty()) return null;
         if (objetivo <= 0) {                                    // sin saber cuántos: sólo se quita «|» y «!»
             StringBuilder t = new StringBuilder();
-            for (int i = 0; i < s.length(); i++) if (costo.get(i) != 1) t.append(s.charAt(i));
+            for (int k = 0; k < s.length(); k++) if (!palo.get(k)) t.append(s.charAt(k));
             return t.length() == 0 ? null : t.toString();
         }
+        boolean[] raya = rayasPorForma(costo, caja);
+        boolean porForma = false;                               // se vio al menos una raya por su forma
+        for (boolean x : raya) porForma |= x;
         int sobran = s.length() - objetivo;
-        if (sobran < 0 || sobran > 2) return null;               // falta un dígito o es otro número (NSS, teléfono)
+        if (sobran < 0 || sobran > (porForma ? 3 : 2)) return null;    // falta un dígito o es otro número (NSS, teléfono)
         if (sobran == 0) {
-            // Un «|» que completa los dígitos puede ser la raya en lugar de un dígito borrado: sólo vale si está en la base
-            return costo.contains(1) && !r.enBase(s) ? null : s;
+            // Una raya que completa los dígitos ocupa el lugar de un número que no se leyó: no es el ID.
+            // Un «|» puede ser eso: sólo vale si está en la base.
+            if (porForma) return null;
+            return palo.contains(true) && !r.enBase(s) ? null : s;
         }
-        // La raya de la impresora sólo AGREGA una línea blanca (se lee «|», «I», «l» o «1»); nunca repite otro dígito.
-        // Cae pegada a un número: un «1» junto a otro «1» («0|1287» → «011287») o al final, pegado al último número
-        // («01287|» → «012871»), es más probablemente la raya que un «1» suelto en medio o al principio.
-        for (int i = 0; i < s.length(); i++) {
-            if (costo.get(i) == 0) continue;
-            boolean pegado = (i > 0 && costo.get(i - 1) > 0) || (i + 1 < s.length() && costo.get(i + 1) > 0);
-            boolean alFinal = i == s.length() - 1;
-            if (pegado || alFinal) costo.set(i, Math.min(costo.get(i), 2));
+        for (int k = 0; k < s.length(); k++) {
+            if (costo.get(k) == 0) continue;
+            if (porForma && caja.get(k) != null) { costo.set(k, raya[k] ? RAYA_POR_FORMA : UNO_POR_FORMA); continue; }
+            // Sin la forma: la raya cae pegada a un número; un «1» junto a otro «1» («0|1287» → «011287») o al
+            // final, pegado al último número («01287|» → «012871»), es más probablemente la raya que uno suelto.
+            boolean pegado = (k > 0 && costo.get(k - 1) > 0) || (k + 1 < s.length() && costo.get(k + 1) > 0);
+            if (pegado || k == s.length() - 1) costo.set(k, Math.min(costo.get(k), 4));
         }
+        List<Integer> quitables = new ArrayList<>();
+        for (int k = 0; k < s.length(); k++) if (costo.get(k) > 0) quitables.add(k);
         Map<String, Integer> opciones = new HashMap<>();        // número posible → lo menos que cuesta llegar a él
-        for (int a = 0; a < s.length(); a++) {
-            if (costo.get(a) == 0) continue;
-            if (sobran == 1) { guardarOpcion(opciones, s.substring(0, a) + s.substring(a + 1), costo.get(a)); continue; }
-            for (int b = a + 1; b < s.length(); b++)
-                if (costo.get(b) > 0)                         // dos rayas juntas en el mismo «11» es poco probable
-                    guardarOpcion(opciones, s.substring(0, a) + s.substring(a + 1, b) + s.substring(b + 1),
-                                  costo.get(a) + costo.get(b) + (b == a + 1 ? 3 : 0));
-        }
-        String elegido = elegirOpcion(opciones, r, true);
-        return elegido != null ? elegido : elegirOpcion(opciones, r, false);
+        quitar(s, costo, raya, quitables, 0, sobran, new ArrayList<>(), opciones);
+        return elegirOpcion(opciones, r);
     }
-    private static void guardarOpcion(Map<String, Integer> m, String codigo, int costo) {
-        Integer antes = m.get(codigo);
-        if (antes == null || costo < antes) m.put(codigo, costo);
+
+    /**
+     * Cuáles caracteres son la raya por su forma: los que se leyeron como «1», «|», «I» o «l» y miden menos de
+     * la mitad de ancho que los otros números de la misma lectura (un «1» impreso mide cerca de ¾ de un «0»).
+     * Si el reconocimiento no dio las cajas, o ninguno es tan delgado, todos en false: se decide por el texto.
+     */
+    static boolean[] rayasPorForma(List<Integer> costo, List<Simbolo> caja) {
+        boolean[] raya = new boolean[costo.size()];
+        List<Integer> anchos = new ArrayList<>();
+        for (int k = 0; k < costo.size(); k++)
+            if (costo.get(k) == 0 && caja.get(k) != null) anchos.add(caja.get(k).ancho());
+        if (anchos.isEmpty()) return raya;
+        Collections.sort(anchos);
+        int ref = anchos.get(anchos.size() / 2);
+        if (ref <= 0) return raya;
+        for (int k = 0; k < costo.size(); k++)
+            raya[k] = costo.get(k) > 0 && caja.get(k) != null && caja.get(k).ancho() * 100 <= ref * 45;
+        return raya;
     }
-    /** La opción más barata (sólo las de la base, si «deLaBase»); null si hay empate entre dos números. */
-    private static String elegirOpcion(Map<String, Integer> opciones, Reglas r, boolean deLaBase) {
-        String mejor = null; int min = Integer.MAX_VALUE; boolean empate = false;
-        for (Map.Entry<String, Integer> e : opciones.entrySet()) {
-            if (deLaBase && !r.enBase(e.getKey())) continue;
-            if (e.getValue() < min) { min = e.getValue(); mejor = e.getKey(); empate = false; }
-            else if (e.getValue() == min) empate = true;
+
+    /** Todas las formas de quitar «faltan» caracteres de «quitables» (a partir del lugar «desde»), con su costo. */
+    private static void quitar(String s, List<Integer> costo, boolean[] raya, List<Integer> quitables, int desde,
+                               int faltan, List<Integer> elegidos, Map<String, Integer> opciones) {
+        if (faltan == 0) {
+            int c = 0;
+            StringBuilder t = new StringBuilder(s);
+            for (int j = elegidos.size() - 1; j >= 0; j--) {
+                int k = elegidos.get(j);
+                c += costo.get(k);
+                // Dos rayas juntas en el mismo «11» es poco probable (las de la impresora están a más de dos números
+                // una de otra), salvo que las dos se vean delgadas o sean las dos últimas: una raya pasada el
+                // número puede leerse como dos caracteres («ll», «|I»)
+                if (j > 0 && elegidos.get(j - 1) == k - 1 && !(raya[k] && raya[k - 1]) && k != s.length() - 1) c += JUNTOS;
+                t.deleteCharAt(k);
+            }
+            Integer antes = opciones.get(t.toString());
+            if (antes == null || c < antes) opciones.put(t.toString(), c);
+            return;
         }
-        return empate ? null : mejor;
+        for (int q = desde; q <= quitables.size() - faltan; q++) {
+            elegidos.add(quitables.get(q));
+            quitar(s, costo, raya, quitables, q + 1, faltan - 1, elegidos, opciones);
+            elegidos.remove(elegidos.size() - 1);
+        }
+    }
+
+    /**
+     * La opción más barata, si cuesta al menos DUDA menos que todas las demás. Si no, entre las dudosas (las que
+     * cuestan menos de DUDA más que la más barata) decide la base del personal, pero sólo si una sola está en la
+     * base y es de las más baratas: si la más probable no está en la base y otra sí, puede ser alguien que
+     * todavía no está en la base, y no se le confunde con otra persona. Si no: null (no se adivina; se vuelve
+     * a leer o se escribe el ID).
+     */
+    private static String elegirOpcion(Map<String, Integer> opciones, Reglas r) {
+        if (opciones.isEmpty()) return null;
+        int min = Integer.MAX_VALUE;
+        for (int v : opciones.values()) min = Math.min(min, v);
+        List<String> dudosas = new ArrayList<>();
+        for (Map.Entry<String, Integer> e : opciones.entrySet()) if (e.getValue() < min + DUDA) dudosas.add(e.getKey());
+        if (dudosas.size() == 1) return dudosas.get(0);
+        String enBase = null;
+        for (String x : dudosas) {
+            if (!r.enBase(x)) continue;
+            if (enBase != null) return null;                    // dos personas de la base: no se sabe cuál
+            enBase = x;
+        }
+        return enBase != null && opciones.get(enBase) == min ? enBase : null;
     }
 
     /** Las letras de la etiqueta de un renglón, sin espacios ni signos: «N SS: 123…» → «NSS». */
@@ -468,14 +578,19 @@ public final class AnalizadorTarjeta {
                 Matcher et = ETIQUETA_ID.matcher(l.texto);
                 if (!et.find()) continue;
                 StringBuilder resto = new StringBuilder(l.texto.substring(et.end()));
+                List<Simbolo> cajas = new ArrayList<>(l.cajas().subList(et.end(), l.texto.length()));
                 List<Linea> derecha = new ArrayList<>();
                 for (Linea y : orden) if (mismaFila(l, y) && y.izquierda > l.izquierda) derecha.add(y);
                 derecha.sort((a, b) -> Integer.compare(a.izquierda, b.izquierda));
-                for (Linea y : derecha) resto.append(' ').append(y.texto);
+                for (Linea y : derecha) {
+                    resto.append(' ').append(y.texto);
+                    cajas.add(null);
+                    cajas.addAll(y.cajas());
+                }
                 filaDelId.add(l);
                 filaDelId.addAll(derecha);
                 if (enRecuadro == null && resto.toString().matches(".*\\d.*")) enRecuadro = resto.toString().trim();
-                String c = codigoDelId(resto.toString(), objetivo, r);
+                String c = codigoDelId(resto.toString(), cajas, objetivo, r);
                 if (c == null) continue;
                 int n = c.length();
                 if (objetivo > 0 ? n != objetivo : (n < r.minDigitos || n > r.maxDigitos)) continue;
@@ -512,7 +627,8 @@ public final class AnalizadorTarjeta {
                 if (objetivo > 0 && et.length() <= 3 && !r.noCodigo.contains(et)) {
                     int ini = 0;
                     while (ini < l.texto.length() && !Character.isDigit(l.texto.charAt(ini))) ini++;
-                    String c = codigoDelId(et.isEmpty() ? l.texto : l.texto.substring(ini), objetivo, r);
+                    if (et.isEmpty()) ini = 0;
+                    String c = codigoDelId(l.texto.substring(ini), l.cajas().subList(ini, l.texto.length()), objetivo, r);
                     if (c != null && !cands.contains(c)) cands.add(c);
                 }
             }
