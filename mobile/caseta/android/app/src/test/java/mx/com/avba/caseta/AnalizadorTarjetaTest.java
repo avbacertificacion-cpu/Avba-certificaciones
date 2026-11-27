@@ -241,6 +241,92 @@ public class AnalizadorTarjetaTest {
         assertEquals("12345678901", AnalizadorTarjeta.analizar(l, r11).codigo);
     }
 
+    /* ── Credenciales con rayas blancas de la impresora (cabezal con inyectores tapados): rayas verticales que
+          cruzan el recuadro del ID y parten las etiquetas («N OMBRE:», «N SS:», «E VIPRESA:»). Datos ficticios. ── */
+    private static List<AnalizadorTarjeta.Linea> conRayas(AnalizadorTarjeta.Linea... id) {
+        List<AnalizadorTarjeta.Linea> l = new ArrayList<>();
+        for (AnalizadorTarjeta.Linea x : id) l.add(x);
+        l.add(ln("N OMBRE: RAMIRO ESTEBAN", 970, 190, 42, 860));
+        l.add(ln("VILLARREAL DUARTE", 1025, 510, 42, 580));
+        l.add(ln("E VIPRESA: MONTAJES DEL NORTE", 1105, 190, 42, 1000));
+        l.add(ln("CAR(GO: AYUDANTE GENERAL", 1210, 190, 42, 700));
+        l.add(ln("N SS: 12345678901", 1325, 190, 40, 480));
+        l.add(ln("T IPO DE SANGRE: O+", 1440, 190, 42, 580));
+        l.add(ln("CREDENCIAL DE ACCESO", 1770, 370, 48, 820));
+        return l;
+    }
+    private static AnalizadorTarjeta.Reglas credencial(String... base) {
+        AnalizadorTarjeta.Reglas r = new AnalizadorTarjeta.Reglas();
+        r.digitosId = 5;
+        r.minDigitos = 5;
+        r.ponerIds(base);
+        return r;
+    }
+
+    /** La raya dentro del recuadro: se lee como «|», «I», espacio o un dígito repetido; el ID sale completo. */
+    @Test public void idConRayasDeLaImpresora() {
+        String[] lecturas = { "ID: 00287", "ID: 0 0287", "ID: 0|0287", "ID: 0I0287", "ID: 0028 7", "ID: 002|87",
+                              "ID: 00287 |", "ID:| 00287", "1D: 0 0287", "ID: 000287", "ID: 010287" };
+        for (String t : lecturas) {
+            AnalizadorTarjeta.Lectura le = AnalizadorTarjeta.analizar(conRayas(ln(t, 825, 560, 70, 370)), credencial());
+            assertEquals("ID leído como «" + t + "»", "00287", le.codigo);
+            assertEquals("nombre con «N OMBRE:» partida", NOMBRE_CRED, le.nombre);
+        }
+        // El número en pedazos, en renglones separados de la misma fila
+        ver(conRayas(ln("ID: 0", 825, 560, 70, 150), ln("0287", 826, 760, 68, 200)), credencial(), "00287", NOMBRE_CRED);
+        ver(conRayas(ln("ID:", 828, 560, 64, 110), ln("002", 825, 700, 70, 120), ln("87", 825, 850, 70, 80)), credencial(), "00287", NOMBRE_CRED);
+        // Sin la etiqueta «ID»: el número solo, partido
+        ver(conRayas(ln("0 0287", 825, 700, 70, 230)), credencial(), "00287", NOMBRE_CRED);
+    }
+
+    /** Si la raya se lee como un «1» y no se sabe cuál es, decide la base del personal; sin base no se adivina. */
+    @Test public void rayaDudosaLaDecideLaBase() {
+        List<AnalizadorTarjeta.Linea> l = conRayas(ln("ID: 101213", 825, 560, 70, 370));   // 10213 con un «1» de más
+        assertNull("sin base: podría ser 01213, 10213 o 10123", AnalizadorTarjeta.analizar(l, credencial()).codigo);
+        assertEquals("10213", AnalizadorTarjeta.analizar(l, credencial("287", "10213", "4471")).codigo);
+        assertNull("ninguna en la base: tampoco se adivina", AnalizadorTarjeta.analizar(l, credencial("287")).codigo);
+    }
+
+    /** Si la raya borró un dígito, no se toma el pedazo: «0028» sería otra persona (la 28). */
+    @Test public void pedazoDelIdNoEsOtraPersona() {
+        assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 0028", 825, 560, 70, 300)), credencial("28", "287")).codigo);
+        assertNull(AnalizadorTarjeta.analizar(conRayas(ln("ID: 0028", 825, 560, 70, 150), ln("|", 825, 760, 70, 10)), credencial("28")).codigo);
+    }
+
+    /** «N SS:» partida no es «N.» (número): el NSS nunca es el ID, con o sin la regla de 5 dígitos. */
+    @Test public void nssConEtiquetaPartida() {
+        assertNull(AnalizadorTarjeta.analizar(conRayas(), new AnalizadorTarjeta.Reglas()).codigo);
+        assertNull(AnalizadorTarjeta.analizar(conRayas(), credencial()).codigo);
+        List<AnalizadorTarjeta.Linea> l = conRayas(ln("ID: 02 87", 825, 560, 70, 370));
+        assertEquals("0287", AnalizadorTarjeta.analizar(l, new AnalizadorTarjeta.Reglas()).codigo);
+        List<AnalizadorTarjeta.Linea> aparte = new ArrayList<>();
+        aparte.add(ln("N SS:", 1327, 190, 40, 140));
+        aparte.add(ln("12345", 1324, 345, 40, 160));                                       // un pedazo del NSS
+        aparte.add(ln("678901", 1324, 520, 40, 190));
+        assertNull(AnalizadorTarjeta.analizar(aparte, credencial()).codigo);
+    }
+
+    @Test public void etiquetasPartidasPorRayas() {
+        assertEquals("RAMIRO ESTEBAN", AnalizadorTarjeta.despuesDeNombre("N OMBRE: RAMIRO ESTEBAN"));
+        assertEquals("RAMIRO", AnalizadorTarjeta.despuesDeNombre("NOM|BRE: RAMIRO"));
+        assertEquals("RAMIRO", AnalizadorTarjeta.despuesDeNombre("NOVIBRE: RAMIRO"));
+        assertNull(AnalizadorTarjeta.despuesDeNombre("NORBERTO RUIZ"));
+        assertTrue(AnalizadorTarjeta.esEtiqueta("N SS:"));
+        assertTrue(AnalizadorTarjeta.esEtiqueta("E VIPRESA:"));
+        assertTrue(AnalizadorTarjeta.esEtiqueta("T IPO DE SANGRE:"));
+        assertTrue(AnalizadorTarjeta.esEtiqueta("ALEF RGIAS:"));
+        assertTrue(AnalizadorTarjeta.esEtiqueta("CAR(GO:"));
+        assertFalse(AnalizadorTarjeta.esEtiqueta("VILLARREAL DUARTE"));
+        assertFalse(AnalizadorTarjeta.esEtiqueta("MONTAJES DEL NORTE"));
+        assertFalse(AnalizadorTarjeta.esEtiqueta("ANA SOFIA"));
+        assertEquals("287", AnalizadorTarjeta.sinCeros("00287"));
+        assertEquals("0", AnalizadorTarjeta.sinCeros("00000"));
+        // Lo que sigue al número en el recuadro no se vuelve número («SOLO» no es «5010»)
+        assertEquals("00287", AnalizadorTarjeta.codigoDelId(" 00287 SOLO", 5, new AnalizadorTarjeta.Reglas()));
+        assertEquals("00287", AnalizadorTarjeta.codigoDelId(" O 0287", 5, new AnalizadorTarjeta.Reglas()));
+        assertNull(AnalizadorTarjeta.codigoDelId(" SOLO", 5, new AnalizadorTarjeta.Reglas()));
+    }
+
     /** Si unas imágenes leyeron sólo el primer renglón del nombre, cuentan a favor del nombre completo. */
     @Test public void nombreCompletoGanaALaLecturaParcial() {
         AnalizadorTarjeta.Estabilizador e = new AnalizadorTarjeta.Estabilizador(3, 6);

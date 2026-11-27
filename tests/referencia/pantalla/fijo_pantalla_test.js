@@ -3,7 +3,9 @@
 //    turno, el equipo lo recuerda si la app se reinicia y lo olvida al salir de la cámara;
 //  · la cuenta de modo fijo (sólo entradas / sólo salidas) abre la lectura continua sola;
 //  · cada lectura se registra, se ignora a quien se registró hace menos de 2 min, la app muestra el
-//    nombre de la base, permisos y avisos; sin señal; la app vieja; Cuentas.
+//    nombre de la base, permisos y avisos; sin señal; la app vieja; Cuentas;
+//  · credenciales con rayas de la impresora: el lector recibe los 5 dígitos del ID y los IDs de la base,
+//    y una lectura con un dígito de más (app anterior) se corrige con la base.
 // API real local; personas e IDs inventados.
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
@@ -23,7 +25,7 @@ function app(conContinuo) {
     window.__ev = {}; window.__mostrados = []; window.__continuo = []; window.__leer = [];
     window.__emitir = (ev, d) => (window.__ev[ev] || []).forEach(f => f(d));
     const L = {
-      disponible: () => Promise.resolve(conContinuo ? { disponible: true, local: true, continuo: true } : { disponible: true, local: true }),
+      disponible: () => Promise.resolve(conContinuo ? { disponible: true, local: true, continuo: true, rayas: conContinuo === 'rayas' } : { disponible: true, local: true }),
       mostrar: d => { window.__mostrados.push(d); return Promise.resolve({ mostrado: true }); },
       detener: () => Promise.resolve(),
       addListener: (ev, fn) => { (window.__ev[ev] = window.__ev[ev] || []).push(fn); return Promise.resolve({ remove() {} }); },
@@ -51,6 +53,7 @@ const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE 
   await post('PADRON_GUARDAR', 'tok-admin', { codigo: '00287', nombre: 'Ramiro Esteban Villarreal Duarte', empresa: 'Montajes del Golfo' });
   await post('PADRON_GUARDAR', 'tok-admin', { codigo: '00412', nombre: 'Ana Sofia Ruiz Paez' });
   await post('PADRON_GUARDAR', 'tok-admin', { codigo: '00316', nombre: 'Pedro Vega Cruz' });
+  await post('PADRON_GUARDAR', 'tok-admin', { codigo: '00230', nombre: 'Lucia Mendez Rios' });
   await post('PERMISO_AGREGAR', 'tok-admin', { codigo: '287', tipos: ['CELULAR'], detalle: 'Celular Samsung A54' });
   await post('PERMISO_AGREGAR', 'tok-admin', { codigo: '412', tipos: ['HERRAMIENTA'], detalle: 'Taladro', vigencia: '2020-01-31' });
   const b = await chromium.launch();
@@ -60,6 +63,9 @@ const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE 
   const op = await p.evaluate(() => window.__continuo);
   ok(op.length === 1 && op[0].tipo === 'entrada' && op[0].titulo === 'ENTRADA', 'al entrar, la lectura continua empieza sola (de ENTRADA)');
   ok(op[0] && op[0].esperaNombre === 0 && op[0].camara === 'frontal', 'con la base del personal, el lector sólo espera el ID (esperaNombre 0) y usa la cámara frontal');
+  ok(op[0] && op[0].digitosId === 5 && op[0].minDigitos === 5 && ['287', '412', '316', '230'].every(k => (op[0].ids || []).includes(k)),
+     'el lector recibe los 5 dígitos del ID y los IDs de la base (para las credenciales con rayas): ' + (op[0] && (op[0].ids || []).join(',')));
+  ok(await p.isVisible('.nota-app') && /versión nueva de la app/.test(await p.textContent('.nota-app')), 'con la app de antes de las rayas: avisa que hay una versión nueva');
   ok(/Equipo fijo de ENTRADA/.test(await p.textContent('#fijo-tit')) && /Leyendo credenciales/.test(await p.textContent('#fijo-estado')), 'la pantalla dice «Equipo fijo de ENTRADA · Leyendo credenciales»');
   ok(await p.isVisible('.cap.ent') && await p.isHidden('.cap.sal') && await p.isHidden('.cap.inc'), 'sólo queda el botón de ENTRADA (sin SALIDA ni INCIDENCIA)');
   ok(/Equipo fijo de entrada/.test(await p.textContent('#sub-usuario')) && !/Turno de/.test(await p.textContent('#sub-usuario')), 'encabezado: ' + await p.textContent('#sub-usuario'));
@@ -82,6 +88,11 @@ const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE 
   await leer(p, '00999', 'ALGUIEN NUEVO'); await p.waitForTimeout(800);
   m = await ultimo(p);
   ok(m && m.color === 'amarillo' && m.nombre === 'ALGUIEN NUEVO' && m.lineas.some(x => /No está en la base/.test(x)) && cuenta('999', 'entrada') === '1', 'ID fuera de la base: se registra y avisa «pasa con el guardia»');
+  // Credencial con una raya de la impresora, leída por la app anterior: «0|0230» llega como «010230»
+  await leer(p, '010230', 'LUCIA'); await p.waitForTimeout(900);
+  m = await ultimo(p);
+  ok(m && m.titulo === 'ENTRADA REGISTRADA' && m.nombre === 'LUCIA MENDEZ RIOS' && m.color === 'verde' && cuenta('230', 'entrada') === '1' && cuenta('10230', 'entrada') === '0',
+     'un dígito de más por la raya: se corrige con la base y se registra el ID 00230 (' + (m && m.lineas[0]) + ')');
   // Una tras otra (una persona cada 10 s es de sobra: aquí cada medio segundo)
   for (const [c, n] of [['00501', 'LUIS'], ['00502', 'MARIA'], ['00503', 'JOSUE'], ['00504', 'KARLA']]) { await leer(p, c, n); await p.waitForTimeout(500); }
   await p.waitForTimeout(3000);
@@ -105,7 +116,8 @@ const cuenta = (cod, tipo) => sql(`SELECT COUNT(*) FROM accesos_registros WHERE 
   await ctx.close();
 
   // ══ Carril de SALIDA ══
-  ({ ctx, p } = await telefono(b, ses('fijo.salida', 'S')));
+  ({ ctx, p } = await telefono(b, ses('fijo.salida', 'S'), 'rayas'));
+  ok(await p.isHidden('.nota-app'), 'con la app nueva (lee credenciales con rayas): sin el aviso de actualizar');
   ok((await p.evaluate(() => window.__continuo[0] && window.__continuo[0].tipo)) === 'salida' && await p.isVisible('.cap.sal') && await p.isHidden('.cap.ent'), 'el carril de salida abre la lectura continua de SALIDA');
   await leer(p, '00287', 'RAMIRO'); await p.waitForTimeout(1500);
   m = await ultimo(p);

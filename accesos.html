@@ -274,6 +274,7 @@
   .btn.carril.entrada{background:var(--verde)} .btn.carril.salida{background:var(--azul)}
   .btn.carril small{font-size:12px;font-weight:600;opacity:.9} .btn.carril b{font-size:21px;letter-spacing:.5px}
   .fijo-estado{font-size:14px;color:var(--texto-sub);margin:12px 4px;line-height:1.5}
+  .nota-app{display:block;margin-top:8px;font-size:13px;color:var(--texto);overflow-wrap:anywhere}
   .fijo-estado b{color:var(--texto)}
   #v-foto{z-index:110}
   .mov-fotos{display:flex;gap:10px;margin-top:6px}
@@ -571,10 +572,29 @@
      internet (la imagen no sale del equipo) y el registro queda guardado al
      instante, sin foto. En el navegador sigue la foto de la identificación. */
   var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
-  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal', repetirSeg: 120 };
+  var REGLAS_TARJETA = { minDigitos: 5, maxDigitos: 12, longitud: 0, digitosId: 5, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal', repetirSeg: 120 };
   function mezclarReglas(g) {
     if (!g || typeof g !== 'object') return;
-    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara', 'repetirSeg', 'esperaNombre'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+    ['minDigitos', 'maxDigitos', 'longitud', 'digitosId', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara', 'repetirSeg', 'esperaNombre'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+  }
+  /** Credenciales con rayas blancas de la impresora: la app anterior puede leer la raya como un dígito de
+   *  más («0|0287» → «010287»). Si ese ID no está en la base, se prueba quitando un «1» o un dígito
+   *  repetido: si sólo sale una persona de la base, es ella. (El ID impreso siempre trae digitosId.) */
+  function corregirConBase(codigo) {
+    var c = String(codigo || ''), L = +REGLAS_TARJETA.digitosId || 0;
+    if (!PADRON.total || !L || !/^\d+$/.test(c) || c.length <= L || c.length > L + 2 || enPadron(c)) return codigo;
+    var hallados = {};
+    (function quitar(s, falta) {
+      if (!falta) { var p = enPadron(s); if (p) hallados[p.codigo] = 1; return; }
+      for (var i = 0; i < s.length; i++)
+        if (s[i] === '1' || s[i] === s[i - 1] || s[i] === s[i + 1]) quitar(s.slice(0, i) + s.slice(i + 1), falta - 1);
+    })(c, c.length - L);
+    var k = Object.keys(hallados);
+    return k.length === 1 ? k[0] : codigo;
+  }
+  function corregirLectura(r) {
+    if (r && r.codigo && !r.manual) r.codigo = corregirConBase(r.codigo);
+    return r;
   }
   /* Equipo: identificador propio de este teléfono o navegador (no cambia al cerrar sesión). Se
      sigue mandando con cada petición, pero el servidor ya no liga cuentas a teléfonos: varios
@@ -962,6 +982,8 @@
     o.subtitulo = 'Acomoda la credencial dentro del recuadro, sin reflejos. Se lee en este teléfono, sin internet.';
     o.simular = false;
     o.esperaNombre = typeof REGLAS_TARJETA.esperaNombre === 'number' ? REGLAS_TARJETA.esperaNombre : (PADRON.total ? 0 : 1500);
+    // Los IDs de la base: si una raya de la impresora deja dudas en el número, el lector se queda con el que existe
+    o.ids = Object.keys(PADRON.personas || {}).slice(0, 30000);
     return o;
   }
   function leerTarjeta(tipo) {
@@ -970,6 +992,7 @@
     var o = opcionesLector(tipo);
     LECTOR.leer(o).then(function (r) {
       leyendoTarjeta = false;
+      corregirLectura(r);
       if (!r || r.cancelado) {
         if (r && r.error) toast(r.error, true);
         // Incidencia de alguien sin credencial: se reporta igual, con su nombre escrito a mano
@@ -2058,7 +2081,7 @@
      Cuentas) no elige: siempre es lo suyo. Aquí se registra (misma cola sin señal), se ignora
      a la misma persona si ya se registró hace poco (regla repetirSeg, 2 min) y se le dice a
      la app qué mostrar en grande: nombre de la base, permisos o avisos. */
-  var CONTINUO = { soportado: null, activo: false, escuchando: false, auto: true };
+  var CONTINUO = { soportado: null, rayas: null, activo: false, escuchando: false, auto: true };
   var CLAVE_CARRIL = 'ca_accesos_carril', CARRIL = '';   // lo que eligió el guardia en este equipo
   var LEIDAS_FIJO = {};                            // clave|tipo → hora del último registro en este equipo
   function carril() { return MODO_FIJO || CARRIL; }
@@ -2112,11 +2135,16 @@
       e.innerHTML = 'Si este equipo se queda fijo en el acceso, elige dónde está: la cámara queda abierta y cada credencial se registra sola, sin tocar la pantalla.';
       el.hidden = false;
     }
+    if (LECTOR && CONTINUO.soportado && CONTINUO.rayas === false)
+      e.innerHTML += '<span class="nota-app">Hay una <b>versión nueva de la app</b> que lee las credenciales con rayas de la impresora: instálala (gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk).</span>';
   }
   function soportaContinuo() {
     if (CONTINUO.soportado !== null) return Promise.resolve(CONTINUO.soportado);
     if (!LECTOR || !LECTOR.disponible || !LECTOR.continuo) return Promise.resolve(CONTINUO.soportado = false);
-    return Promise.resolve(LECTOR.disponible()).then(function (r) { return (CONTINUO.soportado = !!(r && r.continuo)); }, function () { return (CONTINUO.soportado = false); });
+    return Promise.resolve(LECTOR.disponible()).then(function (r) {
+      CONTINUO.rayas = !!(r && r.rayas);           // la versión que lee credenciales con rayas de la impresora
+      return (CONTINUO.soportado = !!(r && r.continuo));
+    }, function () { return (CONTINUO.soportado = false); });
   }
   function iniciarContinuo() {
     if (!carril() || !LECTOR || CONTINUO.activo) return;
@@ -2160,6 +2188,7 @@
   function alLeerContinuo(r) {
     var tipo = carril();
     if (!tipo || !r) return;
+    corregirLectura(r);
     var T = tipo === 'entrada' ? 'ENTRADA' : 'SALIDA';
     var codigo = String(r.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
     if (!codigo) return;

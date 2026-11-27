@@ -114,7 +114,11 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             EXTRA_MIN = "minDigitos", EXTRA_MAX = "maxDigitos", EXTRA_LONGITUD = "longitud", EXTRA_PATRON = "patron",
             EXTRA_CLAVES = "claves", EXTRA_NO_NOMBRE = "noNombre", EXTRA_NO_CODIGO = "noCodigo", EXTRA_CONFIRMAR = "confirmar",
             EXTRA_VERTICAL = "vertical", EXTRA_FOTO = "foto", EXTRA_CAMARA = "camara",
-            EXTRA_CONTINUO = "continuo", EXTRA_TIPO = "tipo", EXTRA_ESPERA_NOMBRE = "esperaNombre";
+            EXTRA_CONTINUO = "continuo", EXTRA_TIPO = "tipo", EXTRA_ESPERA_NOMBRE = "esperaNombre",
+            EXTRA_DIGITOS_ID = "digitosId";
+
+    /** Los IDs de la base del personal que mandó la página (el plugin los deja aquí antes de abrir el lector). */
+    static volatile String[] idsDeLaBase = new String[0];
 
     private static final int VERDE = Color.rgb(76, 175, 80), AMARILLO = Color.rgb(255, 202, 40), BLANCO = Color.WHITE;
 
@@ -202,6 +206,8 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         reglas.minDigitos = Math.max(1, i.getIntExtra(EXTRA_MIN, reglas.minDigitos));
         reglas.maxDigitos = Math.max(reglas.minDigitos, i.getIntExtra(EXTRA_MAX, reglas.maxDigitos));
         reglas.longitud = Math.max(0, i.getIntExtra(EXTRA_LONGITUD, 0));
+        reglas.digitosId = Math.max(0, Math.min(12, i.getIntExtra(EXTRA_DIGITOS_ID, 0)));
+        reglas.ponerIds(idsDeLaBase);
         reglas.ponerPatron(i.getStringExtra(EXTRA_PATRON));
         String[] claves = i.getStringArrayExtra(EXTRA_CLAVES);
         if (claves != null && claves.length > 0) reglas.claves.addAll(AnalizadorTarjeta.Reglas.conjunto(claves));

@@ -53,7 +53,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `personal.html` | **Personal y permisos** (ADMIN y PLANTA): la base de IDs y nombres (buscar, agregar, cambiar —cambiar el ID se lleva sus permisos—, quitar), **cargar Excel** (revisa primero: columnas reconocidas o elegidas a mano, nuevos, con cambios, renglones con problema; no quita a nadie), descargar Excel, IDs leídos en la caseta que no están en la base, y **permisos** por ID con checklist (herramienta, celular, computadora, otro), foto del pase y/o datos del equipo y vigencia. `personal.html?id=287` abre a esa persona. |
 | `api/Personal.php` | La base del personal (`personal`, llave = ID sin ceros) y sus permisos (`personal_permisos`; quitar = `activo` 0, queda historial). Acciones `PADRON_*` y `PERMISO_AGREGAR`/`PERMISO_QUITAR`. `PADRON_CAJA`: la copia para el teléfono de la caseta, con versión (`ca_ajustes.padron_version`). `registrar` e incidencias guardan el **nombre de la base** si el ID está (`Personal::nombreDe`). |
 | `api/lib/xlsx_lector.php` | Lee .xlsx (abre el ZIP con zlib, sin extensión zip) y .csv (también los de Excel en Windows); regresa los renglones con su número de Excel. |
-| `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. |
+| `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. `digitosId` 5 y `minDigitos` 5: el ID impreso trae 5 dígitos (corrige las rayas de la impresora y nunca toma un pedazo del número). |
 | `api/lib/qrcode.php` | Generador de códigos QR (lo usa la portada de la maqueta). |
 | `demo/` | **La maqueta** que hay que volver real: `control-accesos.html` (panel), `caseta.html` (guardia), `demo-datos.js` (datos ficticios y reglas), `index.html` (portada), `sala.php` (sincroniza la demo entre equipos). **Sólo Administración:** `solo-admin.js` regresa a su inicio a quien entre con otro perfil (sin sesión sí abre, para el teléfono que entra con el QR de la portada). |
 | `mobile/caseta/` | App Android «AVBA Control de Accesos» (Capacitor): abre `accesos.html` y agrega el lector nativo de la credencial (CameraX + ML Kit sin internet, `AnalizadorTarjeta.java` con sus pruebas). Cámara frontal o trasera según la regla `camara`; el botón «Cambiar cámara» pasa a la otra y el teléfono la recuerda mientras la regla no cambie. `esperaNombre` (0 con la base del personal): tras confirmar el ID no espera el nombre. **Lectura continua** (`continuo`, eventos `lectura`/`cerrado`, `mostrar`, `detener`; `disponible()` responde `continuo: true`): la cámara no se cierra, cada credencial se avisa a la página, la misma credencial frente a la cámara no se reenvía (6 s), muestra en grande lo que dice la página (o «Leída» si no contesta en 2.5 s), con tono; salir = mantener 3 s. |
@@ -87,6 +87,13 @@ y sus descargas; el enrutador le rechaza todo lo demás y `descargar.php` no le 
    planta; se compara sin ceros, «00287» = «287»), **NOMBRE** en uno o dos renglones,
    EMPRESA, CARGO, **NSS de 11 dígitos (nunca es el ID)**, TIPO DE SANGRE, ALERGIAS y
    abajo «CREDENCIAL DE ACCESO». El lector ya está ajustado a ese formato.
+   **Credenciales con rayas de la impresora** (rayas blancas verticales que cruzan el recuadro
+   del ID y parten etiquetas: «N OMBRE», «N SS»): con la regla `digitosId` (5) el lector junta
+   los pedazos del número («0 0287», «0028 7»), quita la raya leída como «|», «I» o un «1» de más,
+   **nunca toma un pedazo** (sería otra persona) y, si queda en duda, decide con los IDs de la
+   base que le manda la página (`ids`); sin base no adivina. «N SS» partida no se toma como «N.»
+   de número. La página además corrige con la base una lectura de la app anterior con un dígito
+   de más (`corregirConBase`). La app nueva responde `rayas: true` en `disponible()`.
 4. **Turnos por cuenta:** lo que registra un guardia va a **su** turno (el de su cuenta), a
    cualquier hora (`turnoDeGuardia`; en la pantalla `turnoGuardia`): el de día con la fecha
    del día; el de noche con la fecha en que empezó su noche (antes del mediodía es la noche

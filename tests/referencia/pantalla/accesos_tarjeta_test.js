@@ -106,7 +106,7 @@ async function pantalla(b, rol, conLector, reglas, camaraNavegador) {
   ok(op && op.orientacion === 'vertical' && /credencial/.test(op.subtitulo || ''), 'la cámara recibe la credencial de pie (orientacion: ' + (op && op.orientacion) + ')');
   { const rs = (await (await fetch('http://localhost:8794/demo/sala.php?tarjeta=1')).json()).reglas || {};
     ok(rs.orientacion === 'vertical' && rs.noNombre.includes('SOLUCIONES') && rs.noNombre.includes('AYUDANTE') && rs.noNombre.includes('THE'), 'el servidor entrega las reglas de la credencial (vertical; empresa, oficios y logotipos no son nombre)'); }
-  ok(op && /ENTRADA · PUNTO DE CONTROL 1/.test(op.titulo) && op.simular === false && op.minDigitos === 4, 'opciones del lector: ' + op.titulo);
+  ok(op && /ENTRADA · PUNTO DE CONTROL 1/.test(op.titulo) && op.simular === false && op.minDigitos === 5 && op.digitosId === 5, 'opciones del lector (ID de 5 dígitos): ' + op.titulo);
   ok(op && op.camara === 'frontal', 'el lector se abre con la cámara frontal (camara: ' + (op && op.camara) + ')');
   // Salida con código escrito a mano
   await p.evaluate(() => window.__lecturas.push({ codigo: '004512', nombre: '', manual: true, ms: 5000 }));

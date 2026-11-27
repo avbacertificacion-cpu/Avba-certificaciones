@@ -43,7 +43,8 @@ import java.lang.ref.WeakReference;
  *   LectorTarjeta.continuo({ tipo: 'entrada'|'salida', titulo, … })   abre la cámara y no la cierra
  *   LectorTarjeta.mostrar({ titulo, nombre, lineas: [], color, segundos, sonido })   el resultado en grande
  *   LectorTarjeta.detener()
- * disponible() responde continuo: true en las versiones que lo traen.
+ * disponible() responde continuo: true en las versiones que lo traen, y rayas: true en las que leen
+ * credenciales con rayas de la impresora (reglas digitosId e ids: los IDs de la base del personal).
  */
 @CapacitorPlugin(
     name = "LectorTarjeta",
@@ -70,6 +71,7 @@ public class LectorTarjetaPlugin extends Plugin {
         r.put("disponible", true);
         r.put("local", true);
         r.put("continuo", true);
+        r.put("rayas", true);            // lee credenciales con rayas de la impresora (digitosId, ids de la base)
         call.resolve(r);
     }
 
@@ -163,6 +165,9 @@ public class LectorTarjetaPlugin extends Plugin {
         i.putExtra(LectorTarjetaActivity.EXTRA_NO_NOMBRE, textos(call.getArray("noNombre")));
         i.putExtra(LectorTarjetaActivity.EXTRA_NO_CODIGO, textos(call.getArray("noCodigo")));
         i.putExtra(LectorTarjetaActivity.EXTRA_ESPERA_NOMBRE, entero(call, "esperaNombre", 1500));   // 0: sólo el ID (el nombre sale de la base)
+        i.putExtra(LectorTarjetaActivity.EXTRA_DIGITOS_ID, entero(call, "digitosId", 0));         // 5: corrige las rayas de la impresora
+        // Los IDs de la base (para decidir una lectura dudosa) pueden ser miles: no viajan en el Intent
+        LectorTarjetaActivity.idsDeLaBase = textos(call.getArray("ids"));
         return i;
     }
 

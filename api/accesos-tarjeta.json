@@ -1,13 +1,14 @@
 {
-  "_nota": "Reglas para leer la credencial de acceso con la app AVBA Control de Accesos. La app las pide al servidor (api/index.php?action=ACCESOS_TARJETA_REGLAS) cada vez que abre el control de accesos, así que se ajustan aquí sin reinstalarla. camara: frontal o trasera, con cuál empieza el lector (el guardia puede cambiarla con «Cambiar cámara» y su teléfono la recuerda hasta que esta regla cambie). orientacion: vertical (credencial de pie) u horizontal, para el recuadro de la cámara. foto: true guarda con cada registro la foto de la credencial como evidencia (sale de la misma imagen en la que se leyó el ID). longitud: dígitos exactos del ID (0 = cualquiera entre minDigitos y maxDigitos). patron: expresión regular opcional (Java); el ID es su primer grupo. claves: palabras que suelen ir junto al ID (ID ya viene incluida). noNombre: palabras que NO forman parte de un nombre (empresa, oficios, letreros). noCodigo: palabras de los renglones cuyo número NO es el ID (teléfono, NSS, fechas). confirmar: cuántas lecturas iguales se necesitan para darla por buena. repetirSeg: en el equipo fijo (lectura continua), segundos en que la misma persona no se vuelve a registrar (0 = siempre se registra).",
+  "_nota": "Reglas para leer la credencial de acceso con la app AVBA Control de Accesos. La app las pide al servidor (api/index.php?action=ACCESOS_TARJETA_REGLAS) cada vez que abre el control de accesos, así que se ajustan aquí sin reinstalarla. camara: frontal o trasera, con cuál empieza el lector (el guardia puede cambiarla con «Cambiar cámara» y su teléfono la recuerda hasta que esta regla cambie). orientacion: vertical (credencial de pie) u horizontal, para el recuadro de la cámara. foto: true guarda con cada registro la foto de la credencial como evidencia (sale de la misma imagen en la que se leyó el ID). longitud: dígitos exactos del ID (0 = cualquiera entre minDigitos y maxDigitos). digitosId: los dígitos que trae impreso el ID de la credencial (5); con él, la app corrige las credenciales con rayas blancas de la impresora (la raya leída como un 1 de más o el número partido en pedazos), nunca toma un pedazo del número y, si queda en duda, se queda con el ID que está en la base del personal. minDigitos 5: la app anterior tampoco toma un pedazo del número. patron: expresión regular opcional (Java); el ID es su primer grupo. claves: palabras que suelen ir junto al ID (ID ya viene incluida). noNombre: palabras que NO forman parte de un nombre (empresa, oficios, letreros). noCodigo: palabras de los renglones cuyo número NO es el ID (teléfono, NSS, fechas). confirmar: cuántas lecturas iguales se necesitan para darla por buena. repetirSeg: en el equipo fijo (lectura continua), segundos en que la misma persona no se vuelve a registrar (0 = siempre se registra).",
   "tarjeta": "Quantum Energy",
   "camara": "frontal",
   "repetirSeg": 120,
   "orientacion": "vertical",
   "foto": true,
-  "minDigitos": 4,
+  "minDigitos": 5,
   "maxDigitos": 12,
   "longitud": 0,
+  "digitosId": 5,
   "patron": "",
   "claves": [],
   "noNombre": [

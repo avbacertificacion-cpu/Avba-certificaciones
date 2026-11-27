@@ -84,6 +84,19 @@ public final class AnalizadorTarjeta {
             "EXPIRA", "EXPEDICION", "FECHA", "NACIMIENTO", "CP", "C.P.");
         /** Palabras que no deben contar para descartar un nombre aunque estén en noNombre (p. ej. «DE LA»). */
         public Set<String> particulas = conjunto("DE", "DEL", "LA", "LAS", "LOS", "Y", "MC", "MAC", "VAN", "VON", "DA", "DI", "SAN", "SANTA");
+        /** Dígitos que trae impreso el ID de la credencial (5). Con él, si una raya de la impresora se lee
+         *  como un «1» de más o parte el número en pedazos, se corrige; y nunca se toma un pedazo del
+         *  número (otra persona). 0 = no se sabe (cualquiera entre minDigitos y maxDigitos). */
+        public int digitosId = 0;
+        /** Los IDs de la base del personal, sin ceros a la izquierda. Si una lectura dudosa puede ser
+         *  más de un número, se queda la que está en la base. Vacío = sin base. */
+        public Set<String> ids = new HashSet<>();
+
+        public void ponerIds(String[] lista) {
+            ids.clear();
+            if (lista != null) for (String x : lista) { String k = sinCeros(x); if (!k.isEmpty()) ids.add(k); }
+        }
+        boolean enBase(String codigo) { return !ids.isEmpty() && ids.contains(sinCeros(codigo)); }
 
         public static Set<String> conjunto(String... p) {
             Set<String> s = new HashSet<>();
@@ -106,6 +119,105 @@ public final class AnalizadorTarjeta {
 
     public static String sinAcentos(String t) {
         return MARCAS.matcher(Normalizer.normalize(t, Normalizer.Form.NFD)).replaceAll("");
+    }
+
+    /** «00287» → «287»: así se compara el ID (la llave de cada persona). */
+    public static String sinCeros(String c) {
+        String d = c == null ? "" : c.replaceAll("\\D", "");
+        String s = d.replaceFirst("^0+", "");
+        return s.isEmpty() && !d.isEmpty() ? "0" : s;
+    }
+
+    /* ── El renglón del ID («ID: 00287», en el recuadro azul) ──
+       Algunas credenciales salen de la impresora con rayas blancas verticales que cruzan el recuadro.
+       El reconocimiento lee la raya como «|», «I», «l» o un «1» de más, o parte el número en dos
+       («0 0287», «0028 7»). Todo lo que sigue a «ID:» en esa fila es el número: se juntan los pedazos
+       y, si sobra un dígito, se quita el que parece raya. */
+    private static final Pattern ETIQUETA_ID = Pattern.compile("(?<![\\p{L}\\d])[I1l|!]\\s?D(?!\\p{L})\\s*[:;.,]?",
+            Pattern.CASE_INSENSITIVE);
+
+    /**
+     * El ID que trae «resto» (lo leído a la derecha de «ID:»), o null si no se puede saber.
+     * Con «objetivo» (los dígitos del ID) quita lo que sobra: primero lo que casi siempre es la raya
+     * («|», «!»), luego «I»/«l», al último un «1» o un dígito repetido. Si quedan dos números posibles
+     * igual de probables, decide la base del personal; sin base, no se adivina.
+     */
+    static String codigoDelId(String resto, int objetivo, Reglas r) {
+        StringBuilder dig = new StringBuilder();
+        List<Integer> costo = new ArrayList<>();               // lo que cuesta quitar cada dígito (0 = no se quita)
+        for (String tok : resto.trim().split("\\s+")) {
+            // Una palabra (letras que no se confunden con números, o más de dos sin ningún dígito) no es parte del ID
+            boolean conDigito = tok.matches(".*\\d.*"), palabra = false;
+            for (int i = 0; i < tok.length() && !palabra; i++)
+                palabra = Character.isLetter(tok.charAt(i)) && "IliOoQDSsBZz".indexOf(tok.charAt(i)) < 0;
+            if (palabra || (!conDigito && tok.replaceAll("[^\\p{L}]", "").length() > 2)) {
+                if (dig.length() > 0) break;                     // ahí acaba el número
+                continue;
+            }
+            for (int i = 0; i < tok.length(); i++) {
+                char ch = tok.charAt(i), d; int c;
+                if (ch >= '0' && ch <= '9') { d = ch; c = ch == '1' ? 3 : 0; }
+                else switch (ch) {
+                    case '|': case '!': d = '1'; c = 1; break;
+                    case 'I': case 'l': case 'i': d = '1'; c = 2; break;
+                    case 'O': case 'o': case 'Q': case 'D': d = '0'; c = 0; break;
+                    case 'S': case 's': d = '5'; c = 0; break;
+                    case 'B': d = '8'; c = 0; break;
+                    case 'Z': case 'z': d = '2'; c = 0; break;
+                    default: continue;                                                  // signo: se salta
+                }
+                dig.append(d); costo.add(c);
+            }
+        }
+        String s = dig.toString();
+        if (s.isEmpty()) return null;
+        if (objetivo <= 0) {                                    // sin saber cuántos: sólo se quita «|» y «!»
+            StringBuilder t = new StringBuilder();
+            for (int i = 0; i < s.length(); i++) if (costo.get(i) != 1) t.append(s.charAt(i));
+            return t.length() == 0 ? null : t.toString();
+        }
+        int sobran = s.length() - objetivo;
+        if (sobran < 0 || sobran > 2) return null;               // falta un dígito o es otro número (NSS, teléfono)
+        if (sobran == 0) {
+            // Un «|» que completa los dígitos puede ser la raya en lugar de un dígito borrado: sólo vale si está en la base
+            return costo.contains(1) && !r.enBase(s) ? null : s;
+        }
+        for (int i = 0; i < s.length(); i++)                    // un dígito repetido junto a su gemelo también puede sobrar
+            if (costo.get(i) == 0 && ((i > 0 && s.charAt(i - 1) == s.charAt(i)) || (i + 1 < s.length() && s.charAt(i + 1) == s.charAt(i))))
+                costo.set(i, 3);
+        Map<String, Integer> opciones = new HashMap<>();        // número posible → lo menos que cuesta llegar a él
+        for (int a = 0; a < s.length(); a++) {
+            if (costo.get(a) == 0) continue;
+            if (sobran == 1) { guardarOpcion(opciones, s.substring(0, a) + s.substring(a + 1), costo.get(a)); continue; }
+            for (int b = a + 1; b < s.length(); b++)
+                if (costo.get(b) > 0)
+                    guardarOpcion(opciones, s.substring(0, a) + s.substring(a + 1, b) + s.substring(b + 1), costo.get(a) + costo.get(b));
+        }
+        String elegido = elegirOpcion(opciones, r, true);
+        return elegido != null ? elegido : elegirOpcion(opciones, r, false);
+    }
+    private static void guardarOpcion(Map<String, Integer> m, String codigo, int costo) {
+        Integer antes = m.get(codigo);
+        if (antes == null || costo < antes) m.put(codigo, costo);
+    }
+    /** La opción más barata (sólo las de la base, si «deLaBase»); null si hay empate entre dos números. */
+    private static String elegirOpcion(Map<String, Integer> opciones, Reglas r, boolean deLaBase) {
+        String mejor = null; int min = Integer.MAX_VALUE; boolean empate = false;
+        for (Map.Entry<String, Integer> e : opciones.entrySet()) {
+            if (deLaBase && !r.enBase(e.getKey())) continue;
+            if (e.getValue() < min) { min = e.getValue(); mejor = e.getKey(); empate = false; }
+            else if (e.getValue() == min) empate = true;
+        }
+        return empate ? null : mejor;
+    }
+
+    /** Las letras de la etiqueta de un renglón, sin espacios ni signos: «N SS: 123…» → «NSS». */
+    static String etiquetaJunta(String t) {
+        if (t == null) return "";
+        String u = sinAcentos(t).toUpperCase(Locale.ROOT);
+        int fin = 0;
+        while (fin < u.length() && !Character.isDigit(u.charAt(fin))) fin++;
+        return u.substring(0, fin).replaceAll("[^A-Z]", "");
     }
 
     /* El reconocimiento confunde letras con números dentro de un número: O→0, I/l→1, S→5, B→8, Z→2.
@@ -144,6 +256,10 @@ public final class AnalizadorTarjeta {
         for (String w : palabras(t)) if (conj.contains(w) || conj.contains(w + ".")) return true;
         return t.contains("#") && conj.contains("#");
     }
+    /** Trae una palabra que suele ir junto al ID, y no es la etiqueta de otro número partida («N SS» no es «N»). */
+    private static boolean esClave(String t, Reglas r) {
+        return contieneAlguna(t, r.claves) && !r.noCodigo.contains(etiquetaJunta(t));
+    }
 
     /* ── Etiquetas de los campos («NOMBRE:», «EMPRESA:», «NSS:»…) ──
        En la credencial de acceso cada dato lleva su etiqueta. El reconocimiento
@@ -156,9 +272,20 @@ public final class AnalizadorTarjeta {
         "CELULAR", "EMERGENCIA", "CONTACTO", "VIGENCIA", "VENCE", "EXPEDICION", "EMISION", "FECHA", "NACIMIENTO",
         "SEXO", "NACIONALIDAD", "ID", "FOLIO", "EMPLEADO", "FICHA", "NUMERO", "CLAVE", "CODIGO", "FIRMA");
     private static final Set<String> UNIONES = Reglas.conjunto("DE", "DEL", "LA", "EL", "Y");
-    /* «NOMBRE:», «NOMBRE(S)», «N0MBRE» (cero en vez de O) al principio del renglón */
+    /* Etiquetas de varias palabras, juntas («TIPO DE SANGRE» → «TIPODESANGRE»), para reconocerlas aunque una
+       raya de la impresora las parta («T IPO DE SANGRE:», «N SS:», «E VIPRESA:», «CAR(GO:»). */
+    private static final Set<String> ETIQUETAS_JUNTAS = new HashSet<>(ETIQUETAS);
+    static {
+        ETIQUETAS_JUNTAS.addAll(Arrays.asList("TIPODESANGRE", "FECHADENACIMIENTO", "NUMERODEEMPLEADO",
+            "TELEFONODEEMERGENCIA", "CONTACTODEEMERGENCIA", "TIPODESANGRERH"));
+    }
+    /* Una raya entre dos letras: espacio, «|», «!», punto o apóstrofo */
+    private static final String RAYA = "[\\s|!.,'`]?";
+    /* «NOMBRE:», «NOMBRE(S)», «N0MBRE» (cero en vez de O) al principio del renglón; también partida por una raya
+       («N OMBRE:», «NOM|BRE») o con la M leída como «VI» / «IVI» / «RN». */
     private static final Pattern ETIQUETA_NOMBRE = Pattern.compile(
-        "^\\s*N[O0]MBRE(?:\\(S\\)|S)?(?!\\p{L})\\s*[:;.\\-]*\\s*", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+        "^\\s*[|!]?\\s*N" + RAYA + "[O0]" + RAYA + "(?:M|IVI|VI|RN)" + RAYA + "B" + RAYA + "R" + RAYA
+            + "E(?:\\(S\\)|S)?(?!\\p{L})\\s*[:;.\\-]*\\s*", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /** Si el renglón empieza con la etiqueta «NOMBRE», lo que trae después (puede ser ""); si no, null. */
     static String despuesDeNombre(String t) {
@@ -174,13 +301,38 @@ public final class AnalizadorTarjeta {
                 .replaceAll("[\\s:;.\\-]+$", "").trim();
         if (u.isEmpty()) return false;
         String[] w = u.split("[\\s:;.]+");
-        if (w.length > 4) return false;
-        boolean alguna = false;
+        boolean alguna = false, todas = w.length <= 4;
         for (String x : w) {
+            if (!todas) break;
             if (ETIQUETAS.contains(x)) alguna = true;
-            else if (!UNIONES.contains(x)) return false;
+            else if (!UNIONES.contains(x)) todas = false;
         }
-        return alguna;
+        if (todas && alguna) return true;
+        // Partida por una raya: se juntan las letras y se compara («N SS» → «NSS», «E VIPRESA» → «EMPRESA»)
+        String v = sinAcentos(t).toUpperCase(Locale.ROOT).replace("(S)", "S").replaceAll("[|!]", "")
+                .replaceAll("(?<=[A-Z])0|0(?=[A-Z])", "O").replaceAll("(?<=[A-Z])1|1(?=[A-Z])", "I");
+        if (v.matches(".*\\d.*")) return false;
+        String junta = v.replaceAll("[^A-Z]", "");
+        if (junta.length() < 2 || junta.length() > 24) return false;
+        for (String x : new String[] { junta, junta.replace("IVI", "M").replace("VI", "M").replace("RN", "M") }) {
+            if (ETIQUETAS_JUNTAS.contains(x)) return true;
+            if (x.length() >= 6) for (String e : ETIQUETAS_JUNTAS) if (e.length() >= 6 && casiIgual(x, e)) return true;
+        }
+        return false;
+    }
+
+    /** Iguales salvo por una letra de más, de menos o cambiada («ALEFRGIAS» ≈ «ALERGIAS»). */
+    static boolean casiIgual(String a, String b) {
+        if (Math.abs(a.length() - b.length()) > 1) return false;
+        int i = 0, j = 0, dif = 0;
+        while (i < a.length() && j < b.length()) {
+            if (a.charAt(i) == b.charAt(j)) { i++; j++; continue; }
+            if (++dif > 1) return false;
+            if (a.length() > b.length()) i++;
+            else if (a.length() < b.length()) j++;
+            else { i++; j++; }
+        }
+        return dif + (a.length() - i) + (b.length() - j) <= 1;
     }
 
     private static float centro(Linea l) { return l.arriba + l.alto / 2f; }
@@ -192,8 +344,11 @@ public final class AnalizadorTarjeta {
 
     /** Lo que se leyó a la izquierda en la misma fila: normalmente la etiqueta del dato. */
     private static String aLaIzquierda(List<Linea> orden, Linea x) {
+        List<Linea> izq = new ArrayList<>();
+        for (Linea y : orden) if (mismaFila(x, y) && y.izquierda < x.izquierda) izq.add(y);
+        izq.sort((a, b) -> Integer.compare(a.izquierda, b.izquierda));            // en orden de lectura: «N SS:» y luego «12345»
         StringBuilder sb = new StringBuilder();
-        for (Linea y : orden) if (mismaFila(x, y) && y.izquierda < x.izquierda) sb.append(y.texto).append(' ');
+        for (Linea y : izq) sb.append(y.texto).append(' ');
         return sb.toString().trim();
     }
 
@@ -281,9 +436,36 @@ public final class AnalizadorTarjeta {
         for (Linea l : orden) altoMax = Math.max(altoMax, l.alto);
 
         // ── Código ──
+        // Dígitos exactos del ID: «longitud» o, si no se dio, los de la credencial («digitosId»)
+        int objetivo = r.longitud > 0 ? r.longitud : (r.patron == null ? r.digitosId : 0);
         String mejorCodigo = null; int mejorPuntaje = Integer.MIN_VALUE;
+        // 1) El renglón del ID: «ID:» y todo lo leído a su derecha en esa fila (el número puede venir en pedazos)
+        Set<Linea> filaDelId = new HashSet<>();
+        if (r.patron == null) {
+            for (Linea l : orden) {
+                if (filaDelId.contains(l)) continue;
+                Matcher et = ETIQUETA_ID.matcher(l.texto);
+                if (!et.find()) continue;
+                StringBuilder resto = new StringBuilder(l.texto.substring(et.end()));
+                List<Linea> derecha = new ArrayList<>();
+                for (Linea y : orden) if (mismaFila(l, y) && y.izquierda > l.izquierda) derecha.add(y);
+                derecha.sort((a, b) -> Integer.compare(a.izquierda, b.izquierda));
+                for (Linea y : derecha) resto.append(' ').append(y.texto);
+                filaDelId.add(l);
+                filaDelId.addAll(derecha);
+                String c = codigoDelId(resto.toString(), objetivo, r);
+                if (c == null) continue;
+                int n = c.length();
+                if (objetivo > 0 ? n != objetivo : (n < r.minDigitos || n > r.maxDigitos)) continue;
+                int p = 52 + Math.round(10f * l.alto / altoMax) + (objetivo > 0 ? 10 : 0) + (r.enBase(c) ? 15 : 0);
+                if (p > mejorPuntaje) { mejorPuntaje = p; mejorCodigo = c; }
+            }
+        }
+        // 2) Los demás renglones (el ID sin su etiqueta, o tarjetas de otro formato). Los de la fila del ID ya
+        //    se vieron completos: de ahí no se toma un pedazo del número.
         for (int i = 0; i < orden.size(); i++) {
             Linea l = orden.get(i);
+            if (filaDelId.contains(l)) continue;
             String previo = i > 0 ? orden.get(i - 1).texto : "";
             String izq = aLaIzquierda(orden, l);                           // «ID:» o «NSS:» leídos aparte
             String tc = r.patron != null ? l.texto : corregirDigitos(l.texto);  // «0O287» → «00287»
@@ -302,16 +484,25 @@ public final class AnalizadorTarjeta {
                     if (todosLargos) cands.add(g.replaceAll("\\D", ""));                  // «0012 3456» es un solo número
                     else for (String p : partes) cands.add(p);
                 }
+                // Un renglón que sólo trae el número, quizá partido por una raya («0 0287», «0|0287»)
+                if (objetivo > 0 && etiquetaJunta(l.texto).isEmpty()) {
+                    String c = codigoDelId(l.texto, objetivo, r);
+                    if (c != null && !cands.contains(c)) cands.add(c);
+                }
             }
+            // NSS, teléfono, fechas…, aunque una raya parta la etiqueta («N SS:» no es «N.» de número)
+            boolean noCod = contieneAlguna(l.texto, r.noCodigo) || contieneAlguna(izq, r.noCodigo)
+                    || r.noCodigo.contains(etiquetaJunta(l.texto)) || r.noCodigo.contains(etiquetaJunta(izq));
             for (String c : cands) {
                 int n = c.length();
-                if (r.longitud > 0 ? n != r.longitud : (n < r.minDigitos || n > r.maxDigitos)) continue;
+                if (objetivo > 0 ? n != objetivo : (n < r.minDigitos || n > r.maxDigitos)) continue;
                 int p = 10;
-                boolean clave = contieneAlguna(l.texto, r.claves)
-                        || ((contieneAlguna(previo, r.claves) || contieneAlguna(izq, r.claves)) && soloNumero(tc, c));
+                boolean clave = esClave(l.texto, r)
+                        || ((esClave(previo, r) || esClave(izq, r)) && soloNumero(tc, c));
+                if (noCod && !clave) continue;
                 if (clave) p += 30;
                 if (soloNumero(tc, c)) p += 12;
-                if ((contieneAlguna(l.texto, r.noCodigo) || contieneAlguna(izq, r.noCodigo)) && !clave) p -= 40;
+                if (r.enBase(c)) p += 15;
                 String up = sinAcentos(l.texto).toUpperCase(Locale.ROOT);
                 if (MES.matcher(up).find()) p -= 25;
                 if (n == 4 && c.matches("(19|20)\\d\\d") && !clave) p -= 20;              // parece un año
