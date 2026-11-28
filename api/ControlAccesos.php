@@ -573,9 +573,15 @@ class ControlAccesos {
                 'puede_borrar' => $esAdmin || ($f['usuario'] === ($usr['usuario'] ?? null) && self::reciente((string)$f['recibido'])),
             ];
         }
-        return ['status' => 'success', 'turnos' => array_keys($tot), 'registros' => $out, 'totales' => $tot,
-                'lugares' => $lugares, 'mas' => $hayMas, 'punto' => $eq['punto'], 'turno_cuenta' => $tg,
-                'incidencias' => $this->incidenciasDeTurnos($turnos, $lugar, $usr)];
+        $resp = ['status' => 'success', 'turnos' => array_keys($tot), 'registros' => $out, 'totales' => $tot,
+                 'lugares' => $lugares, 'mas' => $hayMas, 'punto' => $eq['punto'], 'turno_cuenta' => $tg,
+                 'incidencias' => $this->incidenciasDeTurnos($turnos, $lugar, $usr)];
+        // Para ahorrar datos: si la pantalla ya tiene esto mismo (su «firma»), sólo se le dice que no cambió
+        $resp['firma'] = substr(md5(json_encode($resp)), 0, 16);
+        if ($pag === '' && (string)($p['firma'] ?? '') === $resp['firma']) {
+            return ['status' => 'success', 'sin_cambios' => true, 'firma' => $resp['firma'], 'turnos' => $resp['turnos']];
+        }
+        return $resp;
     }
 
     /** ¿Ya llegaron al servidor? (la pantalla pregunta por lo que tiene en cola) */
@@ -1006,7 +1012,10 @@ class ControlAccesos {
         self::asegurarTabla($this->pdo);
         $l = array_values(array_filter($this->dentroAhora(''), fn($x) => $x['alerta'] !== ''));
         usort($l, fn($a, $b) => strcmp($a['limite'], $b['limite']));
+        // También la versión de la base del personal y de los permisos: el teléfono baja la copia sólo si cambió
+        Personal::asegurarTablas($this->pdo);
         return ['status' => 'success', 'ahora' => date('Y-m-d H:i:s'), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
+                'padron_version' => Personal::versionActual($this->pdo),
                 'personas' => array_map(fn($x) => array_intersect_key($x, array_flip(['id', 'nombre', 'entrada', 'limite', 'alerta', 'minutos_limite', 'minutos'])), $l)];
     }
 

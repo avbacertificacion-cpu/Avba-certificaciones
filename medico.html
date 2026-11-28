@@ -223,7 +223,8 @@
     var c = api('ACCESOS_TARJETA_REGLAS', null, 'GET').then(function (r) { if (r && r.status === 'success' && r.reglas) guardar('ca_tarjeta_reglas', r.reglas); }).catch(function () {});
     var b = api('PADRON_CAJA', { version: PADRON.version || '' }, 'GET').then(function (r) {
       if (!r || r.status !== 'success' || r.sin_cambios) return;
-      PADRON = { version: String(r.version || ''), total: r.total || 0, personas: r.personas || {}, permisos: r.permisos || {} };
+      PADRON = r.solo_permisos ? { version: String(r.version || ''), total: PADRON.total, personas: PADRON.personas || {}, permisos: r.permisos || {} }
+                               : { version: String(r.version || ''), total: r.total || 0, personas: r.personas || {}, permisos: r.permisos || {} };
       guardar(CLAVE_PADRON, PADRON);
     }).catch(function () {});
     return Promise.all([a, b, c]);
@@ -395,8 +396,8 @@
   }
   function cargarHoy() {
     if (!enLinea()) { pintarLista(); return Promise.resolve(); }
-    return api('MEDICO_LISTAR', null, 'GET').then(function (r) {
-      if (r && r.status === 'success') { HOY = { fecha: r.fecha, tomas: r.tomas }; guardar(CLAVE_HOY, HOY); if (r.reglas) Object.assign(R, r.reglas); }
+    return api('MEDICO_LISTAR', HOY.firma && HOY.fecha === hoy() ? { firma: HOY.firma } : null, 'GET').then(function (r) {
+      if (r && r.status === 'success' && !r.sin_cambios) { HOY = { fecha: r.fecha, tomas: r.tomas, firma: r.firma }; guardar(CLAVE_HOY, HOY); if (r.reglas) Object.assign(R, r.reglas); }
       pintarLista(); pintarSenal();
     }).catch(function () { pintarLista(); pintarSenal(); });
   }

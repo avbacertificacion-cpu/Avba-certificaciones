@@ -217,7 +217,10 @@ final class Medico {
         $st = $this->pdo->prepare("SELECT * FROM medico_tomas WHERE fecha = ? AND " . Omitidos::fuera($this->pdo) . " ORDER BY capturado DESC, id DESC LIMIT 500");
         $st->execute([$f]);
         $tomas = array_map([self::class, 'fila'], $st->fetchAll(PDO::FETCH_ASSOC));
-        return ['status' => 'success', 'fecha' => $f, 'tomas' => $tomas, 'reglas' => self::reglas()];
+        $resp = ['status' => 'success', 'fecha' => $f, 'tomas' => $tomas, 'reglas' => self::reglas()];
+        $resp['firma'] = substr(md5(json_encode($resp)), 0, 16);          // sin cambios: sólo se dice (pocos datos)
+        if ((string)($p['firma'] ?? '') === $resp['firma']) return ['status' => 'success', 'sin_cambios' => true, 'fecha' => $f, 'firma' => $resp['firma']];
+        return $resp;
     }
 
     /** Las tomas de una persona (últimos 30 días), para verlas al identificarla. */

@@ -98,15 +98,21 @@ class Personal {
     }
 
     /** Cada cambio en la base o en los permisos sube la versión: la caseta sabe que debe actualizar su copia. */
-    private function tocarVersion(): void {
-        $this->pdo->prepare("INSERT INTO ca_ajustes (clave, valor, actualizado) VALUES ('padron_version', '1', NOW())
-                             ON DUPLICATE KEY UPDATE valor = CAST(valor AS UNSIGNED) + 1, actualizado = NOW()")->execute();
+    /** Marca que cambió la base (personas) o sólo los permisos: los teléfonos bajan sólo lo que cambió. */
+    private function tocarVersion(string $que = 'padron_version'): void {
+        $this->pdo->prepare("INSERT INTO ca_ajustes (clave, valor, actualizado) VALUES (?, '1', NOW())
+                             ON DUPLICATE KEY UPDATE valor = CAST(valor AS UNSIGNED) + 1, actualizado = NOW()")->execute([$que]);
         self::$nombres = [];
     }
-    private function version(): string {
-        $v = $this->pdo->query("SELECT valor FROM ca_ajustes WHERE clave = 'padron_version'")->fetchColumn();
-        return $v === false ? '0' : (string)$v;
+    /** La versión de la copia del teléfono: «personas.permisos» (p. ej. «12.40»). */
+    public static function versionActual(PDO $pdo): string {
+        $v = ['padron_version' => '0', 'permisos_version' => '0'];
+        try {
+            foreach ($pdo->query("SELECT clave, valor FROM ca_ajustes WHERE clave IN ('padron_version', 'permisos_version')")->fetchAll(PDO::FETCH_KEY_PAIR) as $k => $x) $v[$k] = (string)$x;
+        } catch (\Throwable $e) { }
+        return $v['padron_version'] . '.' . $v['permisos_version'];
     }
+    private function version(): string { return self::versionActual($this->pdo); }
 
     /* ── Utilidades ──────────────────────────────────────────────────────── */
     /** El ID como se escribe: mayúsculas, números, letras y guion. */
@@ -241,16 +247,22 @@ class Personal {
      */
     public function caja(array $p, array $usr): array {
         $v = $this->version();
-        if ((string)($p['version'] ?? '') === $v && $v !== '0') return ['status' => 'success', 'version' => $v, 'sin_cambios' => true];
-        $personas = [];
-        foreach ($this->pdo->query("SELECT clave, codigo, nombre, empresa FROM personal")->fetchAll(PDO::FETCH_NUM) as [$c, $cod, $n, $e]) {
-            $personas[$c] = [$cod, $n, $e];
-        }
+        $tiene = (string)($p['version'] ?? '');
+        if ($tiene === $v && $v !== '0.0') return ['status' => 'success', 'version' => $v, 'sin_cambios' => true];
         $permisos = [];
         foreach ($this->pdo->query("SELECT * FROM personal_permisos WHERE activo = 1 ORDER BY creado DESC, id DESC")->fetchAll(PDO::FETCH_ASSOC) as $f) {
             $x = $this->filaPermiso($f, $usr);
             unset($x['clave'], $x['activo'], $x['quitado_por'], $x['nombres']);
             $permisos[$f['clave']][] = $x;
+        }
+        // Si la base (personas) es la misma que ya tiene el teléfono y sólo cambiaron los permisos, van sólo los
+        // permisos (pocos datos): la base completa se baja sólo cuando se carga el Excel o se cambia una persona
+        if (strpos($tiene, '.') !== false && explode('.', $tiene)[0] === explode('.', $v)[0]) {
+            return ['status' => 'success', 'version' => $v, 'solo_permisos' => true, 'permisos' => $permisos ?: new \stdClass(), 'tipos' => self::TIPOS];
+        }
+        $personas = [];
+        foreach ($this->pdo->query("SELECT clave, codigo, nombre, empresa FROM personal")->fetchAll(PDO::FETCH_NUM) as [$c, $cod, $n, $e]) {
+            $personas[$c] = [$cod, $n, $e];
         }
         return ['status' => 'success', 'version' => $v, 'total' => count($personas),
                 'personas' => $personas ?: new \stdClass(), 'permisos' => $permisos ?: new \stdClass(), 'tipos' => self::TIPOS];
@@ -390,7 +402,7 @@ class Personal {
             throw $e;
         }
         $id = (int)$this->pdo->lastInsertId();
-        $this->tocarVersion();
+        $this->tocarVersion('permisos_version');
         $nombres = implode(' y ', array_map(fn($t) => mb_strtolower(self::TIPOS[$t]), $tipos));
         return ['status' => 'success', 'id' => $id, 'message' => ucfirst($nombres) . (count($tipos) > 1 ? ' guardados' : ' guardado') . ' para el ID ' . self::idMostrado($codigo) . '.'];
     }
@@ -406,7 +418,7 @@ class Personal {
         }
         $this->pdo->prepare("UPDATE personal_permisos SET activo = 0, actualizado = NOW(), quitado_por = ? WHERE id = ?")
             ->execute([mb_substr((string)($usr['nombre'] ?? $usr['usuario'] ?? ''), 0, 150), (int)$f['id']]);
-        $this->tocarVersion();
+        $this->tocarVersion('permisos_version');
         return ['status' => 'success', 'message' => 'Se quitó el permiso.'];
     }
 

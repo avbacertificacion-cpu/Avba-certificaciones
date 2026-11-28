@@ -150,9 +150,18 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
    `subeFoto(it)` en `accesos.html`; la regla `subirFotos: true` (en `api/accesos-tarjeta.json`)
    vuelve a subirlas todas. Las fotos subidas viven en `uploads/accesos/` (protegida) y se
    sirven sólo con sesión; los registros de antes conservan la suya.
-8. **Base del personal y permisos en la caseta:** el teléfono guarda una copia de la base
-   (`ca_padron`, se actualiza al entrar, cada 5 min y al volver la señal) y funciona sin
-   señal. Al leer: nombre de la base, sus permisos en la confirmación (dura 3.5 s si hay
+8. **Base del personal y permisos en la caseta:** la base es **sólo la del cliente** (su Excel,
+   cargado en Personal y permisos, o lo que se agregue ahí a mano); lo que se escanea en la caseta
+   son entradas y salidas y **nunca** entra a la base. El teléfono guarda una copia de la base
+   (`ca_padron`) y funciona sin señal. Se actualiza al entrar, al volver la señal y **cada minuto**
+   con la consulta de los avisos de 16 h (`ACCESOS_ALERTAS_16H` trae `padron_version`
+   «base.permisos»): baja sólo si cambió, y si sólo cambiaron los permisos baja sólo los permisos
+   (`PADRON_CAJA` con `solo_permisos`); así un permiso que agrega otro guardia llega a los demás
+   teléfonos en menos de un minuto. **Datos móviles:** las respuestas de más de 1 KB van con gzip
+   (`respuesta()` en `helpers.php`) y la lista del turno (`LISTAR_ACCESOS`) y las tomas del
+   servicio médico (`MEDICO_LISTAR`) llevan `firma`: si no cambió, el servidor sólo responde
+   `sin_cambios` (unos 100 bytes). Las fotos de credenciales no se suben (ver 7).
+   `api_datos_test` mide lo que viaja (1,200 personas: la base 7 KB comprimida). Al leer: nombre de la base, sus permisos en la confirmación (dura 3.5 s si hay
    algo que decir) y en «Última credencial leída», o «no está en la base». El guardia agrega
    un permiso con **la foto del pase (obligatoria)** desde esa tarjeta; va por la **misma cola**
    que los registros (`clase: 'permiso'`, acción `PERMISO_AGREGAR`, confirmado por

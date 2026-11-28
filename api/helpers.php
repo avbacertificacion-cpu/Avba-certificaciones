@@ -37,7 +37,22 @@ class Database {
 function respuesta(array $data, int $codigo = 200): void {
     while (ob_get_level() > 0) ob_end_clean();       // lo que se haya colado antes (ver api/index.php)
     http_response_code($codigo);
-    echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    $json = (string)json_encode($data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    // Comprimida (gzip) si el teléfono la acepta y vale la pena: menos datos móviles (la base del personal
+    // baja de unos 90 KB a unos 20 KB)
+    if (strlen($json) > 1024 && function_exists('gzencode') && !headers_sent() && !ini_get('zlib.output_compression')
+        && stripos((string)($_SERVER['HTTP_ACCEPT_ENCODING'] ?? ''), 'gzip') !== false) {
+        $gz = gzencode($json, 6);
+        if ($gz !== false) {
+            header('Content-Encoding: gzip');
+            header('Vary: Accept-Encoding');
+            header('Content-Length: ' . strlen($gz));
+            echo $gz;
+            exit;
+        }
+    }
+    header('Vary: Accept-Encoding');
+    echo $json;
     exit;
 }
 

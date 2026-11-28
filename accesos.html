@@ -1204,7 +1204,9 @@
     pidiendoPadron = api('PADRON_CAJA', { version: PADRON.version || '' }, 'GET').then(function (r) {
       pidiendoPadron = null;
       if (!r || r.status !== 'success' || r.sin_cambios) return;
-      PADRON = { version: String(r.version || ''), total: r.total || 0, personas: r.personas || {}, permisos: r.permisos || {} };
+      // Si sólo cambiaron los permisos, sólo llegan los permisos (pocos datos); la base se queda como estaba
+      PADRON = r.solo_permisos ? { version: String(r.version || ''), total: PADRON.total, personas: PADRON.personas, permisos: r.permisos || {} }
+                               : { version: String(r.version || ''), total: r.total || 0, personas: r.personas || {}, permisos: r.permisos || {} };
       try { localStorage.setItem(CLAVE_PADRON, JSON.stringify(PADRON)); } catch (e) {}
       pintarUltima();
     }).catch(function () { pidiendoPadron = null; });
@@ -1687,8 +1689,10 @@
     var q = consulta(), mio = ++pedido;
     var previos = reset ? [] : datos.registros;
     if (!reset && previos.length) { var u = previos[previos.length - 1]; q.antes_cap = u.capturado; q.antes_id = u.id; }
+    else if (datos.firma && datos.turnosFirma === q.turnos) q.firma = datos.firma;   // sin cambios: el servidor sólo lo dice (pocos datos)
     return api('LISTAR_ACCESOS', q, 'GET').then(function (r) {
       if (mio !== pedido || q.turnos !== turnosVista().join(',')) return;   // llegó tarde: ya se pidió otra cosa
+      if (r && r.status === 'success' && r.sin_cambios) { errLista = ''; pintarLista(); return; }
       if (r && /^(OTRO_EQUIPO|SIN_PUNTO|SIN_EQUIPO)$/.test(r.codigo || '')) {     // el aviso va arriba, una sola vez
         bloquear(r.message); datos = { registros: [], totales: {}, mas: false }; errLista = ''; pintarLista(); return;
       }
@@ -1699,7 +1703,8 @@
         if (bloqueado) { bloquear(''); enviarCola(); }
       }
       datos = { registros: previos.concat(r.registros || []), totales: r.totales || {}, mas: !!r.mas,
-                incidencias: reset ? (r.incidencias || []) : (datos.incidencias || []) };
+                incidencias: reset ? (r.incidencias || []) : (datos.incidencias || []),
+                firma: reset ? r.firma : datos.firma, turnosFirma: q.turnos };
       if (reset && !vista) avisarIncidenciasNuevas(datos.incidencias);
       errLista = '';
       pintarLista();
@@ -1855,10 +1860,14 @@
      Quien cumple 16 h dentro de la planta en las próximas 2 h (o ya las cumplió) sale en una franja
      arriba, en la caseta y en Administración. Se revisa cada minuto. */
   var HORAS_LIMITE = 16, alertas16 = [];
+  /* Una consulta pequeña cada minuto (también con la cámara continua abierta): los avisos de 16 h y la
+     versión de la base y de los permisos. La copia del teléfono se baja sólo si cambió, y si sólo cambiaron
+     los permisos, sólo los permisos: así un permiso que agrega otro guardia llega en un minuto. */
   function revisar16() {
-    if (!enLinea() || document.hidden) return;
+    if (!enLinea()) return;
     api('ACCESOS_ALERTAS_16H', {}, 'GET').then(function (r) {
       if (!r || r.status !== 'success') return;
+      if (r.padron_version && r.padron_version !== PADRON.version) actualizarPadron();
       HORAS_LIMITE = r.horas_limite || 16;
       alertas16 = r.personas || [];
       pintar16(r.horas_aviso || 2);
@@ -2384,7 +2393,7 @@
   opcionesPdf(); armarPrompt();
   // La copia de la base del personal: al entrar y cada 5 minutos
   actualizarPadron();
-  setInterval(function () { if (!document.hidden) actualizarPadron(); }, 5 * 60 * 1000);
+  // La base y los permisos se revisan cada minuto con los avisos de 16 h (revisar16): sólo bajan si cambiaron
   firmaVista = turnosVista().join(',');
   pintarTurno(); pintarLista(); cargar(true);
 })();
