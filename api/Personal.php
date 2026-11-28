@@ -460,6 +460,125 @@ class Personal {
         return (bool)array_intersect($palabras($a), $palabras($b));
     }
 
+    /* ── Cargar permisos desde Excel ────────────────────────────────────────
+       Para las listas de equipos ya autorizados (p. ej. «Registro de ingreso de equipos electrónicos»): un
+       renglón por equipo con el ID de la persona, su nombre (para revisar que el ID sea de ella), tipo de equipo,
+       marca, modelo y número de serie; vigencia y referencia (folio, quién autorizó) son opcionales. Cada renglón
+       es un permiso. modo=revisar sólo dice qué va a pasar; modo=aplicar los guarda. No se repite un equipo que
+       la persona ya tiene (mismo número de serie, o la misma descripción si no tiene serie). */
+    private static function columnasPermisos(array $titulos): array {
+        $m = ['id' => -1, 'nombre' => -1, 'tipo' => -1, 'marca' => -1, 'modelo' => -1, 'serie' => -1, 'vigencia' => -1, 'referencia' => -1];
+        foreach ($titulos as $i => $t) {
+            $t = ' ' . trim((string)preg_replace('/[^A-Z0-9Ñ ]+/u', ' ', textoEstandar($t))) . ' ';
+            $prueba = [
+                'serie'      => '/ (SERIE|NS|N S|SERIAL|IMEI) /',
+                'tipo'       => '/ (TIPO|EQUIPO|DISPOSITIVO|TIPO DE EQUIPO) /',
+                'marca'      => '/ MARCA /',
+                'modelo'     => '/ MODELO /',
+                'vigencia'   => '/ (VIGENCIA|VENCE|VENCIMIENTO|HASTA) /',
+                'referencia' => '/ (REFERENCIA|AUTORIZACION|AUTORIZO|FOLIO|OFICIO|VOBO|OBSERVACIONES|NOTA) /',
+                'nombre'     => '/ NOMBRE /',
+                'id'         => '/ (ID|CREDENCIAL|GAFETE|CLAVE) /',
+            ];
+            foreach ($prueba as $k => $re) if ($m[$k] < 0 && preg_match($re, $t)) { $m[$k] = $i; break; }
+        }
+        return $m;
+    }
+    /** Del tipo de equipo escrito en la lista a los tipos de permiso */
+    public static function tipoDeEquipo(string $t): string {
+        $t = ' ' . trim((string)preg_replace('/[^A-Z0-9 ]+/', ' ', strtoupper(iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $t) ?: $t))) . ' ';
+        if (preg_match('/ (CELULAR|TELEFONO|PHONE|IPHONE|SMARTPHONE|MOVIL) /', $t)) return 'CELULAR';
+        if (preg_match('/ (LAPTOP|LAP TOP|COMPUTADORA|COMPUTO|PC|NOTEBOOK|MACBOOK) /', $t)) return 'COMPUTADORA';
+        if (preg_match('/ (HERRAMIENTA|TALADRO|ESMERIL|LLAVE|PINZA|MULTIMETRO) /', $t)) return 'HERRAMIENTA';
+        return 'OTRO';                                                     // tablet, pantalla, monitor, teclado…
+    }
+    private static function fechaDeExcel(string $v): ?string {
+        $v = trim($v);
+        if ($v === '') return null;
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $v)) return self::fechaValida(substr($v, 0, 10));
+        if (preg_match('#^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$#', $v, $m)) {
+            $a = (int)$m[3] < 100 ? 2000 + (int)$m[3] : (int)$m[3];
+            return checkdate((int)$m[2], (int)$m[1], $a) ? sprintf('%04d-%02d-%02d', $a, (int)$m[2], (int)$m[1]) : null;
+        }
+        if (is_numeric($v) && (float)$v > 30000 && (float)$v < 80000) return gmdate('Y-m-d', (int)round(((float)$v - 25569) * 86400));   // fecha de Excel
+        return null;
+    }
+    private static function sinSerie(string $s): bool {
+        return (bool)preg_match('/^(|NA|N A|N\/A|S\/N|SN|SIN NUMERO|SIN SERIE|SIN N|NINGUNO|-+|0)$/', textoEstandar($s));
+    }
+
+    public function importarPermisos(array $p, array $archivo, array $usr): array {
+        if (!self::puedeAdministrar($usr)) return self::sinPermiso();
+        if (empty($archivo['tmp_name']) || (int)($archivo['error'] ?? 1) !== UPLOAD_ERR_OK) return ['status' => 'error', 'message' => 'Elige el archivo de Excel.'];
+        $l = LectorTabla::leer((string)$archivo['tmp_name'], (string)($archivo['name'] ?? ''));
+        if (!$l['ok']) return ['status' => 'error', 'message' => $l['message']];
+        $numeros = array_keys(array_filter($l['renglones'], fn($r) => implode('', $r) !== ''));
+        $ren = array_values(array_filter($l['renglones'], fn($r) => implode('', $r) !== ''));
+        if (!$ren) return ['status' => 'error', 'message' => 'El archivo está vacío.'];
+        $fila = -1; $mapa = null;
+        for ($i = 0; $i < min(10, count($ren)); $i++) {
+            $m = self::columnasPermisos($ren[$i]);
+            if ($m['id'] >= 0 && $m['tipo'] >= 0) { $fila = $i; $mapa = $m; break; }
+        }
+        if ($fila < 0) return ['status' => 'error', 'message' => 'No encontré las columnas. El Excel debe tener títulos como: ID, Nombre, Tipo de equipo, Marca, Modelo, Número de serie (Vigencia y Referencia, opcionales).'];
+        $col = fn(array $r, int $i) => $i >= 0 ? trim((string)preg_replace('/\s+/u', ' ', (string)($r[$i] ?? ''))) : '';
+
+        $personas = [];
+        foreach ($this->pdo->query("SELECT clave, codigo, nombre FROM personal")->fetchAll(PDO::FETCH_ASSOC) as $f) $personas[$f['clave']] = $f;
+        $tiene = [];                                                       // clave → [series y descripciones que ya tiene]
+        foreach ($this->pdo->query("SELECT clave, detalle FROM personal_permisos WHERE activo = 1")->fetchAll(PDO::FETCH_ASSOC) as $f) {
+            $tiene[$f['clave']][] = textoEstandar($f['detalle']);
+        }
+        $nuevos = []; $problemas = []; $ya = 0; $repetidos = 0; $vistos = [];
+        foreach (array_slice($ren, $fila + 1) as $n => $r) {
+            $num = $numeros[$fila + 1 + $n] ?? $fila + $n + 2;
+            $id = self::limpiarId($col($r, $mapa['id']));
+            $nombre = $col($r, $mapa['nombre']);
+            $tipoTxt = $col($r, $mapa['tipo']);
+            if ($id === '' && $tipoTxt === '' && $nombre === '') continue;
+            $clave = ControlAccesos::claveId($id);
+            if ($id === '' || !preg_match('/\d/', $id)) { $problemas[] = ['renglon' => $num, 'motivo' => 'Sin ID', 'texto' => $nombre]; continue; }
+            $p0 = $personas[$clave] ?? null;
+            if (!$p0) { $problemas[] = ['renglon' => $num, 'motivo' => 'El ID ' . self::idMostrado($id) . ' no está en la base', 'texto' => $nombre]; continue; }
+            if ($nombre !== '' && !self::mismaPersona($p0['nombre'], $nombre)) {
+                $problemas[] = ['renglon' => $num, 'motivo' => 'El nombre no coincide con el del ID ' . $p0['codigo'] . ' (' . $p0['nombre'] . ')', 'texto' => $nombre]; continue;
+            }
+            if ($tipoTxt === '') { $problemas[] = ['renglon' => $num, 'motivo' => 'Sin tipo de equipo', 'texto' => $nombre]; continue; }
+            $vigTxt = $col($r, $mapa['vigencia']);
+            $vigencia = self::fechaDeExcel($vigTxt);
+            if ($vigTxt !== '' && !$vigencia) { $problemas[] = ['renglon' => $num, 'motivo' => 'La vigencia no es una fecha', 'texto' => $vigTxt]; continue; }
+            $serie = $col($r, $mapa['serie']);
+            $equipo = trim(implode(' ', array_unique(array_filter([$tipoTxt, $col($r, $mapa['marca']), $col($r, $mapa['modelo'])], fn($x) => $x !== '' && !self::sinSerie($x)))));
+            $detalle = $equipo . ' · ' . (self::sinSerie($serie) ? 'Sin número de serie' : 'Serie ' . $serie);
+            $ref = $col($r, $mapa['referencia']);
+            if ($ref !== '') $detalle .= ' · ' . $ref;
+            $detalle = mb_substr($detalle, 0, 500);
+            // ¿Ya lo tiene? Por número de serie, o por la descripción si no tiene serie
+            $huella = self::sinSerie($serie) ? textoEstandar($equipo . ' · Sin número de serie') : 'SERIE ' . textoEstandar($serie);
+            if (isset($vistos[$clave . '|' . $huella])) { $repetidos++; continue; }
+            $vistos[$clave . '|' . $huella] = 1;
+            if (array_filter($tiene[$clave] ?? [], fn($d) => str_contains($d, $huella))) { $ya++; continue; }
+            $nuevos[] = ['renglon' => $num, 'clave' => $clave, 'codigo' => $p0['codigo'], 'nombre' => $p0['nombre'], 'tipo' => self::tipoDeEquipo($tipoTxt),
+                         'detalle' => $detalle, 'vigencia' => $vigencia];
+        }
+        $info = ['status' => 'success', 'renglon_titulos' => $numeros[$fila] ?? $fila + 1, 'permisos' => count($nuevos),
+                 'personas' => count(array_unique(array_column($nuevos, 'clave'))), 'ya_tienen' => $ya, 'repetidos' => $repetidos,
+                 'problemas' => array_slice($problemas, 0, 80), 'total_problemas' => count($problemas),
+                 'muestra' => array_map(fn($x) => array_diff_key($x, ['clave' => 1]), array_slice($nuevos, 0, 200))];
+        if (($p['modo'] ?? 'revisar') !== 'aplicar') return $info;
+        if (!$nuevos) return ['status' => 'error', 'message' => 'No hay permisos nuevos que guardar.'] + $info;
+        $ins = $this->pdo->prepare("INSERT INTO personal_permisos (uid, clave, tipos, detalle, vigencia, foto, foto_mini, origen, creado, usuario, usuario_nombre, activo, actualizado)
+                                    VALUES (?, ?, ?, ?, ?, '', '', 'excel', NOW(), ?, ?, 1, NOW())");
+        $this->pdo->beginTransaction();
+        try {
+            foreach ($nuevos as $x) $ins->execute(['px-' . bin2hex(random_bytes(12)), $x['clave'], $x['tipo'], $x['detalle'], $x['vigencia'],
+                                                    mb_substr((string)($usr['usuario'] ?? ''), 0, 50), mb_substr((string)($usr['nombre'] ?? ''), 0, 150)]);
+            $this->pdo->commit();
+        } catch (\Throwable $e) { $this->pdo->rollBack(); throw $e; }
+        $this->tocarVersion('permisos_version');
+        return ['aplicado' => true, 'message' => 'Listo: ' . count($nuevos) . ' permisos guardados para ' . $info['personas'] . ' personas. Los teléfonos de la caseta los reciben en menos de un minuto.'] + $info;
+    }
+
     /**
      * Cargar el Excel (o CSV) del personal. modo=revisar: dice qué columnas encontró y qué va a pasar (nuevos,
      * con cambios, iguales, renglones con problema), sin cambiar nada. modo=aplicar: lo guarda (agrega los nuevos
@@ -599,7 +718,7 @@ class Personal {
             array_map(function ($f) use ($nombres) {
                 $q = $this->filaPermiso($f, null);
                 return [self::idMostrado((string)$f['clave']), $nombres[$f['clave']] ?? 'No está en la base', implode(', ', $q['nombres']), $q['detalle'],
-                        $q['vigencia'], $q['creado'], $q['por'], $q['origen'] === 'caseta' ? 'Caseta' : 'Administración'];
+                        $q['vigencia'], $q['creado'], $q['por'], $q['origen'] === 'caseta' ? 'Caseta' : ($q['origen'] === 'excel' ? 'Lista de Excel' : 'Administración')];
             }, $todos),
             [9, 34, 30, 40, 13, 17, 22, 14], ['texto', 'texto', 'texto', 'texto', 'fecha', 'fechahora', 'texto', 'texto'], $titulo);
         $archivo = 'PERSONAL_' . date('Y-m-d') . '_' . bin2hex(random_bytes(6)) . '.xlsx';

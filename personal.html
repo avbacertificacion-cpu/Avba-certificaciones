@@ -89,6 +89,7 @@
       <div class="acciones">
         <button class="btn chico" type="button" id="b-nueva">+ Agregar persona</button>
         <button class="btn sec chico" type="button" id="b-importar">Cargar Excel</button>
+        <button class="btn sec chico" type="button" id="b-imp-perm">Cargar permisos</button>
         <button class="btn sec chico" type="button" id="b-excel">Descargar Excel</button>
       </div>
     </div>
@@ -168,6 +169,24 @@
     <div class="fila" style="margin-top:12px">
       <button class="btn sec" type="button" id="imp-revisar">Revisar</button>
       <button class="btn" type="button" id="imp-aplicar" hidden>Cargar a la base</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cargar permisos (lista de equipos autorizados) -->
+<div class="fondo" id="v-imp-perm" hidden>
+  <div class="ventana" role="dialog" aria-modal="true" aria-labelledby="ip-tit">
+    <button class="cerrar" type="button" data-cerrar aria-label="Cerrar">×</button>
+    <h2 id="ip-tit">Cargar permisos desde Excel</h2>
+    <p style="font-size:13.5px;color:var(--sub);line-height:1.5">Para una lista de equipos ya autorizados: un renglón por equipo con el <b>ID</b> de la persona, su <b>nombre</b> (se revisa que el ID sea de ella), <b>tipo de equipo</b>, marca, modelo y <b>número de serie</b>; <b>vigencia</b> y <b>referencia</b> (folio, quién autorizó) son opcionales. Cada renglón queda como un permiso en esa persona. Primero se revisa; nada cambia hasta que tocas «Guardar permisos». Un equipo que la persona ya tiene (mismo número de serie) no se repite.</p>
+    <div class="campo" style="margin-top:12px"><label for="ip-archivo">Archivo</label><input type="file" id="ip-archivo" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"></div>
+    <div class="aviso" id="ip-msg" hidden role="status"></div>
+    <div id="ip-res" hidden>
+      <div class="resumen-imp" id="ip-cuenta"></div>
+      <div id="ip-detalle"></div>
+    </div>
+    <div class="fila" style="margin-top:12px">
+      <button class="btn" type="button" id="ip-aplicar" hidden>Guardar permisos</button>
     </div>
   </div>
 </div>
@@ -328,7 +347,7 @@
       '<div class="datos"><div>' + x.tipos.map(function (t) { return '<span class="pm' + (x.vencido ? ' venc' : '') + '">' + ICONO[t] + ' ' + esc(TIPOS[t]) + '</span>'; }).join('') + '</div>' +
       (x.detalle ? '<div class="det">' + esc(x.detalle) + '</div>' : '') +
       (x.vigencia ? '<div class="m" style="' + (x.vencido ? 'color:var(--rojo);font-weight:700' : '') + '">' + (x.vencido ? 'Venció el ' : 'Vigente hasta el ') + esc(fecha(x.vigencia)) + '</div>' : '') +
-      '<div class="m">Agregado el ' + esc(fechaHora(x.creado)) + (x.por ? ' por ' + esc(x.por) : '') + (x.origen === 'caseta' ? ' (en la caseta)' : '') +
+      '<div class="m">Agregado el ' + esc(fechaHora(x.creado)) + (x.por ? ' por ' + esc(x.por) : '') + (x.origen === 'caseta' ? ' (en la caseta)' : x.origen === 'excel' ? ' (lista de Excel)' : '') +
       (!x.activo && x.quitado_por ? ' · quitado por ' + esc(x.quitado_por) : '') + '</div></div>' +
       (x.puede_quitar ? '<button class="btn peligro chico" type="button" data-quitar="' + x.id + '">Quitar</button>' : '') + '</div>';
   }
@@ -491,6 +510,54 @@
         r.problemas.map(function (x) { return '<tr><td>' + x.renglon + '</td><td>' + esc(x.motivo) + '</td><td>' + esc(x.texto) + '</td></tr>'; }).join('') + '</tbody></table></div>';
     }
     $('imp-detalle').innerHTML = h;
+  }
+
+  /* ══ Cargar permisos (lista de equipos autorizados) ══ */
+  var ip = null;
+  function msgIp(t, tipo) { $('ip-msg').innerHTML = t; $('ip-msg').className = 'aviso ' + (tipo || 'info'); $('ip-msg').hidden = !t; }
+  $('b-imp-perm').onclick = function () {
+    $('ip-archivo').value = ''; msgIp(''); $('ip-res').hidden = true; $('ip-aplicar').hidden = true; ip = null;
+    abrirV('v-imp-perm');
+  };
+  $('ip-archivo').addEventListener('change', function () { ip = null; $('ip-res').hidden = true; $('ip-aplicar').hidden = true; if ($('ip-archivo').files[0]) enviarIp('revisar'); });
+  function enviarIp(modo) {
+    var f = $('ip-archivo').files[0];
+    if (!f) { msgIp('Elige el archivo de Excel.', 'mal'); return; }
+    var fd = new FormData();
+    fd.append('action', 'PERMISOS_IMPORTAR'); fd.append('modo', modo); fd.append('archivo', f, f.name);
+    $('ip-aplicar').disabled = true;
+    msgIp(modo === 'aplicar' ? 'Guardando los permisos…' : 'Revisando el archivo…');
+    postForm(fd).then(function (r) {
+      $('ip-aplicar').disabled = false;
+      if (r && r.muestra) { ip = r; pintarIp(r); }
+      if (!r || r.status !== 'success') { msgIp(esc((r && r.message) || 'No se pudo leer el archivo.'), 'mal'); $('ip-aplicar').hidden = true; return; }
+      if (r.aplicado) { msgIp(esc(r.message), 'bien'); $('ip-aplicar').hidden = true; $('ip-archivo').value = ''; cargar(); return; }
+      msgIp(r.permisos ? 'Revisa la lista. Si está bien, toca «Guardar permisos».' : 'No hay permisos nuevos que guardar.');
+      $('ip-aplicar').hidden = !r.permisos;
+    }).catch(function (e) { $('ip-aplicar').disabled = false; msgIp(esc(e.message), 'mal'); });
+  }
+  $('ip-aplicar').onclick = function () {
+    if (!ip || !confirm('¿Guardar ' + ip.permisos + ' permisos para ' + ip.personas + ' personas?')) return;
+    enviarIp('aplicar');
+  };
+  function pintarIp(r) {
+    $('ip-res').hidden = false;
+    $('ip-cuenta').innerHTML = '<div><b>' + r.permisos + '</b>permisos nuevos</div><div><b>' + r.personas + '</b>personas</div>' +
+      (r.ya_tienen ? '<div><b>' + r.ya_tienen + '</b>ya los tenían</div>' : '') +
+      (r.repetidos ? '<div><b>' + r.repetidos + '</b>repetidos en el archivo</div>' : '') +
+      (r.total_problemas ? '<div><b>' + r.total_problemas + '</b>' + (r.total_problemas === 1 ? 'renglón con problema' : 'renglones con problema') + '</div>' : '');
+    var h = '';
+    if (r.problemas && r.problemas.length) {
+      h += '<h3>Renglones que no se van a cargar</h3><div class="tabla-env"><table class="t"><thead><tr><th>Renglón</th><th>Motivo</th><th>Dato</th></tr></thead><tbody>' +
+        r.problemas.map(function (x) { return '<tr><td>' + x.renglon + '</td><td>' + esc(x.motivo) + '</td><td>' + esc(x.texto) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+    }
+    if (r.muestra && r.muestra.length) {
+      h += '<h3>Así se van a guardar</h3><div class="tabla-env"><table class="t"><thead><tr><th>Renglón</th><th>ID</th><th>Nombre en la base</th><th>Permiso</th><th>Equipo</th><th>Vigencia</th></tr></thead><tbody>' +
+        r.muestra.map(function (x) {
+          return '<tr><td>' + x.renglon + '</td><td><b>' + esc(x.codigo) + '</b></td><td>' + esc(x.nombre) + '</td><td>' + ICONO[x.tipo] + ' ' + esc(TIPOS[x.tipo]) + '</td><td>' + esc(x.detalle) + '</td><td>' + (x.vigencia ? fecha(x.vigencia) : 'Sin vencimiento') + '</td></tr>';
+        }).join('') + '</tbody></table></div>' + (r.permisos > r.muestra.length ? '<p class="cifras">Y ' + (r.permisos - r.muestra.length) + ' más.</p>' : '');
+    }
+    $('ip-detalle').innerHTML = h;
   }
 
   /* ══ Descargar Excel ══ */
