@@ -442,6 +442,12 @@ class Personal {
         return $mapa;
     }
 
+    /** Dos nombres de la misma persona (una corrección: «LUIS MORA» → «LUIS ALBERTO MORA»): comparten alguna palabra de 3 letras o más. */
+    private static function mismaPersona(string $a, string $b): bool {
+        $palabras = fn(string $x) => array_filter(preg_split('/[^A-Z0-9Ñ]+/u', textoEstandar($x)) ?: [], fn($w) => mb_strlen($w) >= 3);
+        return (bool)array_intersect($palabras($a), $palabras($b));
+    }
+
     /**
      * Cargar el Excel (o CSV) del personal. modo=revisar: dice qué columnas encontró y qué va a pasar (nuevos,
      * con cambios, iguales, renglones con problema), sin cambiar nada. modo=aplicar: lo guarda (agrega los nuevos
@@ -477,6 +483,7 @@ class Personal {
 
         $col = fn(array $r, int $i) => $i >= 0 ? trim((string)($r[$i] ?? '')) : '';
         $nuevos = []; $problemas = []; $repetidos = 0;
+        $choques = [];                                                    // ID repetido con OTRA persona: clave → renglones
         foreach ($datos as $n => $r) {
             $num = $numeros[$fila + 1 + $n] ?? $fila + $n + 2;            // renglón como lo ve Excel
             $id = self::limpiarId($col($r, $mapa['id']));
@@ -485,12 +492,35 @@ class Personal {
             if ($id === '' && $nombre === '') continue;
             if ($id === '') { $problemas[] = ['renglon' => $num, 'motivo' => 'Sin ID', 'texto' => $nombre]; continue; }
             if ($nombre === '') { $problemas[] = ['renglon' => $num, 'motivo' => 'Sin nombre', 'texto' => $id]; continue; }
+            // El ID de la credencial es un número: un nombre o un texto en la columna del ID es un error del archivo
+            if (!preg_match('/\d/', $id)) {
+                $problemas[] = ['renglon' => $num, 'motivo' => 'El ID no es un número', 'texto' => $col($r, $mapa['id']) . ' · ' . $nombre];
+                continue;
+            }
             $clave = ControlAccesos::claveId($id);
-            if (isset($nuevos[$clave])) $repetidos++;
+            if (isset($nuevos[$clave])) {
+                // El mismo ID otra vez: si es la misma persona (comparten alguna palabra del nombre) queda el último
+                // renglón; si es otra persona, no se sabe de quién es el ID y no se carga ninguno de los dos
+                if (!self::mismaPersona($nuevos[$clave]['nombre'], $nombre)) {
+                    $choques[$clave] = ($choques[$clave] ?? [['renglon' => $nuevos[$clave]['renglon'], 'nombre' => $nuevos[$clave]['nombre']]]);
+                    $choques[$clave][] = ['renglon' => $num, 'nombre' => $nombre];
+                    continue;
+                }
+                $repetidos++;
+            }
             $nuevos[$clave] = ['clave' => $clave, 'codigo' => self::idMostrado($id), 'nombre' => $nombre,
                                'empresa' => mb_substr(textoEstandar($col($r, $mapa['empresa'])), 0, 150),
                                'cargo' => mb_substr(textoEstandar($col($r, $mapa['cargo'])), 0, 150), 'renglon' => $num];
         }
+        foreach ($choques as $clave => $filas) {
+            $codigo = $nuevos[$clave]['codigo'];
+            unset($nuevos[$clave]);
+            foreach ($filas as $f) {
+                $otros = implode(' y ', array_map(fn($o) => (string)$o['renglon'], array_filter($filas, fn($o) => $o['renglon'] !== $f['renglon'])));
+                $problemas[] = ['renglon' => $f['renglon'], 'motivo' => 'ID ' . $codigo . ' repetido con otra persona (renglón ' . $otros . ')', 'texto' => $f['nombre']];
+            }
+        }
+        usort($problemas, fn($a, $b) => $a['renglon'] <=> $b['renglon']);
         // Qué pasaría con cada uno
         $existen = [];
         foreach ($this->pdo->query("SELECT clave, codigo, nombre, empresa, cargo FROM personal")->fetchAll(PDO::FETCH_ASSOC) as $f) $existen[$f['clave']] = $f;

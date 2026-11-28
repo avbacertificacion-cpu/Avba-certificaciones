@@ -149,6 +149,9 @@ ws.append([500, 'Luis', 'Mora', 'Díaz', 'Grúas del Norte', 'Operador', None])
 ws.append([None, 'Sin', 'Credencial', '', None, None, None])
 ws.append([733, None, None, None, 'X', None, None])
 ws.append([500, 'Luis Alberto', 'Mora', 'Díaz', 'Grúas del Norte', 'Operador', None])
+ws.append(['JUAN PEREZ', 'Juan', 'Pérez', 'Luna', 'Grúas del Norte', 'Operador', None])
+ws.append([777, 'Ana', 'Ruiz', 'Paez', 'Montajes del Golfo', 'Ayudante', None])
+ws.append(['00777', 'Hugo', 'Salas', 'Tovar', 'Grúas del Norte', 'Operador', None])
 wb.save(sys.argv[1])
 open(sys.argv[2], 'w', encoding='cp1252').write('Columna A;Columna B;Columna C\\n00601;MARÍA FERNANDA RÍOS;Grúas del Norte\\n602;JOSUÉ IBARRA GARZA;\\n')
 EOF`);
@@ -157,7 +160,9 @@ r = await form('tok-admin', { action: 'PADRON_IMPORTAR', modo: 'revisar' }, { ar
 ok(r.status === 'success' && r.renglon_titulos === 3, 'encuentra los títulos en el renglón 3 (después de un encabezado)');
 ok(r.mapa.id === 0 && r.mapa.nombre === 1 && r.mapa.paterno === 2 && r.mapa.materno === 3 && r.mapa.empresa === 4 && r.mapa.cargo === 5, 'reconoce las columnas (y no confunde el NSS con el ID)');
 ok(r.renglones === 3 && r.repetidos === 1 && r.cuenta.nuevos === 2 && r.cuenta.cambian === 1, `3 personas (1 repetida): ${r.cuenta.nuevos} nuevas, ${r.cuenta.cambian} con cambios`);
-ok(r.total_problemas === 2 && r.problemas.map(x => x.renglon + ' ' + x.motivo).join(', ') === '7 Sin ID, 8 Sin nombre', 'renglones con problema, con su número de renglón de Excel: ' + r.problemas.map(x => x.renglon + ' ' + x.motivo).join(', '));
+ok(r.total_problemas === 5 && r.problemas.map(x => x.renglon + ' ' + x.motivo).join(', ') ===
+   '7 Sin ID, 8 Sin nombre, 10 El ID no es un número, 11 ID 00777 repetido con otra persona (renglón 12), 12 ID 00777 repetido con otra persona (renglón 11)',
+   'renglones con problema, con su número de renglón de Excel (un nombre en la columna del ID; el mismo ID con dos personas distintas no se carga): ' + r.problemas.map(x => x.renglon + ' ' + x.motivo).join(', '));
 ok(r.cambios[0].codigo === '02870' && /Empresa: \(vacío\) → MONTAJES DEL GOLFO/.test(r.cambios[0].que), 'dice qué cambia: ' + r.cambios[0].que);
 ok(r.muestra.some(x => x.codigo === '00500' && x.nombre === 'LUIS ALBERTO MORA DIAZ'), 'nombre y apellidos juntos; el ID 500 con sus ceros; el repetido: queda el último');
 ok(sql('SELECT COUNT(*) FROM personal') === '1', 'revisar no cambia nada');
