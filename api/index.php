@@ -142,7 +142,7 @@ try {
         case 'ACCESOS_MI_PUNTO':       respuesta($ca->miPunto($datos, $usr));
         case 'ACCESOS_TARJETA_REGLAS': respuesta(ControlAccesos::reglasTarjeta());
         case 'ACCESOS_EN_PLANTA':      respuesta($ca->enPlanta($datos, $usr));
-        case 'ACCESOS_ALERTAS_16H':    respuesta($ca->alertas16($usr));
+        case 'ACCESOS_ALERTAS_16H':    respuesta($ca->alertas16($datos, $usr));
         case 'ACCESOS_PERSONA':        respuesta($ca->persona($datos, $usr));
         case 'ACCESOS_DAR_SALIDA':     respuesta($ca->darSalida($datos, $usr));
         case 'ACCESOS_PDF':            respuesta($ca->generarPdf($datos, $usr));

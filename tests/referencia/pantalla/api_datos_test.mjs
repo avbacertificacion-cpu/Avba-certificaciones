@@ -76,6 +76,21 @@ const kb = n => (n / 1024).toFixed(1) + ' KB';
   r = await get('LISTAR_ACCESOS', 'tok-punto1', { limite: 60, turnos: t, firma: l1.firma });
   ok(!r.sin_cambios && r.registros.length === 60 && r.firma !== l1.firma, 'con un registro nuevo, baja la lista');
 
+  // ── ¿Tiene entrada? Lo último de cada persona, para todos los teléfonos ──
+  let mv = (await get('ACCESOS_ALERTAS_16H', 'tok-punto1', { movs_desde: 0 })).movs;
+  ok(mv.reinicio && mv.ev.length === 60 && mv.ev.find(e => e[0] === '1')[1] === 'S' && mv.ultimo > 0,
+     `la primera vez, lo último de cada quien (60 personas; la 00001 ya salió): ${mv.ev.length}`);
+  const foto = await bytes('ACCESOS_ALERTAS_16H', 'tok-punto1', { movs_desde: 0 });
+  ok(foto.n < 2048, `pesa ${kb(foto.n)}`);
+  const ult = mv.ultimo;
+  r = await get('ACCESOS_ALERTAS_16H', 'tok-punto1', { movs_desde: ult });
+  ok(!r.movs.reinicio && r.movs.ev.length === 0 && r.movs.ultimo === ult, 'después, sin lecturas nuevas: nada');
+  sql(`INSERT INTO accesos_registros (uid,tipo,fecha,capturado,recibido,lugar,usuario,usuario_nombre,turno_fecha,turno,nombre,codigo,origen)
+    VALUES ('dt98','salida','${hoy.slice(0, 10)}','${hoy}',NOW(),'ACCESO','punto2','PUNTO 2','${hoy.slice(0, 10)}','D','PERSONA INVENTADA 2','00002','tarjeta')`);
+  r = await get('ACCESOS_ALERTAS_16H', 'tok-punto1', { movs_desde: ult });
+  const uno = await bytes('ACCESOS_ALERTAS_16H', 'tok-punto1', { movs_desde: ult });
+  ok(r.movs.ev.length === 1 && r.movs.ev[0][0] === '2' && r.movs.ev[0][1] === 'S' && uno.n < 400, `una salida en otra caseta: sólo esa (${uno.n} bytes)`);
+
   // ── Las tomas de hoy del servicio médico ──
   const m1 = await get('MEDICO_LISTAR', 'tok-medico');
   r = await get('MEDICO_LISTAR', 'tok-medico', { firma: m1.firma });

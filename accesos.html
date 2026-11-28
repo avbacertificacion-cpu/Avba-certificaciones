@@ -83,6 +83,8 @@
   .banda-inc svg{width:28px;height:28px;flex-shrink:0}
   .banda-inc small{display:block;opacity:.85;font-size:12px}
   .hecho.incidencia{background:#b45309}
+  .hecho .prev{font-size:15px;font-weight:700;margin-top:6px;background:rgba(255,255,255,.18);border-radius:10px;padding:4px 12px}
+  .hecho .prev.alerta{background:#FFF1D6;color:#7A4A00}
   .hecho .t-inc{font-size:19px;font-weight:800;margin-top:6px;background:rgba(0,0,0,.18);border-radius:10px;padding:4px 12px}
   /* Ventana para reportar */
   .inc-quien{display:flex;gap:12px;align-items:flex-start;margin-bottom:6px}
@@ -1089,6 +1091,8 @@
     // Si el ID está en la base del personal, su nombre correcto (no el que leyó la cámara)
     var enBase = enPadron(codigo);
     if (enBase) it.persona = enBase.nombre;
+    it.previo = textoPrevio(tipo, r.__previo !== undefined ? r.__previo : previo(codigo));
+    marcarMov(it);
     ponerUltima(codigo, r.nombre);
     // La foto de la credencial que tomó el lector va con el registro como evidencia (también sin señal:
     // queda en el equipo con el registro y se envía junto con él)
@@ -1120,12 +1124,13 @@
       '<b>' + (inc ? 'INCIDENCIA' : ent ? 'ENTRADA' : 'SALIDA') + ' REGISTRADA</b>' + (inc ? '<div class="t-inc">' + esc(TIPOS_INC[it.incidencia]) + '</div>' : '') +
       '<div class="n">' + esc(it.persona || (inc && !it.codigo ? 'Sin credencial' : 'Nombre no leído')) + '</div>' +
       '<div class="c">' + (it.codigo ? 'ID ' + esc(it.codigo) + ' · ' : '') + esc(it.capturado.slice(11, 16)) + '</div>' +
+      (it.previo ? '<div class="prev' + (it.previo.charAt(0) === '⚠' ? ' alerta' : '') + '">' + esc(it.previo) + '</div>' : '') +
       avisosPersona(it.codigo) +
       (it.mini ? '<img class="foto" alt="Foto de la credencial" src="' + esc(it.mini) + '"><div class="ev">' + (subeFoto(it) ? 'Foto guardada como evidencia' : 'Foto guardada en este equipo') + '</div>' : '');
     el.hidden = false;
     if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
     // Con permisos o fuera de la base, se queda más tiempo para leerlo
-    clearTimeout(tHecho); tHecho = setTimeout(function () { el.hidden = true; }, avisosPersona(it.codigo) ? 3500 : 1500);
+    clearTimeout(tHecho); tHecho = setTimeout(function () { el.hidden = true; }, avisosPersona(it.codigo) || it.previo ? 3500 : 1500);
   }
   $('hecho').onclick = function () { clearTimeout(tHecho); $('hecho').hidden = true; };
 
@@ -1860,13 +1865,60 @@
      Quien cumple 16 h dentro de la planta en las próximas 2 h (o ya las cumplió) sale en una franja
      arriba, en la caseta y en Administración. Se revisa cada minuto. */
   var HORAS_LIMITE = 16, alertas16 = [];
+  /* ══ ¿Tiene entrada? ═══════════════════════════════════════════════
+     El teléfono guarda lo último de cada persona (entrada o salida y la hora) de todas las casetas: al
+     escanear una SALIDA dice a qué hora entró, o que no tiene entrada; al escanear una ENTRADA, si ya tenía
+     una sin salida. Con la consulta de cada minuto bajan sólo las lecturas nuevas (unos 30 bytes cada una);
+     cada 6 h, lo último de cada quien de las últimas 48 h. Sin señal, se usa lo que ya tiene. */
+  var CLAVE_MOVS = 'ca_accesos_movs', HORAS_EN_PLANTA = 48;
+  var MOVS = leer(CLAVE_MOVS, null) || { ultimo: 0, sinc: 0, m: {} };
+  if (!MOVS.m) MOVS = { ultimo: 0, sinc: 0, m: {} };
+  function horaMs(c) { return new Date(+c.slice(0, 4), +c.slice(5, 7) - 1, +c.slice(8, 10), +c.slice(11, 13), +c.slice(14, 16)).getTime(); }
+  function anotarMov(k, t, cap) {
+    var y = MOVS.m[k];
+    if (!y || cap.slice(0, 16) >= y[1]) MOVS.m[k] = [t, cap.slice(0, 16)];
+  }
+  function aplicarMovs(mv) {
+    if (mv.reinicio) MOVS.m = {};
+    (mv.ev || []).forEach(function (e) { anotarMov(e[0], e[1], e[2]); });
+    // Lo que sigue en la cola de este teléfono (aún sin enviar) también cuenta
+    cola.forEach(function (x) { if (esRegistro(x) && x.codigo) anotarMov(claveId(x.codigo), x.tipo === 'salida' ? 'S' : 'E', x.capturado); });
+    var limite = Date.now() - HORAS_EN_PLANTA * 3600000;
+    Object.keys(MOVS.m).forEach(function (k) { if (horaMs(MOVS.m[k][1]) < limite) delete MOVS.m[k]; });
+    MOVS.ultimo = mv.ultimo || MOVS.ultimo; MOVS.sinc = Date.now();
+    guardar(CLAVE_MOVS, MOVS);
+  }
+  /** Lo último de esa persona antes de esta lectura: {tipo: 'E'|'S', cap} o null; undefined si el teléfono nunca se ha actualizado. */
+  function previo(codigo) {
+    if (!MOVS.sinc) return undefined;
+    var x = MOVS.m[claveId(codigo)];
+    return x && horaMs(x[1]) >= Date.now() - HORAS_EN_PLANTA * 3600000 ? { tipo: x[0], cap: x[1] } : null;
+  }
+  /** El texto para el guardia: a qué hora entró (en una salida), o el aviso si algo no cuadra. */
+  function textoPrevio(tipo, p) {
+    if (p === undefined) return '';
+    if (tipo === 'salida') {
+      if (p && p.tipo === 'E') return 'Entró ' + (p.cap.slice(0, 10) === hoyLocal() ? 'a las ' + p.cap.slice(11, 16) : cuando(p.cap)) + ' · ' + duracion((Date.now() - horaMs(p.cap)) / 60000) + ' dentro';
+      return '⚠ Sin entrada registrada';
+    }
+    if (tipo === 'entrada' && p && p.tipo === 'E') return '⚠ Ya tenía entrada ' + (p.cap.slice(0, 10) === hoyLocal() ? 'a las ' + p.cap.slice(11, 16) : cuando(p.cap)) + ' sin salida';
+    return '';
+  }
+  function marcarMov(it) {
+    if (!it.codigo || !esRegistro(it)) return;
+    anotarMov(claveId(it.codigo), it.tipo === 'salida' ? 'S' : 'E', it.capturado);
+    guardar(CLAVE_MOVS, MOVS);
+  }
+
   /* Una consulta pequeña cada minuto (también con la cámara continua abierta): los avisos de 16 h y la
      versión de la base y de los permisos. La copia del teléfono se baja sólo si cambió, y si sólo cambiaron
      los permisos, sólo los permisos: así un permiso que agrega otro guardia llega en un minuto. */
   function revisar16() {
     if (!enLinea()) return;
-    api('ACCESOS_ALERTAS_16H', {}, 'GET').then(function (r) {
+    var viejo = !MOVS.sinc || Date.now() - MOVS.sinc > 6 * 3600000;     // cada 6 h, la foto completa
+    api('ACCESOS_ALERTAS_16H', { movs_desde: viejo ? 0 : MOVS.ultimo || 0 }, 'GET').then(function (r) {
       if (!r || r.status !== 'success') return;
+      if (r.movs) aplicarMovs(r.movs);
       if (r.padron_version && r.padron_version !== PADRON.version) actualizarPadron();
       HORAS_LIMITE = r.horas_limite || 16;
       alertas16 = r.personas || [];
@@ -2333,8 +2385,11 @@
       return;
     }
     LEIDAS_FIJO[claveId(codigo) + '|' + tipo] = ahoraLocal();
+    r.__previo = previo(codigo);                    // antes de anotar esta lectura
+    var txtPrevio = textoPrevio(tipo, r.__previo);
     registrarTarjeta(tipo, r);
     var lineas = ['ID ' + (pb ? pb.codigo : codigo) + ' · ' + ahoraLocal().slice(11, 16)], aviso = false, vistos = {};
+    if (txtPrevio) lineas.push(txtPrevio);
     permisosDe(codigo).forEach(function (p) {
       p.tipos.forEach(function (t) {
         var k = t + (p.vencido ? 'v' : ''); if (vistos[k] || !TIPOS_PERM[t]) return; vistos[k] = 1;

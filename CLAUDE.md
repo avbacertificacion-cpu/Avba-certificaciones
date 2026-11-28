@@ -161,7 +161,14 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
    (`respuesta()` en `helpers.php`) y la lista del turno (`LISTAR_ACCESOS`) y las tomas del
    servicio médico (`MEDICO_LISTAR`) llevan `firma`: si no cambió, el servidor sólo responde
    `sin_cambios` (unos 100 bytes). Las fotos de credenciales no se suben (ver 7).
-   `api_datos_test` mide lo que viaja (1,200 personas: la base 7 KB comprimida). Al leer: nombre de la base, sus permisos en la confirmación (dura 3.5 s si hay
+   `api_datos_test` mide lo que viaja (1,200 personas: la base 7 KB comprimida).
+   **¿Tiene entrada?** El teléfono guarda lo último de cada persona de todas las casetas
+   (`ca_accesos_movs`: clave → ['E'|'S', hora], últimas 48 h). La misma consulta de cada minuto
+   manda `movs_desde` (el último id que tiene) y baja sólo las lecturas nuevas
+   (`ControlAccesos::movimientos`, unos 30 bytes cada una); cada 6 h, o la primera vez, lo último de
+   cada quien. Al escanear una SALIDA la confirmación (y la lectura continua) dice «Entró a las 06:10 ·
+   2 h dentro» o «⚠ Sin entrada registrada»; en una ENTRADA, «⚠ Ya tenía entrada a las … sin salida».
+   Funciona sin señal con lo último que bajó (`previo`, `textoPrevio` en `accesos.html`). Al leer: nombre de la base, sus permisos en la confirmación (dura 3.5 s si hay
    algo que decir) y en «Última credencial leída», o «no está en la base». El guardia agrega
    un permiso con **la foto del pase (obligatoria)** desde esa tarjeta; va por la **misma cola**
    que los registros (`clase: 'permiso'`, acción `PERMISO_AGREGAR`, confirmado por

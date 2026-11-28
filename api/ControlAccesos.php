@@ -1008,13 +1008,14 @@ class ControlAccesos {
      * Para la caseta y Administración: quiénes cumplen 16 h en planta en las próximas 2 h o ya las cumplieron
      * (sólo ID, nombre, entrada y la hora en que cumplen; la caseta no ve el resto de «En planta»).
      */
-    public function alertas16(array $usr): array {
+    public function alertas16(array $p, array $usr): array {
         self::asegurarTabla($this->pdo);
         $l = array_values(array_filter($this->dentroAhora(''), fn($x) => $x['alerta'] !== ''));
         usort($l, fn($a, $b) => strcmp($a['limite'], $b['limite']));
         // También la versión de la base del personal y de los permisos: el teléfono baja la copia sólo si cambió
         Personal::asegurarTablas($this->pdo);
-        return ['status' => 'success', 'ahora' => date('Y-m-d H:i:s'), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
+        $extra = isset($p['movs_desde']) && is_numeric($p['movs_desde']) ? ['movs' => $this->movimientos((int)$p['movs_desde'])] : [];
+        return $extra + ['status' => 'success', 'ahora' => date('Y-m-d H:i:s'), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
                 'padron_version' => Personal::versionActual($this->pdo),
                 'personas' => array_map(fn($x) => array_intersect_key($x, array_flip(['id', 'nombre', 'entrada', 'limite', 'alerta', 'minutos_limite', 'minutos'])), $l)];
     }
@@ -1031,6 +1032,31 @@ class ControlAccesos {
         return ['status' => 'success', 'personas' => $out, 'total' => count($out), 'horas' => self::HORAS_EN_PLANTA,
                 'ahora' => date('Y-m-d H:i:s'), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
                 'aviso' => count(array_filter($out, fn($x) => $x['alerta'] === 'aviso')), 'limite' => count(array_filter($out, fn($x) => $x['alerta'] === 'limite'))];
+    }
+
+    /** Más que esto de lecturas nuevas: mejor la foto completa (lo último de cada quien). */
+    private const MOVS_MAX = 3000;
+
+    /**
+     * Para que cada teléfono sepa si una persona tiene entrada (y a qué hora) gastando pocos datos: las
+     * lecturas con ID nuevas desde la «desde» (el último id que ya tiene), como [clave, 'E'|'S', 'AAAA-MM-DD HH:MM'].
+     * Con desde 0, o si hay demasiadas, la foto completa: la última lectura de cada quien de las últimas 48 h.
+     */
+    private function movimientos(int $desde): array {
+        $max = (int)$this->pdo->query("SELECT COALESCE(MAX(id), 0) FROM accesos_registros")->fetchColumn();
+        $fuera = Omitidos::fuera($this->pdo);
+        $fila = fn(array $f) => [self::claveId((string)$f['codigo']), $f['tipo'] === 'salida' ? 'S' : 'E', substr((string)$f['capturado'], 0, 16)];
+        if ($desde > 0 && $desde <= $max && $max - $desde <= self::MOVS_MAX) {
+            $st = $this->pdo->prepare("SELECT codigo, tipo, capturado FROM accesos_registros WHERE id > ? AND codigo <> '' AND $fuera ORDER BY id");
+            $st->execute([$desde]);
+            return ['ultimo' => $max, 'reinicio' => false, 'ev' => array_map($fila, $st->fetchAll(PDO::FETCH_ASSOC))];
+        }
+        $t = date('Y-m-d H:i:s', time() - self::HORAS_EN_PLANTA * 3600);
+        $st = $this->pdo->prepare("SELECT codigo, tipo, capturado FROM accesos_registros WHERE codigo <> '' AND fecha >= ? AND capturado >= ? AND $fuera ORDER BY capturado, id");
+        $st->execute([substr($t, 0, 10), $t]);
+        $ult = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) { $x = $fila($f); $ult[$x[0]] = $x; }
+        return ['ultimo' => $max, 'reinicio' => true, 'ev' => array_values($ult)];
     }
 
     /** Quiénes están dentro ahora (la regla de «En planta»), con su aviso de las 16 h. */
