@@ -68,7 +68,7 @@ const turnoBD = cod => sql(`SELECT GROUP_CONCAT(CONCAT(tipo,':',turno_fecha,'-',
   await leer(p, '17:59:30', 'ent', '00603', 'Pedro Vega Cruz');
   t = await bloques(p);
   const sub = await p.textContent('#t-sub');
-  ok(t.length === 1 && /1 Entradas 0 Salidas/.test(t[0]) && /18:00 a .*06:00/.test(sub), 'sin señal (en cola): cuenta en su noche (' + sub + '): ' + t[0]);
+  ok(t.length === 1 && /1 Entradas 0 Salidas/.test(t[0]) && /17:30 a .*05:30/.test(sub), 'sin señal (en cola): cuenta en su noche (' + sub + '): ' + t[0]);
   await ctx.setOffline(false);
   await p.evaluate(() => window.dispatchEvent(new Event('online'))); await p.waitForTimeout(4000);
   ok(turnoBD('00603') === `entrada:${hoy}-N`, 'al volver la señal: turno de noche de hoy');

@@ -22,8 +22,7 @@
        (ControlAccesos::emparejar). Una visita de más de 24 h no cuenta en
        los tiempos (es una salida que no se registró).
      · Personas dentro: cada entrada cuenta hasta su salida; si no hay
-       salida, hasta ahora si entró en las últimas 48 h (como «En planta»),
-       o 16 h si después volvió a entrar o es de antes.
+       salida, hasta ahora o hasta el reinicio de las 05:30 (como «En planta»).
    ══════════════════════════════════════════════════════════════ */
 
 require_once __DIR__ . '/lib/xlsx.php';
@@ -60,7 +59,7 @@ class Tablero {
      * @return array{0:string,1:string}|string  el periodo o el mensaje de error
      */
     public static function periodo(array $p) {
-        $hoy = date('Y-m-d');
+        $hoy = date('Y-m-d', ControlAccesos::ahora());
         $valida = function ($f): bool {
             return is_string($f) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $f, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1]);
         };
@@ -73,12 +72,12 @@ class Tablero {
             return 'El periodo puede ser de hasta ' . self::DIAS_MAX . ' días (unos 3 meses). Para más tiempo, descarga un Excel por cada periodo.';
         }
         // Horas (opcional): desde las hora_desde del primer día hasta las hora_hasta del último (el corte del
-        // turno: de las 06:00 a la hora en que se pide el reporte)
+        // turno: de las 05:30 a la hora en que se pide el reporte)
         $hora = fn($h, string $omision): string => is_string($h) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $h) ? $h : $omision;
         $hIni = $hora($p['hora_desde'] ?? null, '00:00');
         $hFin = $hora($p['hora_hasta'] ?? null, '23:59');
         if ($desde === $hasta && $hFin <= $hIni) return 'La hora final debe ser después de la hora inicial.';
-        if (strtotime($desde . ' ' . $hIni . ':00') > time()) return 'El periodo empieza a las ' . $hIni . ': todavía no hay datos.';
+        if (strtotime($desde . ' ' . $hIni . ':00') > ControlAccesos::ahora()) return 'El periodo empieza a las ' . $hIni . ': todavía no hay datos.';
         return [$desde, $hasta, $hIni, $hFin];
     }
     public static function masDias(string $f, int $n): string { return date('Y-m-d', strtotime($f . ' 12:00:00 ' . ($n >= 0 ? '+' : '') . $n . ' days')); }
@@ -90,14 +89,14 @@ class Tablero {
     private function calcular(string $desde, string $hasta, array $usr, string $hIni = '00:00', string $hFin = '23:59'): array {
         ControlAccesos::asegurarTabla($this->pdo);
         ControlAccesos::asegurarIncidencias($this->pdo);
-        $ahora = time();
+        $ahora = ControlAccesos::ahora();
         $tIni = strtotime($desde . ' ' . $hIni . ':00');
         $tFin = strtotime($hasta . ' ' . $hFin . ($hFin === '23:59' ? ':59' : ':00'));
         $ini = date('Y-m-d H:i:s', $tIni);
         $fin = date('Y-m-d H:i:s', $tFin);
         $corte = min($tFin, $ahora);                                       // el momento del reporte: el fin, o ahora
         // Con margen a los lados, para juntar entradas y salidas que cruzan el principio o el fin; hacia atrás,
-        // lo que revisa «En planta» (48 h), para saber quién estaba dentro al empezar
+        // hasta el reinicio de las 05:30 anterior (y 16 h más), para saber quién estaba dentro al empezar
         $margen = ControlAccesos::HORAS_JORNADA_MAX * 3600;
         $a = date('Y-m-d H:i:s', $tIni - max($margen, ControlAccesos::HORAS_EN_PLANTA * 3600));
         $b = date('Y-m-d H:i:s', $tFin + $margen);
@@ -250,50 +249,58 @@ class Tablero {
     }
 
     /**
-     * El cuadre del periodo, con la regla de «En planta» (una persona está dentro si su última lectura, de las
-     * últimas 48 h, es una ENTRADA). Así los números siempre cuadran:
-     *     dentro al inicio + entradas − salidas − sin salida por más de 48 h = dentro al corte
-     * Las lecturas que no cambian nada se cuentan aparte: una ENTRADA de quien ya estaba dentro (repetida) y
-     * una SALIDA de quien no estaba dentro (sin entrada). Las lecturas sin ID no entran en el cuadre.
+     * El cuadre del periodo, con la regla de «En planta»: una persona está dentro si su última lectura es una
+     * ENTRADA de después del último reinicio (05:30). Así los números siempre cuadran:
+     *     dentro al inicio + entradas − salidas − sin salida al reinicio de las 05:30 = dentro al corte
+     * Las lecturas que no cambian a cuántos hay dentro se cuentan aparte: una ENTRADA de quien ya estaba dentro
+     * (repetida), una SALIDA de quien entró antes del reinicio (cuenta en su turno, p. ej. el de noche) y una
+     * SALIDA sin entrada. Las lecturas sin ID no entran en el cuadre.
      * @return array{0:array,1:array}  [cuadre, quién está dentro al corte]
      */
     public static function cuadre(array $filas, int $tIni, int $corte): array {
-        $ventana = ControlAccesos::HORAS_EN_PLANTA * 3600;
+        $jornada = ControlAccesos::HORAS_JORNADA_MAX * 3600;
         $c = ['inicio' => 0, 'entradas' => 0, 'entradas_validas' => 0, 'entradas_repetidas' => 0, 'salidas' => 0,
-              'salidas_validas' => 0, 'salidas_sin_entrada' => 0, 'vencidas' => 0, 'fin' => 0, 'sin_id' => 0,
-              'desde' => date('Y-m-d H:i:s', $tIni), 'corte' => date('Y-m-d H:i:s', $corte)];
-        $estado = []; $quien = [];                         // clave → hora de su entrada (está dentro) · [codigo, nombre]
+              'salidas_validas' => 0, 'salidas_turno_anterior' => 0, 'salidas_sin_entrada' => 0, 'vencidas' => 0, 'fin' => 0, 'sin_id' => 0,
+              'desde' => date('Y-m-d H:i:s', $tIni), 'corte' => date('Y-m-d H:i:s', $corte), 'reinicio' => ControlAccesos::hora(ControlAccesos::REINICIO)];
+        $estado = []; $quien = [];                         // clave → hora de su última entrada (sin salida) · [codigos, nombre]
+        $dentroEn = fn(int $e, int $t): bool => $e >= ControlAccesos::reinicioAntes($t);
+        // Quien estaba dentro y lo quitó un reinicio dentro del periodo
+        $quitadoEnPeriodo = fn(int $e): bool => ControlAccesos::reinicioDespues($e) > $tIni;
         $empezo = false;
         foreach ($filas as $f) {
             $t = strtotime((string)$f['capturado']);
             if ($t > $corte) break;
             if (!$empezo && $t >= $tIni) {                  // quién estaba dentro al empezar
                 $empezo = true;
-                foreach ($estado as $k => $e) if ($e >= $tIni - $ventana) $c['inicio']++;
+                foreach ($estado as $e) if ($dentroEn($e, $tIni)) $c['inicio']++;
             }
             if ($empezo && (string)$f['codigo'] === '') { $c['sin_id']++; $c[$f['tipo'] === 'salida' ? 'salidas' : 'entradas']++; continue; }
             if ((string)$f['codigo'] === '') continue;
             $k = ControlAccesos::claveId((string)$f['codigo']);
             $quien[$k] = [array_merge($quien[$k][0] ?? [], [(string)$f['codigo']]), (string)$f['nombre'] !== '' ? (string)$f['nombre'] : ($quien[$k][1] ?? '')];
-            $esta = isset($estado[$k]) && $estado[$k] >= $t - $ventana;
-            if ($empezo && isset($estado[$k]) && !$esta && $estado[$k] + $ventana >= $tIni) $c['vencidas']++;   // lleva más de 48 h sin salida
-            if (!$esta) unset($estado[$k]);
+            $antes = $estado[$k] ?? null;
+            $esta = $antes !== null && $dentroEn($antes, $t);
+            if ($empezo && $antes !== null && !$esta && $quitadoEnPeriodo($antes)) $c['vencidas']++;   // la quitó el reinicio
             if ($f['tipo'] === 'salida') {
-                if ($empezo) { $c['salidas']++; $c[$esta ? 'salidas_validas' : 'salidas_sin_entrada']++; }
+                if ($empezo) {
+                    $c['salidas']++;
+                    // Sin entrada desde el reinicio: si entró en las 16 h anteriores (p. ej. de noche), cuenta en su turno
+                    $c[$esta ? 'salidas_validas' : ($antes !== null && $t - $antes <= $jornada ? 'salidas_turno_anterior' : 'salidas_sin_entrada')]++;
+                }
                 unset($estado[$k]);
             } else {
                 if ($empezo) { $c['entradas']++; $c[$esta ? 'entradas_repetidas' : 'entradas_validas']++; }
                 $estado[$k] = $t;                           // la última entrada (como «En planta»)
             }
         }
-        if (!$empezo) foreach ($estado as $k => $e) if ($e >= $tIni - $ventana) $c['inicio']++;
+        if (!$empezo) foreach ($estado as $e) if ($dentroEn($e, $tIni)) $c['inicio']++;
         $lista = [];
         foreach ($estado as $k => $e) {
-            if ($e >= $corte - $ventana) {
+            if ($dentroEn($e, $corte)) {
                 $min = max(0, (int)floor(($corte - $e) / 60));
                 $lista[] = ['id' => ControlAccesos::idMostrado($quien[$k][0]), 'nombre' => $quien[$k][1], 'entrada' => date('Y-m-d H:i:s', $e),
                             'minutos' => $min, 'revisar' => $min > ControlAccesos::MINUTOS_REVISAR] + ControlAccesos::alerta16($e, $corte);
-            } elseif ($e + $ventana >= $tIni) $c['vencidas']++;
+            } elseif ($dentroEn($e, $tIni) || ($e >= $tIni && $quitadoEnPeriodo($e))) $c['vencidas']++;
         }
         $c['fin'] = count($lista);
         $orden = ['limite' => 0, 'aviso' => 1, '' => 2];                    // primero quien ya cumplió 16 h o está por cumplirlas
@@ -313,8 +320,7 @@ class Tablero {
 
     /**
      * Cuánto tiempo estuvo dentro cada quien: [inicio, fin] por cada entrada. Sin salida, hasta
-     * ahora si es su última lectura y entró en las últimas 48 h (como «En planta»); si no, 16 h
-     * (o hasta su siguiente entrada, si es antes).
+     * ahora o hasta el reinicio de las 05:30 (como «En planta»), o hasta su siguiente entrada si es antes.
      * @return array<int,array{0:int,1:int}>
      */
     private function intervalos(array $filas, int $ahora): array {
@@ -330,11 +336,13 @@ class Tablero {
             for ($i = 0; $i < $n; $i++) {
                 if ($regs[$i]['tipo'] !== 'entrada') continue;
                 $ini = strtotime((string)$regs[$i]['capturado']);
+                // Hasta su salida (si fue en las 16 h siguientes); si no, hasta su siguiente entrada o el reinicio de las 05:30
+                $reinicio = ControlAccesos::reinicioDespues($ini);
                 if ($i + 1 < $n) {
                     $sig = strtotime((string)$regs[$i + 1]['capturado']);
-                    $fin = $regs[$i + 1]['tipo'] === 'salida' ? $sig : min($sig, $ini + $jornada);
+                    $fin = $regs[$i + 1]['tipo'] === 'salida' && $sig - $ini <= $jornada ? $sig : min($sig, $reinicio);
                 } else {
-                    $fin = $ini >= $ahora - ControlAccesos::HORAS_EN_PLANTA * 3600 ? $ahora : $ini + $jornada;
+                    $fin = min($ahora, $reinicio);
                 }
                 if ($fin > $ini) $out[] = [$ini, $fin];
             }
@@ -401,9 +409,10 @@ class Tablero {
             ['CUADRE: dentro al inicio (' . self::fechaHora($q['desde']) . ')', $q['inicio'], 'entero'],
             ['   + entradas (de quien no estaba dentro)', $q['entradas_validas'], 'entero'],
             ['   − salidas (de quien estaba dentro)', $q['salidas_validas'], 'entero'],
-            ['   − sin salida por más de 48 h (ya no cuentan)', $q['vencidas'], 'entero'],
+            ['   − sin salida al reinicio de las ' . $q['reinicio'] . ' (ya no cuentan)', $q['vencidas'], 'entero'],
             ['   = dentro al corte (' . self::fechaHora($q['corte']) . ')', $q['fin'], 'entero'],
             ['   entradas repetidas (ya estaba dentro: no cambian el cuadre)', $q['entradas_repetidas'], 'entero'],
+            ['   salidas de quien entró antes del reinicio (cuentan en su turno, p. ej. de noche)', $q['salidas_turno_anterior'], 'entero'],
             ['   salidas sin entrada registrada (no cambian el cuadre)', $q['salidas_sin_entrada'], 'entero'],
             ['Entradas', $k['entradas'], 'entero'],
             ['   del turno de día', $k['entradas_dia'], 'entero'],
@@ -534,7 +543,7 @@ class Tablero {
                . $caja('Incidencias', $n($k['incidencias']), 'Reportadas en la caseta')
                . '</tr></table>';
 
-        // El cuadre: dentro al inicio + entradas − salidas − sin salida por más de 48 h = dentro al corte
+        // El cuadre: dentro al inicio + entradas − salidas − sin salida al reinicio de las 05:30 = dentro al corte
         $q = $c['cuadre'];
         $paso = fn($v, $t, $fin = false) => '<td style="padding:2mm 3mm;background:' . ($fin ? '#0B2545' : '#eef3f9') . ';text-align:center">'
             . '<div style="font-size:15pt;font-weight:bold;color:' . ($fin ? '#ffffff' : '#0B2545') . '">' . $n($v) . '</div>'
@@ -542,11 +551,13 @@ class Tablero {
         $op = fn($s) => '<td style="padding:0 2mm;font-size:14pt;font-weight:bold;color:#5a6072;text-align:center">' . $s . '</td>';
         $html .= '<h2>Cuadre del periodo</h2><table cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>'
                . $paso($q['inicio'], 'Dentro al ' . self::fechaHora($q['desde'])) . $op('+') . $paso($q['entradas_validas'], 'Entradas')
-               . $op('−') . $paso($q['salidas_validas'], 'Salidas') . ($q['vencidas'] ? $op('−') . $paso($q['vencidas'], 'Sin salida (+48 h)') : '')
+               . $op('−') . $paso($q['salidas_validas'], 'Salidas') . ($q['vencidas'] ? $op('−') . $paso($q['vencidas'], 'Sin salida al reinicio (' . $q['reinicio'] . ')') : '')
                . $op('=') . $paso($q['fin'], 'Dentro al ' . self::fechaHora($q['corte']), true) . '</tr></table>'
                . '<p class="nota">Entradas leídas: ' . $n($q['entradas']) . ($q['entradas_repetidas'] ? ' (' . $n($q['entradas_repetidas']) . ' de quien ya estaba dentro: leída dos veces, no cambia a cuántos hay dentro)' : '')
-               . '. Salidas leídas: ' . $n($q['salidas']) . ($q['salidas_sin_entrada'] ? ' (' . $n($q['salidas_sin_entrada']) . ' de quien no tenía entrada registrada)' : '') . '.'
-               . ($q['vencidas'] ? ' ' . $n($q['vencidas']) . ' llevaban más de 48 h sin registrar su salida: ya no cuentan como dentro.' : '')
+               . '. Salidas leídas: ' . $n($q['salidas'])
+               . ($q['salidas_turno_anterior'] ? ' (' . $n($q['salidas_turno_anterior']) . ' de quien entró antes del reinicio de las ' . $q['reinicio'] . ': cuentan en su turno)' : '')
+               . ($q['salidas_sin_entrada'] ? ' (' . $n($q['salidas_sin_entrada']) . ' de quien no tenía entrada registrada)' : '') . '.'
+               . ($q['vencidas'] ? ' ' . $n($q['vencidas']) . ' no registraron su salida antes del reinicio de las ' . $q['reinicio'] . ': ya no cuentan como dentro.' : '')
                . ($q['sin_id'] ? ' ' . $n($q['sin_id']) . ' lecturas sin ID (sólo foto) no entran en el cuadre.' : '') . '</p>';
 
         // Gráficas, de dos en dos

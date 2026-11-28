@@ -7,18 +7,19 @@ const A = 'http://localhost:8794/api/index.php';
 let fallas = 0;
 const ok = (c, m) => { if (!c) fallas++; console.log((c ? 'OK    ' : 'FALLA ') + m); };
 const sql = q => execSync(`mariadb --default-character-set=utf8mb4 -N -B -uprueba -pprueba -h127.0.0.1 ca_prueba -e "${q}"`).toString().trim();
+const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' });
+// El servidor «a las 05:00 de hoy» (sólo en pruebas): antes del reinicio de las 05:30, quien se quedó ayer sigue en planta
+const AHORA = `${hoy} 05:00:00`, X = { 'X-Prueba-Ahora': AHORA };
 const get = async (accion, tok, q = {}) => {
-  const r = await fetch(A + '?' + new URLSearchParams({ ...q, action: accion }), { headers: tok ? { Authorization: 'Bearer ' + tok } : {} });
+  const r = await fetch(A + '?' + new URLSearchParams({ ...q, action: accion }), { headers: { ...X, ...(tok ? { Authorization: 'Bearer ' + tok } : {}) } });
   return Object.assign(await r.json(), { http: r.status });
 };
 const post = async (accion, tok, payload = {}) => {
-  const r = await fetch(A, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ action: accion, payload }) });
+  const r = await fetch(A, { method: 'POST', headers: { ...X, 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ action: accion, payload }) });
   return Object.assign(await r.json(), { http: r.status });
 };
-const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' });
 const dia = n => new Date(new Date(hoy + 'T12:00:00Z').getTime() - n * 86400e3).toISOString().slice(0, 10);
 const ayer = dia(1), manana = dia(-1);
-const hace = min => new Date(Date.now() - min * 60e3).toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' }).replace('T', ' ');
 const reg = (uid, tipo, cap, codigo, nombre) => sql(
   `INSERT INTO accesos_registros (uid,tipo,fecha,capturado,recibido,lugar,usuario,usuario_nombre,turno_fecha,turno,nombre,codigo,origen)
    VALUES ('${uid}','${tipo}','${cap.slice(0, 10)}','${cap}',NOW(),'ACCESO','punto1','CASETA PUNTO 1','${cap.slice(0, 10)}','D','${nombre}','${codigo}','tarjeta')`);
@@ -29,7 +30,7 @@ reg('omitido-0002', 'salida', `${ayer} 10:00:00`, '00287', 'RAMIRO ESTEBAN VILLA
 reg('omitido-0003', 'entrada', `${ayer} 09:30:00`, '00777', 'PERSONA DE PRUEBA');                 // se quedó «en planta»
 sql(`INSERT INTO accesos_incidencias (uid,tipo,detalle,fecha,capturado,recibido,turno_fecha,turno,codigo,nombre,usuario,usuario_nombre)
      VALUES ('omitido-inc1','OTRO','Prueba del botón','${ayer}','${ayer} 09:40:00',NOW(),'${ayer}','D','00777','PERSONA DE PRUEBA','punto1','CASETA PUNTO 1')`);
-reg('omitido-0004', 'entrada', hace(2), '00316', 'PEDRO VEGA CRUZ');                                // real, de hoy
+reg('omitido-0004', 'entrada', `${hoy} 04:58:00`, '00316', 'PEDRO VEGA CRUZ');                                // real, de hoy
 
 const periodo = { desde: ayer, hasta: hoy };
 const cuadro = async () => {
@@ -71,7 +72,7 @@ ok(r.status === 'error' && /no hay registros/.test(r.message), 'un día sin regi
 r = await post('OMITIR', 'tok-admin', { fecha: ayer, desde: '11:00', hasta: '09:00' });
 ok(r.status === 'error' && /antes/.test(r.message), 'horas al revés: error');
 r = await post('OMITIR', 'tok-admin', { fecha: hoy });
-ok(r.status === 'success' && r.hasta_ahora && r.hasta < hace(-1) && r.entradas === 1, 'hoy: sólo hasta ahora (lo que se registre después sí cuenta)');
+ok(r.status === 'success' && r.hasta_ahora && r.hasta === AHORA && r.entradas === 1, 'hoy: sólo hasta ahora (lo que se registre después sí cuenta)');
 
 // ── Omitir ayer ──
 r = await post('OMITIR', 'tok-admin', { fecha: ayer, motivo: 'Pruebas del lector', aplicar: true });

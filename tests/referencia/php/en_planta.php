@@ -3,6 +3,9 @@
 declare(strict_types=1);
 date_default_timezone_set('America/Mexico_City');
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
+// Hora fija (sólo en pruebas): las 21:00, así todas las entradas de abajo son después del reinicio de las 05:30
+define('MODO_PRUEBAS', true);
+$_SERVER['HTTP_X_PRUEBA_AHORA'] = '2026-11-26 21:00:00';
 require __DIR__ . '/../../../api/helpers.php';
 require __DIR__ . '/../../../api/ControlAccesos.php';
 $fallas = 0;
@@ -15,7 +18,7 @@ $admin = ['usuario' => 'admin', 'nombre' => 'ADMINISTRADOR', 'rol' => 'ADMIN'];
 $calidad = ['usuario' => 'cal', 'nombre' => 'CALIDAD', 'rol' => 'CALIDAD'];
 $caseta = ['usuario' => 'punto1', 'nombre' => 'CASETA PUNTO 1', 'rol' => 'ACCESOS'];
 $ca = new ControlAccesos($pdo);
-$hace = fn(int $min) => date('Y-m-d H:i:s', time() - $min * 60);
+$hace = fn(int $min) => date('Y-m-d H:i:s', ControlAccesos::ahora() - $min * 60);
 $n = 0;
 $mete = function (string $tipo, int $minAtras, string $cod, string $nom, string $lugar) use ($pdo, $hace, &$n) {
     $n++; $cap = $hace($minAtras); [$tf, $t] = ControlAccesos::turnoDe($tipo, $cap);
@@ -32,7 +35,7 @@ $mete('salida', 60, '00412', 'ANA SOFIA RUIZ PAEZ', 'PUNTO DE CONTROL 3');
 $mete('entrada', 600, '00316', 'PEDRO VEGA CRUZ', 'PUNTO DE CONTROL 1');
 $mete('salida', 400, '316', '', 'PUNTO DE CONTROL 1');
 $mete('entrada', 30, '00316', 'PEDRO VEGA CRUZ', 'PUNTO DE CONTROL 2');
-// 00500: entró hace 15 h y no registró salida → aparece, marcado para revisar
+// 00500: entró hace 15 h (06:00, después del reinicio) y no registró salida → aparece, marcado para revisar
 $mete('entrada', 900, '00500', 'LUIS MORA DIAZ', 'PUNTO DE CONTROL 4');
 // 00600: entró hace 3 días → fuera de la ventana de 48 h
 $mete('entrada', 3 * 24 * 60, '00600', 'JUAN SOTO RIOS', 'PUNTO DE CONTROL 1');

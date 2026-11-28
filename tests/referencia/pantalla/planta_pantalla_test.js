@@ -5,6 +5,9 @@ const B = 'http://localhost:8794/';
 const D = __dirname + '/';
 let fallas = 0;
 const ok = (c, m) => { if (!c) fallas++; console.log((c ? 'OK   ' : 'FALLA') + ' ' + m); };
+// Hora fija: las 21:00 de hoy, la misma con la que se sembró (sembrar_planta.php), en la pantalla y en el servidor
+const hoy = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' });
+const AHORA = `${hoy} 21:00:00`;
 const ses = u => ({ token: 'tok-' + u, rol: u === 'admin' ? 'ADMIN' : 'ACCESOS', usuario: u, nombre: u.toUpperCase() });
 
 async function abrir(b, sesion, vista, lector) {
@@ -13,7 +16,9 @@ async function abrir(b, sesion, vista, lector) {
     if (!sessionStorage.getItem('ya')) { localStorage.setItem('ca_sesion', JSON.stringify(s)); sessionStorage.setItem('ya', '1'); }
     if (lector) window.Capacitor = { isNativePlatform: () => true, Plugins: { LectorTarjeta: { leer: () => Promise.resolve({ cancelado: true }), abrir: () => Promise.resolve({}) } } };
   }, [sesion, lector]);
+  await ctx.setExtraHTTPHeaders({ 'X-Prueba-Ahora': AHORA });
   const p = await ctx.newPage();
+  await p.clock.setFixedTime(new Date(`${hoy}T21:00:00-06:00`));
   p.errores = []; p.pedidos = [];
   p.on('pageerror', e => p.errores.push(e.message));
   p.on('request', r => p.pedidos.push(r.url()));

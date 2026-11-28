@@ -56,6 +56,8 @@ PHP
   echo "config/config.php de prueba creado"
 fi
 grep -q "'ca_prueba'" config/config.php || { echo "config/config.php no apunta a la base de prueba ca_prueba: no sigo."; exit 1; }
+# Sólo en pruebas: se puede fijar la hora del servidor con el encabezado X-Prueba-Ahora (ControlAccesos::ahora)
+grep -q "MODO_PRUEBAS" config/config.php || echo "define('MODO_PRUEBAS', true);" >> config/config.php
 
 # ── mPDF (para los PDF) ──────────────────────────────────────────────
 [ -f vendor/autoload.php ] || composer install --no-interaction --no-progress -q

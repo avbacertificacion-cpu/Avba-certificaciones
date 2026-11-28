@@ -47,7 +47,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `js/destinos.js` | Pantalla de inicio de cada perfil y la clave de la sesión (`ca_sesion`). |
 | `accesos.html` | Módulo real que ya funcionaba en el Sistema de Gestión: pantalla del guardia (lee la credencial con la app, ENTRADA/SALIDA, cola sin señal, foto de evidencia) y del administrador (registros por turno, **En planta**, movimientos por ID, dar salida, incidencias, PDF). |
 | `api/ControlAccesos.php` | Lógica del servidor del módulo (registros, turnos, puntos y equipos, en planta, PDF con mPDF). |
-| `tablero.html` | **Tablero** (perfil CLIENTE; también PLANTA y ADMIN), con dos pestañas: **Accesos** y **Servicio médico** (`ca_tablero_vista`; ver `Medico.php`). Accesos: periodo (hoy, 7 y 30 días, mes, otras fechas; hasta 93 días), cifras, gráficas con Chart.js (`js/chart/`, colores validados: entradas azul `#257de0`, salidas naranja `#f47230`, tiempo dentro en escala de azules), «Ver datos» de cada gráfica, quién está dentro e incidencias. Descarga Excel y PDF (el PDF lleva las gráficas que dibuja la pantalla). **Turno de hoy (desde 06:00)** y horas en «Otras fechas» (`hora_desde`/`hora_hasta`; antes de las 06:00 el turno de hoy empezó ayer): el **corte** es el fin o ahora. **Cuadre** (`Tablero::cuadre`, con la regla de En planta): dentro al inicio + entradas − salidas − sin salida por más de 48 h = dentro al corte; aparte, entradas repetidas (ya estaba dentro), salidas sin entrada y lecturas sin ID. Las cifras de las otras pantallas cuentan distinto: la lista por turno usa el turno de cada guardia y sus márgenes de 2 h, y «Hoy» empieza a las 00:00. |
+| `tablero.html` | **Tablero** (perfil CLIENTE; también PLANTA y ADMIN), con dos pestañas: **Accesos** y **Servicio médico** (`ca_tablero_vista`; ver `Medico.php`). Accesos: periodo (hoy, 7 y 30 días, mes, otras fechas; hasta 93 días), cifras, gráficas con Chart.js (`js/chart/`, colores validados: entradas azul `#257de0`, salidas naranja `#f47230`, tiempo dentro en escala de azules), «Ver datos» de cada gráfica, quién está dentro e incidencias. Descarga Excel y PDF (el PDF lleva las gráficas que dibuja la pantalla). **Turno de hoy (desde 05:30)** y horas en «Otras fechas» (`hora_desde`/`hora_hasta`; antes de las 05:30 el turno de hoy empezó ayer): el **corte** es el fin o ahora. **Cuadre** (`Tablero::cuadre`, con la regla de En planta): dentro al inicio + entradas − salidas − sin salida al reinicio de las 05:30 = dentro al corte; aparte, entradas repetidas (ya estaba dentro), salidas de quien entró antes del reinicio (cuentan en su turno), salidas sin entrada y lecturas sin ID. Las cifras de las otras pantallas cuentan distinto: la lista por turno usa el turno de cada guardia y sus márgenes de 2 h, y «Hoy» empieza a las 00:00. |
 | `api/Tablero.php` | Cálculos del tablero (acciones `TABLERO`, `TABLERO_EXCEL`, `TABLERO_PDF`): entradas, salidas, personas por ID, visitas (entrada con su salida; más de 24 h no cuenta en horas), personas dentro hora por hora o máximo por día, tiempo dentro, más horas, incidencias. Archivos en `uploads/accesos/reportes/` (se borran al día). |
 | `api/lib/xlsx.php` | Excel (.xlsx) propio, sin librerías ni extensión zip: hojas con títulos fijos, filtros, fechas y el ID como texto. |
 | `personal.html` | **Personal y permisos** (ADMIN y PLANTA): la base de IDs y nombres (buscar, agregar, cambiar —cambiar el ID se lleva sus permisos—, quitar), **cargar Excel** (revisa primero: columnas reconocidas o elegidas a mano, nuevos, con cambios, renglones con problema —sin ID, sin nombre, un ID sin número (un nombre en la columna del ID) o el mismo ID con dos personas distintas: no se cargan—; el mismo ID con la misma persona queda el último renglón; no quita a nadie), descargar Excel, IDs leídos en la caseta que no están en la base, y **permisos** por ID con checklist (herramienta, celular, computadora, otro), foto del pase y/o datos del equipo y vigencia. `personal.html?id=287` abre a esa persona. |
@@ -123,11 +123,16 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
 4. **Turnos por cuenta:** lo que registra un guardia va a **su** turno (el de su cuenta), a
    cualquier hora (`turnoDeGuardia`; en la pantalla `turnoGuardia`): el de día con la fecha
    del día; el de noche con la fecha en que empezó su noche (antes del mediodía es la noche
-   del día anterior). El guardia sólo ve su turno en curso. El reloj (día 06:00–18:00, noche
-   18:00–06:00) queda de respaldo para Administración y para guardias sin turno: una entrada
-   cuenta para el turno que empieza (desde 2 h antes), una salida para el que termina (hasta
-   2 h después), y la salida de quien tiene su entrada abierta (últimas 16 h) va al turno de
-   esa entrada (`turnoDeEntradaAbierta`). Administración ve los turnos en curso por reloj.
+   del día anterior). El guardia sólo ve su turno en curso. El reloj (jornadas continuas: día
+   **05:30–17:30**, noche **17:30–05:30**; `CAMBIO_DIA`/`CAMBIO_NOCHE`, recorridos media hora porque
+   hay quien entra unos minutos antes) queda de respaldo para Administración y para guardias sin
+   turno: una entrada cuenta para el turno que empieza desde su inicio (`MARGEN_ENTRADA` 0: de las
+   05:30 en adelante es el de día), una salida para el que termina (hasta 2 h después), y la salida
+   de quien tiene su entrada abierta (últimas 16 h) va al turno de esa entrada
+   (`turnoDeEntradaAbierta`: quien entró de noche y sale a las 05:45 cuenta en su noche).
+   Administración ve los turnos en curso por reloj. **Reinicio diario a las 05:30** (`REINICIO`,
+   `reinicioAntes`/`reinicioDespues`): quien no registró su salida deja de contar como dentro (En
+   planta, aviso de 16 h, cuadre y gráfica del tablero, «Ya tenía entrada» de la caseta).
 5. **Un solo acceso, varios teléfonos a la vez:** todo se registra en `ACCESO`
    (`ControlAccesos::ACCESO`, se muestra «Acceso»). No hay puntos que asignar ni teléfono
    ligado: cualquier cuenta de guardia registra desde cualquier teléfono, varias al mismo

@@ -19,9 +19,9 @@
     El PDF de datos junta la entrada y la salida de cada persona por código.
   · En la app funciona sin señal: el registro se guarda en el teléfono y se
     envía solo (js/app-sin-senal.js, ACCESO_REGISTRAR).
-  · El control es por TURNO, no por día: día 06:00–18:00 y noche
-    18:00–06:00. Una entrada cuenta para el turno que empieza (desde 2 h
-    antes) y una salida para el que termina (hasta 2 h después). Los
+  · El control es por TURNO, no por día: día 05:30–17:30 y noche
+    17:30–05:30. Una entrada cuenta para el turno que empieza (desde su
+    inicio) y una salida para el que termina (hasta 2 h después). Los
     contadores siguen aunque se cierre la sesión y se reinician solos en el
     cambio de turno. Administración puede ver turnos anteriores.
   · Cada foto enviada se confirma con el servidor antes de borrarla del
@@ -418,7 +418,7 @@
         <input type="search" id="planta-buscar" placeholder="Buscar por ID o nombre" autocomplete="off" aria-label="Buscar por ID o nombre">
         <button class="btn sec" type="button" id="planta-csv" title="Descargar la lista para Excel">Excel</button>
       </div>
-      <small class="ayuda">Una persona por ID (el número del recuadro azul de su credencial): su última lectura fue ENTRADA, en cualquier punto, en las últimas 48 h. En cuanto registra su SALIDA ya no aparece. Toca a alguien para ver sus entradas y salidas.</small>
+      <small class="ayuda">Una persona por ID (el número del recuadro azul de su credencial): su última lectura fue ENTRADA, en cualquier punto, desde el reinicio de las 05:30 (quien no registró su salida antes ya no cuenta). En cuanto registra su SALIDA ya no aparece. Toca a alguien para ver sus entradas y salidas.</small>
     </div>
     <label class="check" id="campo-solo-punto" style="margin-top:8px"><input type="checkbox" id="solo-punto" checked> Sólo este punto de control</label>
     <div class="nota mal" id="err-lista" hidden></div>
@@ -429,7 +429,7 @@
   <div class="tarjeta" id="tarjeta-pdf">
     <h2>PDF del turno</h2>
     <div class="campo" style="margin-bottom:6px"><label for="pdf-turno">Turno</label><select id="pdf-turno"></select>
-      <small class="ayuda">Un turno queda completo 2 horas después de su cambio, cuando ya salió su personal: el de día a las 20:00 y el de noche a las 08:00.</small></div>
+      <small class="ayuda">Un turno queda completo 2 horas después de su cambio, cuando ya salió su personal: el de día a las 19:30 y el de noche a las 07:30.</small></div>
     <p class="nota" id="pdf-aviso" hidden style="margin:0 0 6px"></p>
     <label class="check" style="margin-top:4px"><input type="checkbox" id="pdf-punto" checked> Sólo el punto de control elegido</label>
     <h3 class="sub-pdf">Entradas y salidas: nombre, ID y hora</h3>
@@ -686,21 +686,30 @@
   function numero(n) { return Number(n || 0).toLocaleString('es-MX'); }
 
   /* ══ Turnos ══════════════════════════════════════════════════════════
-     Día 06:00–18:00 y noche 18:00–06:00 (igual que el servidor,
-     ControlAccesos::turnoDe). En el cambio de turno salen unos y entran
-     otros a la misma hora, así que no basta el reloj:
-       · una ENTRADA cuenta para el turno que empieza (desde 2 h antes);
+     Día 05:30–17:30 y noche 17:30–05:30 (igual que el servidor,
+     ControlAccesos::turnoDe; jornadas continuas). En el cambio de turno salen
+     unos y entran otros a la misma hora, así que no basta el reloj:
+       · una ENTRADA cuenta para el turno que empieza, desde su inicio (05:30);
        · una SALIDA, para el que termina (hasta 2 h después).
-     Por eso de 04:00 a 08:00 y de 16:00 a 20:00 hay dos turnos en curso: el
+     Por eso de 05:30 a 07:30 y de 17:30 a 19:30 hay dos turnos en curso: el
      que sale y el que entra. Una clave de turno es «2026-11-24-D» o
-     «2026-11-24-N» (la fecha del turno de noche es la del día en que empieza). */
-  var CAMBIO_DIA = 360, CAMBIO_NOCHE = 1080, MARGEN = 120;      // 06:00 y 18:00 (cambio de turno de la planta)
+     «2026-11-24-N» (la fecha del turno de noche es la del día en que empieza).
+     A las 05:30 se reinicia quién está dentro (REINICIO). */
+  var CAMBIO_DIA = 330, CAMBIO_NOCHE = 1050, MARGEN = 120, MARGEN_ENTRADA = 0, REINICIO = 330;   // 05:30 y 17:30
+  function hhmm(min) { return dos(Math.floor(min / 60)) + ':' + dos(min % 60); }
+  var H_DIA = hhmm(CAMBIO_DIA), H_NOCHE = hhmm(CAMBIO_NOCHE);
+  /** El último reinicio (05:30) hasta ahora, en milisegundos */
+  function reinicioAntes(ms) {
+    var d = new Date(ms); d.setHours(Math.floor(REINICIO / 60), REINICIO % 60, 0, 0);
+    if (d.getTime() > ms) d.setDate(d.getDate() - 1);
+    return d.getTime();
+  }
   function fechaDe(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
   function sumarDias(f, n) { var d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return fechaDe(d); }
   function turnoDe(tipo, cap) {
     var f = cap.slice(0, 10), m = (+cap.slice(11, 13)) * 60 + (+cap.slice(14, 16));
-    var ini = tipo === 'salida' ? CAMBIO_DIA + MARGEN : CAMBIO_DIA - MARGEN;
-    var fin = tipo === 'salida' ? CAMBIO_NOCHE + MARGEN : CAMBIO_NOCHE - MARGEN;
+    var ini = tipo === 'salida' ? CAMBIO_DIA + MARGEN : CAMBIO_DIA - MARGEN_ENTRADA;
+    var fin = tipo === 'salida' ? CAMBIO_NOCHE + MARGEN : CAMBIO_NOCHE - MARGEN_ENTRADA;
     if (m >= ini && m < fin) return f + '-D';
     if (m >= fin) return f + '-N';
     return sumarDias(f, -1) + '-N';
@@ -749,7 +758,7 @@
     return e === s ? [e] : [s, e].sort();           // el que sale primero
   }
   /* Hasta cuándo recibe registros (sus últimas salidas) */
-  function cierreTurno(k) { return k.slice(-1) === 'D' ? k.slice(0, 10) + ' 20:00:00' : sumarDias(k.slice(0, 10), 1) + ' 08:00:00'; }
+  function cierreTurno(k) { return k.slice(-1) === 'D' ? k.slice(0, 10) + ' ' + hhmm(CAMBIO_NOCHE + MARGEN) + ':00' : sumarDias(k.slice(0, 10), 1) + ' ' + hhmm(CAMBIO_DIA + MARGEN) + ':00'; }
   function cerrado(k) { return ahoraLocal() >= cierreTurno(k); }
   var vista = null;                                // null: el turno en curso; o la clave de uno anterior
   function turnosVista() { return vista ? [vista] : turnosEnCurso(); }
@@ -757,12 +766,12 @@
   function nombreTurno(k) { return k.slice(-1) === 'D' ? 'Turno de día' : 'Turno de noche'; }
   function rangoTurno(k) {
     var f = k.slice(0, 10);
-    return k.slice(-1) === 'D' ? diaCorto(f) + ' · 06:00 a 18:00' : diaCorto(f) + ' 18:00 a ' + diaCorto(sumarDias(f, 1)) + ' 06:00';
+    return k.slice(-1) === 'D' ? diaCorto(f) + ' · ' + H_DIA + ' a ' + H_NOCHE : diaCorto(f) + ' ' + H_NOCHE + ' a ' + diaCorto(sumarDias(f, 1)) + ' ' + H_DIA;
   }
   function turnoLargo(k) {                         // para las instrucciones a Claude
     var f = k.slice(0, 10);
-    return k.slice(-1) === 'D' ? 'turno de día del ' + fechaLarga(f) + ' (06:00 a 18:00)'
-      : 'turno de noche del ' + fechaLarga(f) + ', 18:00, al ' + fechaLarga(sumarDias(f, 1)) + ', 06:00';
+    return k.slice(-1) === 'D' ? 'turno de día del ' + fechaLarga(f) + ' (' + H_DIA + ' a ' + H_NOCHE + ')'
+      : 'turno de noche del ' + fechaLarga(f) + ', ' + H_NOCHE + ', al ' + fechaLarga(sumarDias(f, 1)) + ', ' + H_DIA;
   }
   function enLinea() { return window.AVBAApp ? AVBAApp.enLinea() : navigator.onLine !== false; }
   var tToast;
@@ -1829,7 +1838,7 @@
 
   /* ══ En planta (administración) ══════════════════════════════════════
      Una persona por ID (el número del recuadro azul, único por persona): su
-     última lectura de las últimas 48 h fue ENTRADA, en cualquier punto. Si ya
+     última lectura desde el reinicio de las 05:30 fue ENTRADA, en cualquier punto. Si ya
      registró su salida, aunque sea por otro punto, no aparece. Se actualiza
      sola cada 30 s, como la lista. */
   var modoPlanta = false, pedidoPlanta = 0, ES_GESTOR = ses.rol === 'ADMIN' || ses.rol === 'PLANTA';
@@ -1892,7 +1901,7 @@
   function previo(codigo) {
     if (!MOVS.sinc) return undefined;
     var x = MOVS.m[claveId(codigo)];
-    return x && horaMs(x[1]) >= Date.now() - HORAS_EN_PLANTA * 3600000 ? { tipo: x[0], cap: x[1] } : null;
+    return x && horaMs(x[1]) >= Date.now() - 16 * 3600000 ? { tipo: x[0], cap: x[1] } : null;     // su jornada: 16 h
   }
   /** El texto para el guardia: a qué hora entró (en una salida), o el aviso si algo no cuadra. */
   function textoPrevio(tipo, p) {
@@ -1901,7 +1910,7 @@
       if (p && p.tipo === 'E') return 'Entró ' + (p.cap.slice(0, 10) === hoyLocal() ? 'a las ' + p.cap.slice(11, 16) : cuando(p.cap)) + ' · ' + duracion((Date.now() - horaMs(p.cap)) / 60000) + ' dentro';
       return '⚠ Sin entrada registrada';
     }
-    if (tipo === 'entrada' && p && p.tipo === 'E') return '⚠ Ya tenía entrada ' + (p.cap.slice(0, 10) === hoyLocal() ? 'a las ' + p.cap.slice(11, 16) : cuando(p.cap)) + ' sin salida';
+    if (tipo === 'entrada' && p && p.tipo === 'E' && horaMs(p.cap) >= reinicioAntes(Date.now())) return '⚠ Ya tenía entrada ' + (p.cap.slice(0, 10) === hoyLocal() ? 'a las ' + p.cap.slice(11, 16) : cuando(p.cap)) + ' sin salida';
     return '';
   }
   function marcarMov(it) {

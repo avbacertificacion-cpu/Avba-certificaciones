@@ -129,7 +129,7 @@ final class Omitidos {
         $historial = array_map([self::class, 'fila'],
             $this->pdo->query("SELECT * FROM accesos_omitidos WHERE activo = 0 ORDER BY quitado DESC LIMIT 20")->fetchAll(PDO::FETCH_ASSOC));
         return ['status' => 'success', 'dias' => array_values($dias), 'omitidos' => $omitidos, 'historial' => $historial,
-                'hoy' => date('Y-m-d'), 'ahora' => date('H:i')];
+                'hoy' => date('Y-m-d', ControlAccesos::ahora()), 'ahora' => date('H:i', ControlAccesos::ahora())];
     }
 
     private static function fila(array $o): array {
@@ -151,7 +151,7 @@ final class Omitidos {
         $fecha = (string)($p['fecha'] ?? '');
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha) || !checkdate((int)substr($fecha, 5, 2), (int)substr($fecha, 8, 2), (int)substr($fecha, 0, 4)))
             return ['status' => 'error', 'message' => 'Elige el día.'];
-        $hoy = date('Y-m-d');
+        $hoy = date('Y-m-d', ControlAccesos::ahora());
         if ($fecha > $hoy) return ['status' => 'error', 'message' => 'Ese día todavía no pasa: sólo se omiten días con registros.'];
         $hd = (string)($p['desde'] ?? '');
         $hh = (string)($p['hasta'] ?? '');
@@ -160,7 +160,8 @@ final class Omitidos {
         $desde = $fecha . ' ' . ($hd !== '' ? $hd . ':00' : '00:00:00');
         $hasta = $fecha . ' ' . ($hh !== '' ? $hh . ':59' : '23:59:59');
         $hastaAhora = false;
-        if ($fecha === $hoy && $hasta > date('Y-m-d H:i:s')) { $hasta = date('Y-m-d H:i:s'); $hastaAhora = true; }   // sólo lo que ya pasó
+        $ya = date('Y-m-d H:i:s', ControlAccesos::ahora());
+        if ($fecha === $hoy && $hasta > $ya) { $hasta = $ya; $hastaAhora = true; }   // sólo lo que ya pasó
         if ($desde >= $hasta) return ['status' => 'error', 'message' => 'La hora de inicio debe ser antes que la de fin.'];
         foreach (self::rangos($this->pdo) as [$a, $b])
             if ($a <= $desde && $b >= $hasta) return ['status' => 'error', 'message' => 'Ese periodo ya está omitido.'];

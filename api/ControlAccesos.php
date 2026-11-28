@@ -18,7 +18,7 @@
      · Cada registro lleva un identificador del dispositivo (uid): si la app
        reenvía uno que el servidor ya tenía (se cortó la señal a medio
        envío), no se duplica.
-     · El control por TURNO (día 06:00–18:00, noche 18:00–06:00): lista con
+     · El control por TURNO (día 05:30–17:30, noche 17:30–05:30): lista con
        hora, foto y quién registró, y los totales de entradas y salidas.
      · El PDF del turno: las fotos de ENTRADAS y de SALIDAS, cada una con su
        etiqueta (ENTRADA 001 · 24/11 06:15:32), pensado para subirlo a Claude y
@@ -217,7 +217,7 @@ class ControlAccesos {
         if (!self::esCaseta($usr)) return ['status' => 'success', 'punto' => ''];
         $t = self::turnoCuenta($usr);
         return ['status' => 'success', 'punto' => self::ACCESO, 'nombre_punto' => self::nombrePunto(self::ACCESO),
-                'turno_cuenta' => $t, 'modo' => self::modoCuenta($usr), 'turno_actual' => $t !== '' ? implode('-', self::turnoDeGuardia($t, date('Y-m-d H:i:s'))) : ''];
+                'turno_cuenta' => $t, 'modo' => self::modoCuenta($usr), 'turno_actual' => $t !== '' ? implode('-', self::turnoDeGuardia($t, date('Y-m-d H:i:s', self::ahora()))) : ''];
     }
 
     /** ¿La tabla ya tiene nombre, código y origen? Si la migración no se pudo
@@ -234,30 +234,67 @@ class ControlAccesos {
     }
 
     /* ── Turnos ─────────────────────────────────────────────────────────────
-       Día: 06:00 a 18:00. Noche: 18:00 a 06:00 del día siguiente (la fecha de
-       un turno de noche es la del día en que empieza).
+       Día: 05:30 a 17:30. Noche: 17:30 a 05:30 del día siguiente (la fecha de
+       un turno de noche es la del día en que empieza). Jornadas continuas: se
+       recorrieron media hora (antes 06:00 y 18:00) porque hay quien entra unos
+       minutos antes.
 
        En el cambio de turno salen unos y entran otros por la misma caseta, a
        la misma hora. Por eso el turno no se decide sólo por el reloj:
-         · una ENTRADA cuenta para el turno que empieza: desde 2 horas antes
-           de su inicio (de 04:00 a 16:00 es el de día);
+         · una ENTRADA cuenta para el turno que empieza a partir de su inicio
+           (de 05:30 a 17:30 es el de día);
          · una SALIDA cuenta para el turno que termina: hasta 2 horas después
-           de su fin (de 08:00 a 20:00 es el de día).
-       Así las entradas de la mañana y las salidas de la tarde del personal de
-       día quedan en el mismo turno, y las de la noche con su mañana.
+           de su fin (de 07:30 a 19:30 es el de día).
        Además, la SALIDA de quien tiene su ENTRADA abierta (últimas 16 h) va al
        turno de esa entrada (turnoDeEntradaAbierta): el reloj sólo decide cuando
-       no hay entrada con qué juntarla. */
-    public const CAMBIO_DIA   = 360;    // 06:00, en minutos (cambio de turno de la planta)
-    public const CAMBIO_NOCHE = 1080;   // 18:00
-    public const MARGEN       = 120;    // 2 horas
+       no hay entrada con qué juntarla. Así quien entró en la noche y sale a las
+       05:45 cuenta en su noche.
+
+       Reinicio diario a las 05:30 (REINICIO): quien no registró su salida deja de
+       contar como dentro de la planta (En planta, el cuadre del tablero, el aviso de
+       16 h). Su salida después del reinicio sigue contando en su turno. */
+    public const CAMBIO_DIA     = 330;    // 05:30, en minutos (cambio de turno de la planta)
+    public const CAMBIO_NOCHE   = 1050;   // 17:30
+    public const MARGEN_ENTRADA = 0;      // la entrada cuenta para el turno desde su inicio
+    public const MARGEN         = 120;    // la salida, hasta 2 horas después del fin
+    public const REINICIO       = 330;    // 05:30: se reinicia quién está dentro
+
+    /**
+     * La hora del servidor. Sólo en la configuración de pruebas (MODO_PRUEBAS, nunca en el servidor real) se puede
+     * fijar con el encabezado «X-Prueba-Ahora: AAAA-MM-DD HH:MM:SS», para probar el reinicio y los avisos a
+     * cualquier hora.
+     */
+    public static function ahora(): int {
+        static $t = null;
+        if ($t === null) {
+            $t = time();
+            if (defined('MODO_PRUEBAS') && MODO_PRUEBAS === true) {
+                $h = (string)($_SERVER['HTTP_X_PRUEBA_AHORA'] ?? '');
+                if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $h) && ($x = strtotime($h)) !== false) $t = $x;
+            }
+        }
+        return $t;
+    }
+
+    /** El último reinicio (05:30) hasta el momento $t (timestamp). */
+    public static function reinicioAntes(int $t): int {
+        $r = strtotime(date('Y-m-d', $t) . ' ' . self::hora(self::REINICIO) . ':00');
+        return $r <= $t ? $r : strtotime(date('Y-m-d', $t - 86400) . ' ' . self::hora(self::REINICIO) . ':00');
+    }
+    /** El siguiente reinicio después de $t. */
+    public static function reinicioDespues(int $t): int {
+        $r = strtotime(date('Y-m-d', $t) . ' ' . self::hora(self::REINICIO) . ':00');
+        return $r > $t ? $r : strtotime(date('Y-m-d', $t + 86400) . ' ' . self::hora(self::REINICIO) . ':00');
+    }
+    /** 330 → «05:30» */
+    public static function hora(int $min): string { return sprintf('%02d:%02d', intdiv($min, 60), $min % 60); }
 
     /** @return array{0:string,1:string} [fecha del turno, 'D' | 'N'] */
     public static function turnoDe(string $tipo, string $capturado): array {
         $d = substr($capturado, 0, 10);
         $m = (int)substr($capturado, 11, 2) * 60 + (int)substr($capturado, 14, 2);
         if ($tipo === 'salida') { $ini = self::CAMBIO_DIA + self::MARGEN; $fin = self::CAMBIO_NOCHE + self::MARGEN; }
-        else                    { $ini = self::CAMBIO_DIA - self::MARGEN; $fin = self::CAMBIO_NOCHE - self::MARGEN; }
+        else                    { $ini = self::CAMBIO_DIA - self::MARGEN_ENTRADA; $fin = self::CAMBIO_NOCHE - self::MARGEN_ENTRADA; }
         if ($m >= $ini && $m < $fin) return [$d, 'D'];
         if ($m >= $fin) return [$d, 'N'];
         return [date('Y-m-d', strtotime($d . ' 12:00:00 -1 day')), 'N'];
@@ -269,9 +306,10 @@ class ControlAccesos {
     }
 
     public static function nombreTurno(string $fecha, string $t): string {
-        if ($t === 'D') return 'Turno de día · ' . self::fechaLarga($fecha) . ' (06:00 a 18:00)';
+        $di = self::hora(self::CAMBIO_DIA); $no = self::hora(self::CAMBIO_NOCHE);
+        if ($t === 'D') return 'Turno de día · ' . self::fechaLarga($fecha) . ' (' . $di . ' a ' . $no . ')';
         $sig = date('Y-m-d', strtotime($fecha . ' 12:00:00 +1 day'));
-        return 'Turno de noche · ' . self::fechaLarga($fecha) . ' 18:00 al ' . self::fechaLarga($sig) . ' 06:00';
+        return 'Turno de noche · ' . self::fechaLarga($fecha) . ' ' . $no . ' al ' . self::fechaLarga($sig) . ' ' . $di;
     }
 
     /** uploads/accesos/ de la plataforma. Una ruta relativa en config.php (p. ej. 'uploads/') se toma
@@ -337,7 +375,7 @@ class ControlAccesos {
 
         // La hora es la del dispositivo al tomar la foto o leer la tarjeta (puede llegar después, sin señal)
         $cap = (string)($p['capturado'] ?? '');
-        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $cap) || strtotime($cap) === false) $cap = date('Y-m-d H:i:s');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $cap) || strtotime($cap) === false) $cap = date('Y-m-d H:i:s', self::ahora());
         $fecha = substr($cap, 0, 10);
 
         $foto = ''; $mini = '';
@@ -491,19 +529,19 @@ class ControlAccesos {
             if (($t = self::claveTurno(trim($c))) && !in_array($t, $turnos)) $turnos[] = $t;
         }
         if (!$turnos) {                                   // sin turnos: los que están en curso según el servidor
-            $ahora = date('Y-m-d H:i:s');
+            $ahora = date('Y-m-d H:i:s', self::ahora());
             foreach (['entrada', 'salida'] as $tp) { $t = self::turnoDe($tp, $ahora); if (!in_array($t, $turnos)) $turnos[] = $t; }
         }
         $tg = self::turnoCuenta($usr);
         if ($caseta && $tg !== '') {
             // El guardia ve su turno en curso: el que pide su teléfono si es de su tipo (día o noche) y de
             // estos días (el reloj del teléfono puede ir distinto), o el que dice el servidor.
-            $hoy = strtotime(date('Y-m-d') . ' 12:00:00');
+            $hoy = strtotime(date('Y-m-d', self::ahora()) . ' 12:00:00');
             $turnos = array_values(array_filter($turnos, fn($t) => $t[1] === $tg && abs(strtotime($t[0] . ' 12:00:00') - $hoy) <= 86400));
-            $turnos = $turnos ? [$turnos[0]] : [self::turnoDeGuardia($tg, date('Y-m-d H:i:s'))];
+            $turnos = $turnos ? [$turnos[0]] : [self::turnoDeGuardia($tg, date('Y-m-d H:i:s', self::ahora()))];
         } elseif ($caseta) {
             // La caseta sólo ve los turnos de ahora (con un día de margen por la zona horaria)
-            $hoy = strtotime(date('Y-m-d') . ' 12:00:00');
+            $hoy = strtotime(date('Y-m-d', self::ahora()) . ' 12:00:00');
             $turnos = array_values(array_filter($turnos, fn($t) => abs(strtotime($t[0] . ' 12:00:00') - $hoy) <= 2 * 86400));
             if (!$turnos) return ['status' => 'success', 'registros' => [], 'totales' => (object)[], 'lugares' => [], 'mas' => false, 'incidencias' => []];
         }
@@ -692,7 +730,7 @@ class ControlAccesos {
         $hecho[$k] = true;
     }
 
-    /** El turno de una incidencia es el del reloj (día 06:00–18:00, noche 18:00–06:00), sin margen. */
+    /** El turno de una incidencia es el del reloj (día 05:30–17:30, noche 17:30–05:30), sin margen. */
     public static function turnoReloj(string $capturado): array {
         $d = substr($capturado, 0, 10);
         $m = (int)substr($capturado, 11, 2) * 60 + (int)substr($capturado, 14, 2);
@@ -725,7 +763,7 @@ class ControlAccesos {
         if ($conFoto && ($mal = self::fotoInvalida($archivo))) return ['status' => 'error', 'message' => $mal];
 
         $cap = (string)($p['capturado'] ?? '');
-        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $cap) || strtotime($cap) === false) $cap = date('Y-m-d H:i:s');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $cap) || strtotime($cap) === false) $cap = date('Y-m-d H:i:s', self::ahora());
         $fecha = substr($cap, 0, 10);
         $foto = ''; $mini = '';
         if ($conFoto) {
@@ -984,7 +1022,7 @@ class ControlAccesos {
 
     /* ── Administración: quién está en planta y los movimientos de cada ID ──── */
 
-    /** Horas hacia atrás que se revisan para saber quién sigue dentro. */
+    /** Horas hacia atrás que bajan los teléfonos para saber a qué hora entró cada quien (¿tiene entrada?). */
     public const HORAS_EN_PLANTA = 48;
     /** Más de esto dentro: probablemente salió sin pasar su credencial. */
     public const MINUTOS_REVISAR = 13 * 60;
@@ -1015,22 +1053,22 @@ class ControlAccesos {
         // También la versión de la base del personal y de los permisos: el teléfono baja la copia sólo si cambió
         Personal::asegurarTablas($this->pdo);
         $extra = isset($p['movs_desde']) && is_numeric($p['movs_desde']) ? ['movs' => $this->movimientos((int)$p['movs_desde'])] : [];
-        return $extra + ['status' => 'success', 'ahora' => date('Y-m-d H:i:s'), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
+        return $extra + ['status' => 'success', 'ahora' => date('Y-m-d H:i:s', self::ahora()), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
                 'padron_version' => Personal::versionActual($this->pdo),
                 'personas' => array_map(fn($x) => array_intersect_key($x, array_flip(['id', 'nombre', 'entrada', 'limite', 'alerta', 'minutos_limite', 'minutos'])), $l)];
     }
 
     /**
-     * Quiénes están en planta: cada ID cuya última lectura (de las últimas 48 h, en cualquier
-     * punto) es una ENTRADA. Si ya registró su salida, aunque sea por otro punto, no aparece.
+     * Quiénes están en planta: cada ID cuya última lectura desde el reinicio de las 05:30 (en cualquier
+     * punto) es una ENTRADA. Quien no registró su salida antes de las 05:30 ya no cuenta. Si ya registró su salida, aunque sea por otro punto, no aparece.
      * Con «lugar», sólo los que entraron por ese punto.
      */
     public function enPlanta(array $p, array $usr): array {
         if (self::esCaseta($usr)) return ['status' => 'error', 'message' => 'Esta cuenta sólo registra entradas y salidas.'];
         self::asegurarTabla($this->pdo);
         $out = $this->dentroAhora(textoEstandar($p['lugar'] ?? ''));
-        return ['status' => 'success', 'personas' => $out, 'total' => count($out), 'horas' => self::HORAS_EN_PLANTA,
-                'ahora' => date('Y-m-d H:i:s'), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
+        return ['status' => 'success', 'personas' => $out, 'total' => count($out), 'reinicio' => date('Y-m-d H:i:s', self::reinicioAntes(self::ahora())),
+                'ahora' => date('Y-m-d H:i:s', self::ahora()), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
                 'aviso' => count(array_filter($out, fn($x) => $x['alerta'] === 'aviso')), 'limite' => count(array_filter($out, fn($x) => $x['alerta'] === 'limite'))];
     }
 
@@ -1051,7 +1089,7 @@ class ControlAccesos {
             $st->execute([$desde]);
             return ['ultimo' => $max, 'reinicio' => false, 'ev' => array_map($fila, $st->fetchAll(PDO::FETCH_ASSOC))];
         }
-        $t = date('Y-m-d H:i:s', time() - self::HORAS_EN_PLANTA * 3600);
+        $t = date('Y-m-d H:i:s', self::ahora() - self::HORAS_EN_PLANTA * 3600);
         $st = $this->pdo->prepare("SELECT codigo, tipo, capturado FROM accesos_registros WHERE codigo <> '' AND fecha >= ? AND capturado >= ? AND $fuera ORDER BY capturado, id");
         $st->execute([substr($t, 0, 10), $t]);
         $ult = [];
@@ -1061,9 +1099,9 @@ class ControlAccesos {
 
     /** Quiénes están dentro ahora (la regla de «En planta»), con su aviso de las 16 h. */
     private function dentroAhora(string $lugar): array {
-        $ahora = time();
+        $ahora = self::ahora();
         if (!self::conTarjeta($this->pdo)) return [];
-        $desde = date('Y-m-d H:i:s', $ahora - self::HORAS_EN_PLANTA * 3600);
+        $desde = date('Y-m-d H:i:s', self::reinicioAntes($ahora));     // desde el reinicio de las 05:30
         $st = $this->pdo->prepare(
             "SELECT id, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre, (foto <> '') AS con_foto
                FROM accesos_registros
@@ -1127,7 +1165,7 @@ class ControlAccesos {
         $ult = $filas[count($filas) - 1];
         return ['id' => self::idMostrado(array_column($filas, 'codigo')), 'nombre' => self::nombreMasLeido(array_column($filas, 'nombre')),
                 'movimientos' => $movs, 'registros' => count($filas),
-                'en_planta' => $ult['tipo'] === 'entrada' && strtotime((string)$ult['capturado']) >= time() - self::HORAS_EN_PLANTA * 3600] + $base;
+                'en_planta' => $ult['tipo'] === 'entrada' && strtotime((string)$ult['capturado']) >= self::reinicioAntes(self::ahora())] + $base;
     }
 
     /** Administración registra la salida de alguien que salió sin pasar su credencial (queda marcada). */
@@ -1137,7 +1175,7 @@ class ControlAccesos {
         if (($per['status'] ?? '') !== 'success') return $per;
         if (empty($per['en_planta'])) return ['status' => 'error', 'message' => 'Ese ID ya no aparece en planta.'];
         $r = $this->registrar([
-            'uid' => 'adm-' . bin2hex(random_bytes(12)), 'tipo' => 'salida', 'capturado' => date('Y-m-d H:i:s'),
+            'uid' => 'adm-' . bin2hex(random_bytes(12)), 'tipo' => 'salida', 'capturado' => date('Y-m-d H:i:s', self::ahora()),
             'lugar' => 'ADMINISTRACION', 'nota' => 'Salida registrada por ' . (($usr['rol'] ?? '') === 'ADMIN' ? 'Administración' : 'el administrador de accesos'),
             'codigo' => $per['id'], 'persona' => $per['nombre'], 'origen' => 'admin',
         ], [], $usr);

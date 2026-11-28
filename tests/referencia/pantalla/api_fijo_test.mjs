@@ -48,10 +48,10 @@ ok(r.modo === '' && r.turno === 'D', 'el guardia con botones: sin modo, con su t
 // ── Sólo registra su tipo; el turno lo decide la hora ──
 r = await registrar(tE, { uid: 'fijo-e-000001', tipo: 'salida', codigo: '00287', persona: 'RAMIRO ESTEBAN VILLARREAL DUARTE', capturado: `${hoy} 07:00:00` });
 ok(r.status === 'error' && r.codigo === 'MODO_FIJO', 'el equipo de entrada no registra salidas: ' + r.message);
-r = await registrar(tE, { uid: 'fijo-e-000002', tipo: 'entrada', codigo: '00287', persona: 'RAMIRO ESTEBAN VILLARREAL DUARTE', capturado: `${hoy} 05:20:00` });
-ok(r.status === 'success' && r.turno === `${hoy}-D`, 'entrada a las 05:20: turno de día (entra para el turno que empieza): ' + r.turno);
-r = await registrar(tE, { uid: 'fijo-e-000003', tipo: 'entrada', codigo: '00412', persona: 'ANA SOFIA RUIZ PAEZ', capturado: `${hoy} 17:10:00` });
-ok(r.status === 'success' && r.turno === `${hoy}-N`, 'entrada a las 17:10: turno de noche: ' + r.turno);
+r = await registrar(tE, { uid: 'fijo-e-000002', tipo: 'entrada', codigo: '00287', persona: 'RAMIRO ESTEBAN VILLARREAL DUARTE', capturado: `${hoy} 05:35:00` });
+ok(r.status === 'success' && r.turno === `${hoy}-D`, 'entrada a las 05:35 (desde las 05:30): turno de día: ' + r.turno);
+r = await registrar(tE, { uid: 'fijo-e-000003', tipo: 'entrada', codigo: '00412', persona: 'ANA SOFIA RUIZ PAEZ', capturado: `${hoy} 17:40:00` });
+ok(r.status === 'success' && r.turno === `${hoy}-N`, 'entrada a las 17:40 (desde las 17:30): turno de noche: ' + r.turno);
 const tS = (await post('LOGIN', null, { usuario: 'carril.salida', password: 'contrasena-larga' })).token;
 r = await registrar(tS, { uid: 'fijo-s-000001', tipo: 'entrada', codigo: '00287' });
 ok(r.status === 'error' && r.codigo === 'MODO_FIJO', 'el equipo de salida no registra entradas');

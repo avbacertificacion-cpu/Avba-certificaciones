@@ -125,7 +125,7 @@
   </div>
   <section class="card filtros" aria-label="Periodo y descargas">
     <div class="periodos" id="periodos" role="group" aria-label="Periodo">
-      <button type="button" data-p="turno">Turno de hoy (desde 06:00)</button>
+      <button type="button" data-p="turno">Turno de hoy (desde 05:30)</button>
       <button type="button" data-p="hoy">Hoy</button>
       <button type="button" data-p="7">7 días</button>
       <button type="button" data-p="30">30 días</button>
@@ -156,7 +156,7 @@
     <section class="card graf ancha" data-g="ocupacion">
       <div class="g-tit"><h2>Personas dentro de la planta</h2><span data-sub></span></div>
       <div class="lienzo"><canvas role="img" aria-label="Personas dentro de la planta a lo largo del periodo"></canvas><div class="vacio" hidden></div></div>
-      <p class="nota-g">Cuenta a cada persona desde su entrada hasta su salida. En las 06:00 y las 18:00 se juntan los que salen y los que entran.</p>
+      <p class="nota-g">Cuenta a cada persona desde su entrada hasta su salida. En las 05:30 y las 17:30 se juntan los que salen y los que entran; a las 05:30 deja de contar quien no registró su salida.</p>
       <button class="ver" type="button">Ver datos</button><div class="tabla-env" hidden></div>
     </section>
     <section class="card graf" data-g="dia">
@@ -288,16 +288,16 @@
   function rango(p) {
     var h = new Date(), hoy = iso(h), menos = function (n) { var d = new Date(h); d.setDate(d.getDate() - n); return iso(d); };
     if (p === 'hoy') return [hoy, hoy];
-    if (p === 'turno') return [h.getHours() < 6 ? menos(1) : hoy, hoy];          // antes de las 06:00, el turno empezó ayer
+    if (p === 'turno') return [h.getHours() * 60 + h.getMinutes() < 330 ? menos(1) : hoy, hoy];   // antes de las 05:30, el turno empezó ayer
     if (p === '30') return [menos(29), hoy];
     if (p === 'mes') return [iso(new Date(h.getFullYear(), h.getMonth(), 1)), hoy];
     if (p === 'mesant') return [iso(new Date(h.getFullYear(), h.getMonth() - 1, 1)), iso(new Date(h.getFullYear(), h.getMonth(), 0))];
     if (p === 'otro' && P.desde && P.hasta) return [P.desde, P.hasta];
     return [menos(6), hoy];
   }
-  /** Las horas del periodo: el turno de hoy desde las 06:00 hasta ahora; en otras fechas, las elegidas. */
+  /** Las horas del periodo: el turno de hoy desde las 05:30 hasta ahora; en otras fechas, las elegidas. */
   function horas(p) {
-    if (p === 'turno') return ['06:00', ''];
+    if (p === 'turno') return ['05:30', ''];
     if (p === 'otro') return [P.hdesde && P.hdesde !== '00:00' ? P.hdesde : '', P.hhasta && P.hhasta !== '23:59' ? P.hhasta : ''];
     return ['', ''];
   }
@@ -551,19 +551,21 @@
       caja('Incidencias', num(k.incidencias), 'Reportadas en la caseta');
     pintarCuadre(d);
   }
-  /* El cuadre: dentro al inicio + entradas − salidas − sin salida por más de 48 h = dentro al corte */
+  /* El cuadre: dentro al inicio + entradas − salidas − sin salida al reinicio de las 05:30 = dentro al corte */
   function pintarCuadre(d) {
     var c = d.cuadre; if (!c) { $('cuadre').hidden = true; return; }
     var h = function (s) { return s.slice(0, 10) === d.desde && d.desde === d.hasta ? s.slice(11, 16) : fechaHora(s); };
     var p = function (op, v, l, cls) { return '<div class="p' + (cls ? ' ' + cls : '') + '"><b>' + (op ? '<em>' + op + '</em>' : '') + num(v) + '</b><span>' + l + '</span></div>'; };
     var notas = [];
     notas.push('Entradas leídas: ' + num(c.entradas) + (c.entradas_repetidas ? ' · ' + num(c.entradas_repetidas) + ' de quien ya estaba dentro (leída dos veces): no cambian a cuántos hay dentro' : ''));
-    notas.push('Salidas leídas: ' + num(c.salidas) + (c.salidas_sin_entrada ? ' · ' + num(c.salidas_sin_entrada) + ' de quien no tenía entrada registrada (no pasó su credencial al entrar)' : ''));
-    if (c.vencidas) notas.push(num(c.vencidas) + ' llevaban más de 48 h sin registrar su salida: ya no cuentan como dentro');
+    notas.push('Salidas leídas: ' + num(c.salidas) +
+      (c.salidas_turno_anterior ? ' · ' + num(c.salidas_turno_anterior) + ' de quien entró antes del reinicio de las ' + c.reinicio + ' (cuentan en su turno, p. ej. el de noche)' : '') +
+      (c.salidas_sin_entrada ? ' · ' + num(c.salidas_sin_entrada) + ' de quien no tenía entrada registrada (no pasó su credencial al entrar)' : ''));
+    if (c.vencidas) notas.push(num(c.vencidas) + ' no registraron su salida antes del reinicio de las ' + c.reinicio + ': ya no cuentan como dentro');
     if (c.sin_id) notas.push(num(c.sin_id) + ' lecturas sin ID (sólo foto) no entran en el cuadre');
     $('cuadre').innerHTML = '<h2>Cuadre del periodo</h2><div class="ec">' +
       p('', c.inicio, 'Dentro a las ' + h(c.desde)) + p('+', c.entradas_validas, 'Entradas') + p('−', c.salidas_validas, 'Salidas') +
-      (c.vencidas ? p('−', c.vencidas, 'Sin salida (+48 h)') : '') + p('=', c.fin, 'Dentro a las ' + h(c.corte), 'fin') + '</div><ul>' + notas.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+      (c.vencidas ? p('−', c.vencidas, 'Sin salida al reinicio (' + c.reinicio + ')') : '') + p('=', c.fin, 'Dentro a las ' + h(c.corte), 'fin') + '</div><ul>' + notas.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
     $('cuadre').hidden = false;
   }
   var DENTRO = [];
