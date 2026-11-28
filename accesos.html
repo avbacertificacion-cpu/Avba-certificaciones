@@ -556,6 +556,7 @@
 <div class="hecho" id="hecho" hidden role="status" aria-live="assertive"></div>
 
 <script src="js/destinos.js"></script>
+<script src="js/pendientes.js"></script>
 <script src="js/native-bridge.js"></script>
 <script>
 (function () {
@@ -658,10 +659,11 @@
     a.addEventListener('click', function (ev) {
       ev.preventDefault();
       var pend = (typeof cola !== 'undefined' ? cola : []).filter(function (x) { return !x.error; }).length;
-      if (!confirm(pend ? 'Hay ' + pend + ' registro(s) por enviar: se enviarán cuando vuelvas a entrar en este equipo. ¿Salir?' : '¿Cerrar sesión?')) return;
+      if (!confirm(pend ? 'Hay ' + pend + ' registro(s) por enviar: se subirán solos, a tu nombre, en cuanto haya internet (aunque entre otra cuenta). ¿Salir?' : '¿Cerrar sesión?')) return;
       try { fetch(API, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
                          body: JSON.stringify({ action: 'LOGOUT', payload: {} }) }).catch(function () {}); } catch (e) {}
       try { localStorage.removeItem('ca_sesion'); } catch (e) {}
+      window.__saliendo = true;                    // lo pendiente se sube solo: sin la pregunta de «¿salir de la página?»
       location.replace('login.html');
     });
   }
@@ -837,17 +839,22 @@
   }
   var cola = [];                                   // copia en memoria para pintar
   var sinCola = false;                             // navegador sin IndexedDB: envío directo
-  /* Cada registro guarda la cuenta que lo capturó: si en este equipo entra
-     otra cuenta (otro punto, Administración), lo pendiente de la primera no
-     se envía a nombre de la segunda; espera aquí a que esa cuenta vuelva. */
+  /* Cada registro guarda la cuenta que lo capturó y su llave de subida (la da el servidor al
+     iniciar sesión): TODO lo guardado en este equipo se sube en cuanto hay señal, a nombre de
+     quien lo capturó y con su turno, aunque esa sesión ya se haya cerrado o vencido o ahora esté
+     otra cuenta. En la pantalla cada quien ve sólo lo suyo (cola); colaTodo es todo lo del equipo.
+     Lo de antes de la llave (sin «llave») de otra cuenta espera a que esa cuenta vuelva. */
+  var colaTodo = [];
   function cuentaActual() { return String(sesion().usuario || '').trim().toUpperCase(); }
   function esDeEstaCuenta(x) { var c = cuentaActual(); return !x.cuenta || !c || x.cuenta === c; }
+  function sePuedeSubir(x) { return !!x.llave || esDeEstaCuenta(x); }
   function leerCola() {
     return tx('readonly', function (st) { return st.getAll(); }).then(function (r) {
-      cola = (r || []).filter(esDeEstaCuenta).sort(function (a, b) { return a.capturado < b.capturado ? -1 : 1; });
-      cola.forEach(function (x) { if (!x.turno) x.turno = turnoDe(x.tipo, x.capturado); });
-      pintarCola(); return cola;
-    }).catch(function () { sinCola = true; cola = []; return cola; });
+      colaTodo = (r || []).sort(function (a, b) { return a.capturado < b.capturado ? -1 : 1; });
+      colaTodo.forEach(function (x) { if (!x.turno) x.turno = turnoDe(x.tipo, x.capturado); });
+      cola = colaTodo.filter(esDeEstaCuenta);
+      pintarCola(); return colaTodo.filter(sePuedeSubir);
+    }).catch(function () { sinCola = true; cola = []; colaTodo = []; return cola; });
   }
   function ponerEnCola(it) { return tx('readwrite', function (st) { return st.put(it); }).then(leerCola); }
   function quitarDeCola(uid) { return tx('readwrite', function (st) { return st.delete(uid); }).then(leerCola); }
@@ -900,8 +907,8 @@
   var enviando = null, espera = 0, tReintento = null, enviados = {};
   /* ¿El servidor ya lo tiene guardado? Se le pregunta después de cada envío:
      la foto sólo sale del equipo cuando el servidor confirma que la tiene. */
-  function confirmar(uids) {
-    return api('ACCESOS_EXISTEN', { uids: uids }).then(function (r) {
+  function confirmar(uids, llave) {
+    return api('ACCESOS_EXISTEN', llave ? { uids: uids, llave_envio: llave } : { uids: uids }).then(function (r) {
       if (!r || r.status !== 'success') throw new Error((r && r.message) || 'Sin confirmación');
       return r.existen || {};
     });
@@ -914,6 +921,7 @@
     ['uid', 'tipo', 'capturado', 'lugar', 'nota'].forEach(function (k) { fd.append(k, it[k] || ''); });
     if (it.codigo) { fd.append('codigo', it.codigo); fd.append('persona', it.persona || ''); fd.append('origen', it.origen || 'tarjeta'); }
     fd.append('dispositivo', EQUIPO.id); fd.append('dispositivo_desc', EQUIPO.desc);
+    if (it.llave) fd.append('llave_envio', it.llave);      // a nombre de quien lo capturó
     if (it.datos && subeFoto(it)) fd.append('foto', new Blob([it.datos], { type: it.mime || 'image/jpeg' }), it.uid + '.jpg');
     if (esInc(it)) {                               // botón INCIDENCIA: misma cola, su propia acción
       fd.append('incidencia', it.incidencia); fd.append('detalle', it.detalle || '');
@@ -930,6 +938,9 @@
     enviando = it.uid; pintarLista();
     return fetch(API, { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: formulario(it) })
       .then(function (r) {
+        if (r.status === 401 && it.llave) return r.json().then(function (j) {      // la llave ya no sirve (venció o se desactivó la cuenta)
+          it.error = (j && j.message) || 'No se pudo identificar la cuenta que lo capturó.'; return 'rechazo';
+        }, function () { return 'red'; });
         if (r.status === 401) return 'sesion';
         if (r.status >= 500) return 'red';
         return r.json().then(function (j) {
@@ -953,7 +964,7 @@
           if (!seguir) return false;
           return enviarUno(it).then(function (r) {
             if (r === 'ok') {
-              return confirmar([it.uid]).then(function (ya) {
+              return confirmar([it.uid], it.llave).then(function (ya) {
                 if (!ya[it.uid]) {                                           // respondió, pero no lo tiene
                   it.error = 'El servidor no confirmó que lo guardó. Toca Reintentar.';
                   return ponerEnCola(it).then(function () { return true; });
@@ -961,7 +972,7 @@
                 hubo++;
                 enviados[it.uid] = ya[it.uid];
                 if (it.datos && !subeFoto(it)) guardarFotoLocal(it);         // en cola de antes, con su foto: se queda aquí
-                if (esRegistro(it)) recienEnviados.push(resumen(it, ya[it.uid]));
+                if (esRegistro(it) && esDeEstaCuenta(it)) recienEnviados.push(resumen(it, ya[it.uid]));
                 if (esPermiso(it)) setTimeout(actualizarPadron, 300);     // la copia de la base trae el permiso ya guardado
                 recienEnviados = recienEnviados.slice(-50);
                 return quitarDeCola(it.uid).then(function () { return true; });
@@ -979,7 +990,7 @@
       }, Promise.resolve(true)).then(function (todoBien) {
         enviando = null;
         if (hubo) { espera = 0; $('banda-sesion').hidden = true; programarRecarga(); }
-        if (todoBien === false || cola.some(function (x) { return !x.error; })) {
+        if (todoBien === false || colaTodo.some(function (x) { return !x.error && sePuedeSubir(x); })) {
           espera = Math.min(espera ? espera * 2 : 5000, 60000);
           tReintento = setTimeout(enviarCola, espera);
         }
@@ -987,20 +998,24 @@
       });
     }).catch(function () { enviando = null; });
   }
-  setInterval(function () { if (cola.length && !enviando) enviarCola(); }, 20000);
+  setInterval(function () { if (colaTodo.length && !enviando) enviarCola(); }, 20000);
+  // Y las tomas del servicio médico que quedaron en este equipo (las sube js/pendientes.js con su llave)
+  if (window.CA_PENDIENTES) CA_PENDIENTES.vigilar({ medico: true });
   window.addEventListener('online', function () { espera = 0; enviarCola(); pintarBotonPdf(); cargar(true); actualizarPadron(); });
   window.addEventListener('offline', function () { pintarBotonPdf(); });
   document.addEventListener('visibilitychange', function () { if (!document.hidden) { enviarCola(); cargar(true); } });
   window.addEventListener('beforeunload', function (e) {
-    if (cola.some(function (x) { return !x.error; })) { e.preventDefault(); e.returnValue = 'Hay registros por enviar.'; return e.returnValue; }
+    if (!window.__saliendo && colaTodo.some(function (x) { return !x.error && sePuedeSubir(x); })) { e.preventDefault(); e.returnValue = 'Hay registros por enviar.'; return e.returnValue; }
   });
 
   function pintarCola() {
     var pend = cola.filter(function (x) { return !x.error; }).length, err = cola.length - pend;
+    var otros = colaTodo.filter(function (x) { return !esDeEstaCuenta(x) && !x.error; }).length;   // de otra cuenta, también se suben
     var chip = $('chip-cola');
-    chip.hidden = !cola.length;
+    chip.hidden = !cola.length && !otros;
     chip.className = 'chip-cola' + (err ? ' err' : '');
-    chip.textContent = err ? err + ' con error' + (pend ? ' · ' + pend + ' por enviar' : '') : '⇅ ' + pend + ' por enviar';
+    chip.textContent = (err ? err + ' con error' + (pend ? ' · ' + pend + ' por enviar' : '') : '⇅ ' + pend + ' por enviar') +
+      (otros ? ' · ' + otros + ' de otra cuenta' : '');
   }
   $('chip-cola').onclick = function () { $('tarjeta-lista').scrollIntoView({ behavior: 'smooth' }); };
 
@@ -1031,6 +1046,7 @@
             : esInc(it) ? 'Incidencia ' + it.capturado.slice(11, 16) + ' guardada (' + TIPOS_INC[it.incidencia] + ')'
             : (it.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + it.capturado.slice(11, 16) + ' guardada' + (it.persona ? ': ' + it.persona : '');
     it.cuenta = cuentaActual();
+    it.llave = sesion().llave_envio || '';         // llave de subida: se sube aunque cierre su sesión o entre otra cuenta
     if (it.datos && !subeFoto(it)) {               // la foto de la credencial se queda en este equipo; al servidor sólo los datos
       var conFoto = it;
       it = Object.assign({}, it); delete it.datos; delete it.mime;

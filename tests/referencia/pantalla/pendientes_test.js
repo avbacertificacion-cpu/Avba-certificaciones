@@ -1,6 +1,9 @@
 // accesos.html contra la API real (copia local, base de prueba):
-//  1) lo pendiente de una cuenta no se envía a nombre de otra que entra en el mismo teléfono
+//  1) lo pendiente de una cuenta se sube aunque entre otra en el mismo teléfono, a nombre de quien lo capturó
 //  2) dos teléfonos sin señal a la vez, con cuentas distintas: cada uno manda lo suyo al volver
+//  3) el guardia cierra sesión con registros pendientes y nadie entra: se suben desde la pantalla de inicio
+//     de sesión en cuanto hay internet (también las tomas del servicio médico que quedaron en el teléfono)
+//  4) lo de antes de la llave de subida (sin «llave») de otra cuenta sigue esperando a esa cuenta
 const { chromium } = require('playwright');
 const { execSync } = require('child_process');
 const B = 'http://localhost:8794/';
@@ -13,7 +16,9 @@ const post = async (accion, tok, payload = {}) => (await fetch(API, {
   method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
   body: JSON.stringify({ action: accion, token: tok, payload })
 })).json();
-const ses = u => ({ token: 'tok-' + u, rol: u === 'admin' ? 'ADMIN' : 'ACCESOS', usuario: u, nombre: u.toUpperCase() });
+const crypto = require('crypto');
+const llave = u => 'L' + crypto.createHash('sha256').update('llave-' + u).digest('hex').slice(0, 48);   // ver sembrar-cuentas.sql
+const ses = u => ({ token: 'tok-' + u, rol: u === 'admin' ? 'ADMIN' : u.startsWith('medico') ? 'MEDICO' : 'ACCESOS', usuario: u, nombre: u.toUpperCase(), llave_envio: llave(u) });
 
 async function equipo(b, sesion) {
   const ctx = await b.newContext({ timezoneId: 'America/Mexico_City', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
@@ -56,19 +61,22 @@ const bloqueados = p => p.$eval('.cap.ent', e => e.disabled);
   await P.ctx.setOffline(true);
   await leerTarjeta(P.p, '55500001', 'Mario Lopez Ruiz');
   ok((await badges(P.p)).some(t => /55500001/.test(t) && /En cola/.test(t)), 'sin señal: queda «En cola» en el teléfono');
-  // Cierra sesión y entra la cuenta punto1 antes de que vuelva la señal
+  // Cierra sesión (el servidor ya no tiene su sesión) y entra la cuenta punto1 antes de que vuelva la señal
+  sql("DELETE FROM sesiones_usuario WHERE token='tok-punto4'");
   await P.p.evaluate((s) => localStorage.setItem('ca_sesion', JSON.stringify(s)), ses('punto1'));
+  // Sigue sin llegar al servidor (la página sí abre): se cortan las peticiones a la API
+  await P.ctx.route('**/api/index.php**', r => r.abort('internetdisconnected'));
   await P.ctx.setOffline(false);
-  await P.p.waitForTimeout(2500);
-  await P.p.reload(); await P.p.waitForTimeout(4000);
-  ok(/PUNTO1/.test(await P.p.textContent('#sub-usuario')), 'ahora el teléfono P está con la cuenta punto1');
-  ok(enServidor('55500001') === '', 'lo pendiente de punto4 NO se envió a nombre de punto1 (' + (enServidor('55500001') || 'no está en el servidor') + ')');
-  ok(!(await badges(P.p)).some(t => /55500001/.test(t)) && await P.p.isHidden('#chip-cola'), 'y no aparece en la lista ni en «por enviar» de punto1');
-  // Vuelve a entrar punto4 → lo suyo sale solo, a su nombre
-  await cambiarCuenta(P.p, 'punto4');
-  await P.p.waitForTimeout(3500);
-  ok(enServidor('55500001') === 'punto4|ACCESO', 'al volver a entrar punto4, se envía a su nombre: ' + enServidor('55500001'));
-  ok((await badges(P.p)).some(t => /55500001/.test(t) && !/En cola/.test(t)), 'y ya aparece en su lista como registrado');
+  await P.p.reload(); await P.p.waitForTimeout(1500);
+  ok(/PUNTO1/.test(await P.p.textContent('#sub-usuario')) && /de otra cuenta/.test(await P.p.textContent('#chip-cola')),
+     'ahora está punto1 y ve que hay pendientes de otra cuenta: «' + await P.p.textContent('#chip-cola') + '»');
+  await P.ctx.unroute('**/api/index.php**');
+  await P.p.evaluate(() => window.dispatchEvent(new Event('online')));
+  await P.p.waitForTimeout(4000);
+  ok(enServidor('55500001') === 'punto4|ACCESO', 'en cuanto hay señal se sube, a nombre de punto4 (aunque su sesión se cerró): ' + (enServidor('55500001') || 'no está en el servidor'));
+  ok(sql("SELECT CONCAT(turno_fecha <> '', turno) FROM accesos_registros WHERE codigo='55500001'") === '1D', 'con el turno de punto4 (día)');
+  ok(!(await badges(P.p)).some(t => /55500001/.test(t)) && await P.p.isHidden('#chip-cola'), 'no aparece en la lista de punto1 y ya no hay nada por enviar');
+  sql("INSERT IGNORE INTO sesiones_usuario (token, usuario_id, origen, creado, expira) SELECT 'tok-punto4', id, 'prueba', NOW(), NOW() + INTERVAL 30 DAY FROM usuarios WHERE usuario='punto4'");
 
   // ── 2) Dos teléfonos sin señal a la vez, con cuentas distintas ──
   const Q = await equipo(b, ses('punto2'));
@@ -85,10 +93,49 @@ const bloqueados = p => p.$eval('.cap.ent', e => e.disabled);
   ok(await Q.p.isHidden('#chip-cola') && await R.p.isHidden('#chip-cola') && !(await bloqueados(Q.p)) && !(await bloqueados(R.p)), 'nada por enviar y ningún botón bloqueado');
   ok(!(await aviso(Q.p)) && !(await aviso(R.p)), 'sin avisos de «otro equipo»');
 
-  const errs = [P, Q, R].flatMap(x => x.p.errores);
+  // ── 3) Cierra sesión con pendientes y nadie entra: se suben desde la pantalla de inicio de sesión ──
+  const S = await equipo(b, ses('punto3'));
+  // Sin señal hacia el servidor (las páginas sí abren): se cortan las peticiones a la API
+  await S.ctx.route('**/api/index.php**', r => r.abort('internetdisconnected'));
+  await leerTarjeta(S.p, '55500006', 'Irma Cano Diaz');
+  await leerTarjeta(S.p, '55500007', 'Jorge Pena Lira', 'sal');
+  // Una toma del servicio médico que quedó en este teléfono (otra cuenta, sin enviar)
+  await S.p.evaluate((l) => localStorage.setItem('ca_medico_cola', JSON.stringify([{ uid: 'med-pend-000001', codigo: '55500008', nombre: 'KARLA SOTO VEGA',
+    empresa: '', sistolica: 120, diastolica: 80, frecuencia: 72, resultado: 'A', observaciones: '', capturado: new Date(Date.now() - 6e5).toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' }),
+    origen: 'manual', llave: l }])), llave('medico'));
+  let msg = '';
+  S.p.removeAllListeners('dialog'); S.p.on('dialog', d => { msg += (d.type() === 'confirm' ? '' : d.type() + ': ') + d.message(); d.accept(); });
+  await S.p.click('#atras'); await S.p.waitForTimeout(1500);
+  ok(/se subirán solos/.test(msg) && /login\.html/.test(S.p.url()), 'al salir avisa que se subirán solos: «' + msg + '» (' + S.p.url() + ')');
+  ok(enServidor('55500006') === '' && sql("SELECT COUNT(*) FROM medico_tomas WHERE uid='med-pend-000001'") === '0', 'sin señal todavía no llegan');
+  await S.ctx.unroute('**/api/index.php**');
+  await S.p.evaluate(() => window.dispatchEvent(new Event('online')));
+  await S.p.waitForTimeout(4000);
+  ok(enServidor('55500006') === 'punto3|ACCESO' && enServidor('55500007') === 'punto3|ACCESO', 'con señal, desde la pantalla de inicio de sesión (sin nadie dentro) se suben a nombre de punto3');
+  ok(sql("SELECT usuario FROM medico_tomas WHERE uid='med-pend-000001'") === 'medico', 'y la toma del servicio médico, a nombre de quien la tomó');
+  const quedan = await S.p.evaluate(() => new Promise(ok => { const r = indexedDB.open('ca_accesos', 2); r.onsuccess = () => { const q = r.result.transaction('cola').objectStore('cola').getAll(); q.onsuccess = () => ok(q.result.length); }; }));
+  ok(quedan === 0 && await S.p.evaluate(() => JSON.parse(localStorage.getItem('ca_medico_cola') || '[]').length) === 0, 'el teléfono ya no tiene nada pendiente');
+
+  // ── 4) Lo de antes de la llave (sin «llave») de otra cuenta espera a esa cuenta ──
+  const V = await equipo(b, ses('punto2'));
+  await V.p.evaluate(() => new Promise(ok => { const r = indexedDB.open('ca_accesos', 2); r.onsuccess = () => {
+    const t = r.result.transaction('cola', 'readwrite'); t.objectStore('cola').put({ uid: 'viejo-0000000001', tipo: 'entrada', capturado: new Date(Date.now() - 3e5).toLocaleString('sv-SE', { timeZone: 'America/Mexico_City' }),
+      lugar: 'ACCESO', codigo: '55500009', persona: 'Luis Mena Rojo', origen: 'tarjeta', cuenta: 'PUNTO1' }); t.oncomplete = ok; }; }));
+  await V.p.reload(); await V.p.waitForTimeout(3500);
+  ok(enServidor('55500009') === '', 'un registro de antes, de otra cuenta y sin llave, no se sube a nombre de punto2');
+  await cambiarCuenta(V.p, 'punto1'); await V.p.waitForTimeout(3000);
+  ok(enServidor('55500009') === 'punto1|ACCESO', 'cuando entra su cuenta, se sube: ' + enServidor('55500009'));
+
+  // ── 5) Un teléfono con la sesión abierta desde antes de la llave la pide solo ──
+  const sinLlave = Object.assign(ses('noche1'), { rol: 'ACCESOS' }); delete sinLlave.llave_envio;
+  const W = await equipo(b, sinLlave);
+  await W.p.waitForTimeout(1500);
+  ok(/^L[0-9a-f]{48}$/.test(await W.p.evaluate(() => JSON.parse(localStorage.getItem('ca_sesion')).llave_envio || '')), 'una sesión de antes recibe su llave sin volver a entrar');
+
+  const errs = [P, Q, R, S, V, W].flatMap(x => x.p.errores);
   ok(!errs.length, 'sin errores de JavaScript' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await b.close();
-  sql("DELETE FROM accesos_registros WHERE codigo LIKE '5550%'");
+  sql("DELETE FROM accesos_registros WHERE codigo LIKE '5550%'; DELETE FROM medico_tomas WHERE uid='med-pend-000001'");
   console.log(fallas ? fallas + ' FALLAS' : 'TODO BIEN');
   process.exit(fallas ? 1 : 0);
 })().catch(e => { console.error('FALLO', e); process.exit(1); });

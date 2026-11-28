@@ -74,7 +74,18 @@ try {
     }
 
     // ── Con sesión ────────────────────────────────────────
-    $usr = validarToken($pdo, $token);
+    // Lo que el teléfono guardó sin señal llega con la llave de subida de la cuenta que lo capturó
+    // (Auth::usuarioDeLlave): se sube a nombre de esa cuenta aunque su sesión se haya cerrado o
+    // vencido, o aunque ahora haya entrado otra. La llave sólo sirve para estas acciones.
+    $llave = (string)($datos['llave_envio'] ?? '');
+    if ($llave !== '' && in_array($accion, ['ACCESO_REGISTRAR', 'ACCESO_INCIDENCIA', 'PERMISO_AGREGAR', 'ACCESOS_EXISTEN', 'MEDICO_REGISTRAR', 'MEDICO_EXISTEN'], true)) {
+        $usr = Auth::usuarioDeLlave($pdo, $llave);
+        if (!$usr) respuesta(['status' => 'error', 'codigo' => 'LLAVE', 'message' => 'No se pudo identificar la cuenta que capturó este registro (la llave venció o la cuenta se desactivó).'], 401);
+        $usr['por_llave'] = true;
+        $token = '';
+    } else {
+        $usr = validarToken($pdo, $token);
+    }
     if (!$usr) respuesta(['status' => 'error', 'codigo' => 'SIN_SESION', 'message' => 'Tu sesión venció. Vuelve a iniciar sesión.'], 401);
     $usr['token'] = $token;
     if (!ControlAccesos::permitido($usr)) respuesta(['status' => 'error', 'message' => 'Tu cuenta no tiene un perfil válido.'], 403);
@@ -85,14 +96,14 @@ try {
             'SESION', 'CAMBIAR_MI_CONTRASENA',
             'ACCESO_REGISTRAR', 'LISTAR_ACCESOS', 'LISTAR_ACCESOS_LUGARES', 'ACCESO_ELIMINAR',
             'ACCESO_INCIDENCIA', 'INCIDENCIA_ELIMINAR',
-            'ACCESOS_EXISTEN', 'ACCESOS_MI_PUNTO', 'ACCESOS_TARJETA_REGLAS', 'ACCESOS_ALERTAS_16H',
+            'ACCESOS_EXISTEN', 'ACCESOS_MI_PUNTO', 'ACCESOS_TARJETA_REGLAS', 'ACCESOS_ALERTAS_16H', 'LLAVE_ENVIO',
             'PADRON_CAJA', 'PERMISO_AGREGAR', 'PERMISO_QUITAR',
         ], true)) {
         respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo puede registrar entradas y salidas.'], 403);
     }
     // El servicio médico sólo toma la tensión arterial (con la copia de la base y las reglas del lector)
     if (Medico::esMedico($usr) && !in_array($accion, [
-            'SESION', 'CAMBIAR_MI_CONTRASENA', 'PADRON_CAJA', 'ACCESOS_TARJETA_REGLAS',
+            'SESION', 'CAMBIAR_MI_CONTRASENA', 'PADRON_CAJA', 'ACCESOS_TARJETA_REGLAS', 'LLAVE_ENVIO',
             'MEDICO_REGISTRAR', 'MEDICO_EXISTEN', 'MEDICO_LISTAR', 'MEDICO_PERSONA', 'MEDICO_REGLAS',
         ], true)) {
         respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo registra tomas del servicio médico.'], 403);
@@ -122,6 +133,10 @@ try {
                        'nombre_rol' => Auth::NOMBRES_ROL[$usr['rol']] ?? $usr['rol']]);
         case 'CAMBIAR_MI_CONTRASENA':
             respuesta($auth->cambiarMiContrasena($datos, $usr));
+        case 'LLAVE_ENVIO':                 // un teléfono que inició sesión antes de que existiera la llave de subida
+            if ($metodo !== 'POST' || !empty($usr['por_llave'])) respuesta(['status' => 'error', 'message' => 'Método no permitido.'], 405);
+            if (ControlAccesos::esCliente($usr)) respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo consulta.'], 403);
+            respuesta(['status' => 'success', 'llave_envio' => Auth::llaveNueva($pdo, (int)$usr['id'])]);
         case 'CUENTAS_LISTAR':
         case 'CUENTA_CREAR':
         case 'CUENTA_EDITAR':

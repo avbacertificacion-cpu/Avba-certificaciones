@@ -164,6 +164,7 @@
 <div class="toast" id="toast" hidden role="status"></div>
 
 <script src="js/destinos.js"></script>
+<script src="js/pendientes.js"></script>
 <script>
 (function () {
   'use strict';
@@ -346,7 +347,9 @@
     var t = { uid: 'med-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10), codigo: P.codigo, nombre: nombre, empresa: empresa,
               sistolica: s, diastolica: d, frecuencia: isNaN(fc) ? '' : fc, resultado: RES, observaciones: obs, capturado: ahora(), origen: P.origen,
               // para mostrarla mientras se envía
-              calculado: CALC, categoria: categoria(s, d), en_base: P.enBase, tomo: ses.nombre || ses.usuario, toma: tomasDeHoy(P).length + 1, pendiente: true };
+              calculado: CALC, categoria: categoria(s, d), en_base: P.enBase, tomo: ses.nombre || ses.usuario, toma: tomasDeHoy(P).length + 1, pendiente: true,
+              // llave de subida: se sube a nombre de quien la tomó aunque cierre su sesión o entre otra cuenta
+              llave: (leer(CLAVE, {}) || {}).llave_envio || '' };
     COLA.push(t); guardar(CLAVE_COLA, COLA);
     mostrarHecho(t);
     pintarLista();
@@ -384,6 +387,7 @@
     enviando = true;
     var t = COLA[0], datos = {};
     ['uid', 'codigo', 'nombre', 'empresa', 'sistolica', 'diastolica', 'frecuencia', 'resultado', 'observaciones', 'capturado', 'origen'].forEach(function (k) { datos[k] = t[k]; });
+    if (t.llave) datos.llave_envio = t.llave;
     return api('MEDICO_REGISTRAR', datos).then(function (r) {
       enviando = false;
       if (r && r.status === 'success') {
@@ -451,6 +455,8 @@
   actualizar().then(revisarVersion).then(function () { return enviar(); }).then(cargarHoy);
   if (!LECTOR) $('id').focus();
 })();
+  // Lo guardado en este equipo sin señal en la caseta (de cualquier cuenta) se sube en cuanto hay internet
+  if (window.CA_PENDIENTES) CA_PENDIENTES.vigilar({ caseta: true });
 </script>
 </body>
 </html>

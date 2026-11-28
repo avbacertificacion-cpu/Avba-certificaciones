@@ -77,6 +77,7 @@
 </main>
 
 <script src="js/destinos.js"></script>
+<script src="js/pendientes.js"></script>
 <script>
 (function () {
   'use strict';
@@ -128,6 +129,8 @@
     }).catch(function () { $('b-pass').disabled = false; msg('No se pudo conectar con el servidor.'); });
   });
 })();
+  // Lo guardado en este equipo sin señal (de cualquier cuenta) se sube en cuanto hay internet
+  if (window.CA_PENDIENTES) CA_PENDIENTES.vigilar({ caseta: true, medico: true });
 </script>
 </body>
 </html>

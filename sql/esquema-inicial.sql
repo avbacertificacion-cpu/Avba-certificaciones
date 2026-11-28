@@ -46,6 +46,17 @@ CREATE TABLE IF NOT EXISTS sesiones_usuario (
   KEY idx_expira (expira)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── Llaves de subida: lo guardado sin señal se sube a nombre de quien lo capturó ──
+-- (aunque su sesión ya se cerró o venció, o entró otra cuenta). Se guarda la huella (sha256).
+CREATE TABLE IF NOT EXISTS ca_llaves_envio (
+  llave       CHAR(64)    NOT NULL PRIMARY KEY,
+  usuario_id  INT         NOT NULL,
+  creado      DATETIME    NOT NULL,
+  ultimo_uso  DATETIME    NULL,
+  KEY idx_usuario (usuario_id),
+  KEY idx_creado (creado)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── Intentos fallidos de inicio de sesión (la espera crece) ─────────
 CREATE TABLE IF NOT EXISTS login_intentos (
   id              INT AUTO_INCREMENT PRIMARY KEY,

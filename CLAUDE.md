@@ -45,6 +45,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `api/index.php` | Enrutador propio: sesión, cuentas y las acciones de `accesos.html`. |
 | `api/Auth.php`, `api/helpers.php` | Cuentas, sesiones por equipo, límite de intentos; conexión a la base propia y utilidades. |
 | `js/destinos.js` | Pantalla de inicio de cada perfil y la clave de la sesión (`ca_sesion`). |
+| `js/pendientes.js` | Sube lo que quedó guardado en el teléfono (cola de la caseta en IndexedDB y `ca_medico_cola`) desde las pantallas que no son la suya: inicio de sesión, menú, caseta (las tomas médicas) y servicio médico (los registros de la caseta). Ver cuidado 11. |
 | `accesos.html` | Módulo real que ya funcionaba en el Sistema de Gestión: pantalla del guardia (lee la credencial con la app, ENTRADA/SALIDA, cola sin señal, foto de evidencia) y del administrador (registros por turno, **En planta**, movimientos por ID, dar salida, incidencias, PDF). |
 | `api/ControlAccesos.php` | Lógica del servidor del módulo (registros, turnos, puntos y equipos, en planta, PDF con mPDF). |
 | `tablero.html` | **Tablero** (perfil CLIENTE; también PLANTA y ADMIN), con dos pestañas: **Accesos** y **Servicio médico** (`ca_tablero_vista`; ver `Medico.php`). Accesos: periodo (hoy, 7 y 30 días, mes, otras fechas; hasta 93 días), cifras, gráficas con Chart.js (`js/chart/`, colores validados: entradas azul `#257de0`, salidas naranja `#f47230`, tiempo dentro en escala de azules), «Ver datos» de cada gráfica, quién está dentro e incidencias. Descarga Excel y PDF (el PDF lleva las gráficas que dibuja la pantalla). **Turno de hoy (desde 05:30)** y horas en «Otras fechas» (`hora_desde`/`hora_hasta`; antes de las 05:30 el turno de hoy empezó ayer): el **corte** es el fin o ahora. **Cuadre** (`Tablero::cuadre`, con la regla de En planta): dentro al inicio + entradas − salidas − sin salida al reinicio de las 05:30 = dentro al corte; aparte, entradas repetidas (ya estaba dentro), salidas de quien entró antes del reinicio (cuentan en su turno), salidas sin entrada y lecturas sin ID. Las cifras de las otras pantallas cuentan distinto: la lista por turno usa el turno de cada guardia y sus márgenes de 2 h, y «Hoy» empieza a las 00:00. |
@@ -199,6 +200,19 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
    `accesos.html` para la caseta y Administración (acción `ACCESOS_ALERTAS_16H`, permitida a la
    caseta: sólo ID, nombre y horas; se revisa cada minuto); En planta los pone primero y
    marcados; el tablero, su Excel y su PDF también.
+11. **Todo lo guardado en el teléfono se sube, esté quien esté** (llave de subida,
+   `Auth::usuarioDeLlave`, tabla `ca_llaves_envio`): al iniciar sesión el servidor da una
+   `llave_envio` (se guarda en `ca_sesion`; en la base sólo su huella sha256; dura `DIAS_LLAVE` 30
+   días, no se borra al cerrar sesión; el cliente no recibe). Cada registro de la cola (entradas,
+   salidas, incidencias, permisos y tomas médicas) la guarda (`it.llave`) y la manda
+   (`llave_envio`): el enrutador lo sube **a nombre de la cuenta que lo capturó, con su turno**,
+   aunque su sesión se haya cerrado o vencido (12 h) o en el teléfono esté otra cuenta. La llave
+   sólo sirve para `ACCESO_REGISTRAR`, `ACCESO_INCIDENCIA`, `PERMISO_AGREGAR`, `ACCESOS_EXISTEN`,
+   `MEDICO_REGISTRAR` y `MEDICO_EXISTEN` (y con las reglas del perfil de esa cuenta); llave inventada,
+   vencida o de una cuenta desactivada: 401 `LLAVE` (el registro queda marcado con el error). En
+   `accesos.html` `cola` es lo de la cuenta en pantalla y `colaTodo` todo lo del equipo («· N de
+   otra cuenta» en el indicador); `js/pendientes.js` sube desde la pantalla de inicio de sesión aun
+   sin nadie dentro. Lo de antes de la llave (sin `llave`) de otra cuenta espera a esa cuenta.
 
 ## Cómo probar
 

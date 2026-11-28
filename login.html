@@ -58,6 +58,7 @@
 </main>
 
 <script src="js/destinos.js"></script>
+<script src="js/pendientes.js"></script>
 <script>
 (function () {
   'use strict';
@@ -87,7 +88,7 @@
     return (window.CA_DESTINOS || {})[rol] || 'index.html';
   }
   function entrar(r) {
-    try { localStorage.setItem(CLAVE, JSON.stringify({ token: r.token, usuario: r.usuario, nombre: r.nombre, rol: r.rol, turno: r.turno || '', modo: r.modo || '', expira: r.expira })); } catch (e) {}
+    try { localStorage.setItem(CLAVE, JSON.stringify({ token: r.token, usuario: r.usuario, nombre: r.nombre, rol: r.rol, turno: r.turno || '', modo: r.modo || '', expira: r.expira, llave_envio: r.llave_envio || '' })); } catch (e) {}
     location.replace(destino(r.rol));
   }
   function error(id, msg) { $(id).textContent = msg || ''; $(id).hidden = !msg; }
@@ -168,6 +169,8 @@
     error('err-login', 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.');
   });
 })();
+  // Lo guardado en este equipo sin señal (de cualquier cuenta) se sube en cuanto hay internet
+  if (window.CA_PENDIENTES) CA_PENDIENTES.vigilar({ caseta: true, medico: true });
 </script>
 </body>
 </html>

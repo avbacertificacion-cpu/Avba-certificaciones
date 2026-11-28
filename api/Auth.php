@@ -83,6 +83,17 @@ class Auth {
         );
         // Turno de las cuentas de guardia (D | N), en usuarios.turno
         if (class_exists('ControlAccesos')) { ControlAccesos::asegurarTurnoCuentas($pdo); ControlAccesos::asegurarModoCuentas($pdo); }
+        // Llave de subida: una por cada inicio de sesión (ver llaveNueva)
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS ca_llaves_envio (
+               llave       CHAR(64)    NOT NULL PRIMARY KEY,
+               usuario_id  INT         NOT NULL,
+               creado      DATETIME    NOT NULL,
+               ultimo_uso  DATETIME    NULL,
+               KEY idx_usuario (usuario_id),
+               KEY idx_creado (creado)
+             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
         $hecho[$k] = true;
     }
 
@@ -154,7 +165,46 @@ class Auth {
         return ['status' => 'success', 'token' => $token, 'usuario' => (string)$row['usuario'],
                 'nombre' => (string)$row['nombre'], 'rol' => (string)$row['rol'], 'expira' => $expira,
                 'turno' => $row['rol'] === 'ACCESOS' ? $this->turnoDe((int)$row['id']) : '',
-                'modo' => $row['rol'] === 'ACCESOS' ? $this->modoDe((int)$row['id']) : ''];
+                'modo' => $row['rol'] === 'ACCESOS' ? $this->modoDe((int)$row['id']) : '',
+                // El cliente sólo consulta: no captura nada que deba subirse después
+                'llave_envio' => $row['rol'] === 'CLIENTE' ? '' : self::llaveNueva($this->pdo, (int)$row['id'])];
+    }
+
+    /* ── Llave de subida ─────────────────────────────────────────────────
+       Lo que un teléfono guarda sin señal debe llegar al servidor aunque la sesión de quien lo
+       capturó ya se haya cerrado o vencido, o aunque en el teléfono haya entrado otra cuenta. Al
+       iniciar sesión el teléfono recibe una llave (sólo la conoce ese teléfono; aquí se guarda su
+       huella) y cada registro la lleva consigo: con ella el registro se sube a nombre de la cuenta
+       que lo capturó, con su turno, y sólo sirve para subir registros (ver api/index.php). Dura
+       DIAS_LLAVE días y no se borra al cerrar la sesión. */
+    public const DIAS_LLAVE = 30;
+
+    public static function llaveNueva(PDO $pdo, int $usuarioId): string {
+        $llave = 'L' . bin2hex(random_bytes(24));
+        $ahora = date('Y-m-d H:i:s');
+        $pdo->prepare("DELETE FROM ca_llaves_envio WHERE creado < ?")->execute([date('Y-m-d H:i:s', time() - self::DIAS_LLAVE * 86400)]);
+        $pdo->prepare("INSERT INTO ca_llaves_envio (llave, usuario_id, creado) VALUES (?, ?, ?)")->execute([hash('sha256', $llave), $usuarioId, $ahora]);
+        return $llave;
+    }
+
+    /** La cuenta (activa) de una llave de subida, como validarToken; null si no existe o ya venció. */
+    public static function usuarioDeLlave(PDO $pdo, string $llave): ?array {
+        $llave = trim($llave);
+        if (!preg_match('/^L[0-9a-f]{48}$/', $llave)) return null;
+        self::asegurarTablas($pdo);
+        $h = hash('sha256', $llave);
+        foreach (['u.turno, u.modo', 'u.turno, NULL AS modo', 'NULL AS turno, NULL AS modo'] as $col) {
+            try {
+                $st = $pdo->prepare("SELECT u.id, u.usuario, u.rol, u.nombre, $col FROM ca_llaves_envio l INNER JOIN usuarios u ON u.id = l.usuario_id
+                                      WHERE l.llave = ? AND l.creado >= ? AND u.activo = 1");
+                $st->execute([$h, date('Y-m-d H:i:s', time() - self::DIAS_LLAVE * 86400)]);
+                $u = $st->fetch(PDO::FETCH_ASSOC);
+                if (!$u) return null;
+                $pdo->prepare("UPDATE ca_llaves_envio SET ultimo_uso = ? WHERE llave = ?")->execute([date('Y-m-d H:i:s'), $h]);
+                return $u;
+            } catch (\Throwable $e) { /* base vieja sin la columna: se intenta sin ella */ }
+        }
+        return null;
     }
 
     public function cerrarSesion(?string $token): array {

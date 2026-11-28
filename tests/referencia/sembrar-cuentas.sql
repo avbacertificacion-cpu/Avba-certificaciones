@@ -34,3 +34,8 @@ UPDATE usuarios SET turno = 'N' WHERE usuario IN ('noche1', 'noche2');
 
 INSERT IGNORE INTO sesiones_usuario (token, usuario_id, origen, creado, expira)
   SELECT CONCAT('tok-', usuario), id, 'prueba', NOW(), NOW() + INTERVAL 30 DAY FROM usuarios;
+
+-- Llaves de subida de prueba (lo guardado sin señal se sube a nombre de quien lo capturó):
+-- la de cada cuenta es «L» + los primeros 48 caracteres de sha256('llave-' + usuario); se guarda su huella.
+INSERT IGNORE INTO ca_llaves_envio (llave, usuario_id, creado)
+  SELECT SHA2(CONCAT('L', LEFT(SHA2(CONCAT('llave-', usuario), 256), 48)), 256), id, NOW() FROM usuarios;
