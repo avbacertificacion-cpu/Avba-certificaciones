@@ -213,6 +213,17 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
    `accesos.html` `cola` es lo de la cuenta en pantalla y `colaTodo` todo lo del equipo («· N de
    otra cuenta» en el indicador); `js/pendientes.js` sube desde la pantalla de inicio de sesión aun
    sin nadie dentro. Lo de antes de la llave (sin `llave`) de otra cuenta espera a esa cuenta.
+12. **Todo cuadra: entradas − salidas = personal en planta** (`ControlAccesos::clasificar`, la misma
+   regla en la lista del turno —totales, numeración, «no_cuenta» de cada renglón—, el tablero —cifras,
+   gráficas por día y hora, Excel y PDF—, el PDF de datos del turno —`emparejar`— y «En planta»):
+   **varias entradas seguidas del mismo ID sin salida** (lo regresaron sin pasar su salida): cuenta sólo
+   la **última** y su hora es la de esa última (si entre una y otra pasó el reinicio de las 05:30, las
+   dos cuentan); una **salida sin entrada** (su lectura anterior no es una entrada de las últimas 16 h)
+   va **aparte**, se lista para revisarla y **no se resta**. En el tablero (`Tablero::cuadre`, que da qué
+   cuenta de cada lectura) la salida de quien entró de noche y sale después de las 05:30 cuenta como
+   salida si el reinicio cayó dentro del periodo (y ya no como «sin salida al reinicio»); si el periodo
+   empieza después del reinicio (Turno de hoy desde 05:30) va aparte como «de quien entró antes del
+   reinicio». Las lecturas sin ID no entran en las cifras del tablero.
 
 ## Cómo probar
 

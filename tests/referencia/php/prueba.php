@@ -71,7 +71,7 @@ $x = array_values(array_filter($l['registros'], fn($r) => $r['uid'] === 'tarj-00
 ok($x && $x['persona'] === 'JUAN PEREZ LOPEZ' && $x['codigo'] === '004512' && $x['con_foto'] === false && $x['origen'] === 'tarjeta', 'listar trae persona, código y si tiene foto');
 $v = array_values(array_filter($l['registros'], fn($r) => $r['uid'] === 'fotovieja000001'))[0] ?? null;
 ok($v && $v['con_foto'] === true && $v['codigo'] === '', 'el registro con foto sigue igual');
-ok($l['totales']['2026-11-26-D']['entrada'] === 5 && $l['totales']['2026-11-26-D']['salida'] === 3, 'totales del turno: ' . json_encode($l['totales']));
+ok($l['totales']['2026-11-26-D']['entrada'] === 5 && $l['totales']['2026-11-26-D']['salida'] === 2 && $l['totales']['2026-11-26-D']['sin_entrada'] === 1, 'totales del turno (la salida de 7788 no tiene entrada: va aparte): ' . json_encode($l['totales']));
 
 // 4) Emparejar
 $filas = $pdo->query("SELECT id, uid, tipo, capturado, lugar, nombre, codigo FROM accesos_registros WHERE turno_fecha='2026-11-26' AND turno='D' ORDER BY capturado, id")->fetchAll();

@@ -56,13 +56,14 @@ const reg = (tipo, cap, codigo, nombre = '') => {
   ok(c.vencidas === 0, 'en el periodo no hubo reinicio → ' + c.vencidas);
   ok(c.fin === 3 && c.inicio + c.entradas_validas - c.salidas_validas - c.vencidas === c.fin, `cuadra: 2 + 4 − 3 − 0 = 3 → ${c.fin}`);
   ok(r.kpis.dentro === 3 && r.en_planta.map(x => x.id).sort().join(',') === '00106,00107,00109', 'dentro a las 16:00: 00106, 00107 y 00109 → ' + r.en_planta.map(x => x.id).join(','));
-  ok(r.kpis.entradas === 6 && r.kpis.salidas === 6, 'las cifras de entradas y salidas son las mismas lecturas del cuadre');
+  ok(r.kpis.entradas === 4 && r.kpis.salidas === 3 && c.inicio + r.kpis.entradas - r.kpis.salidas === r.kpis.dentro,
+     `las cifras cuadran con quién está dentro: ${c.inicio} + ${r.kpis.entradas} − ${r.kpis.salidas} = ${r.kpis.dentro} (la repetida y las salidas sin entrada van aparte)`);
   const f = r.en_planta.find(x => x.id === '00106') || {};
   ok(f.limite === `${Y} 22:10:00` && f.alerta === '' && f.minutos === 9 * 60 + 50, 'cada quien dice cuándo cumple 16 h: ' + f.limite);
   // Sin horas: el día completo, y también cuadra
   r = await get('TABLERO', 'tok-cliente', { desde: Y, hasta: Y });
   const d = r.cuadre;
-  ok(r.hora_desde === '00:00' && d.inicio === 2 && d.vencidas === 2 && d.inicio + d.entradas_validas - d.salidas_validas - d.vencidas === d.fin,
+  ok(r.hora_desde === '00:00' && d.inicio === 2 && d.vencidas === 1 && d.inicio + d.entradas_validas - d.salidas_validas - d.vencidas === d.fin,
      `el día completo (con el reinicio de las 05:30 en medio) también cuadra: ${d.inicio} + ${d.entradas_validas} − ${d.salidas_validas} − ${d.vencidas} = ${d.fin}`);
   r = await get('TABLERO', 'tok-cliente', { desde: Y, hasta: Y, hora_desde: '16:00', hora_hasta: '06:00' });
   ok(r.status === 'error' && /después/.test(r.message), 'la hora final antes de la inicial: ' + r.message);

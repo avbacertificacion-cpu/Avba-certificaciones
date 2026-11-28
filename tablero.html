@@ -545,7 +545,9 @@
              k.dentro_aviso ? num(k.dentro_aviso) + ' cumplen ' + d.horas_limite + ' h en menos de ' + d.horas_aviso + ' h' : ''].filter(Boolean).join(' · ') + '</span>'
            : k.dentro_revisar ? '<span class="estado">' + ICO_AVISO + num(k.dentro_revisar) + ' con más de 13 h dentro</span>' : 'Al ' + fechaHora(d.corte), true) +
       caja('Entradas', num(k.entradas), 'Turno de día ' + num(k.entradas_dia) + ' · noche ' + num(k.entradas_noche)) +
-      caja('Salidas', num(k.salidas), k.sin_salida ? num(k.sin_salida) + (k.sin_salida === 1 ? ' entrada sin salida registrada' : ' entradas sin salida registrada') : 'Todas las entradas con su salida') +
+      caja('Salidas', num(k.salidas), (d.cuadre && (d.cuadre.salidas_sin_entrada + d.cuadre.salidas_turno_anterior))
+        ? num(d.cuadre.salidas_sin_entrada + d.cuadre.salidas_turno_anterior) + ' sin entrada en el periodo: van aparte (ver el cuadre)'
+        : k.sin_salida ? num(k.sin_salida) + (k.sin_salida === 1 ? ' entrada sin salida registrada' : ' entradas sin salida registrada') : 'Todas las entradas con su salida') +
       caja('Personas distintas', num(k.personas), 'Por el ID de su credencial') +
       caja('Horas en planta', num(Math.round(k.minutos / 60)), k.visitas ? 'Promedio por visita: ' + hm(k.promedio_min) : 'Sin visitas completas') +
       caja('Incidencias', num(k.incidencias), 'Reportadas en la caseta');
@@ -557,10 +559,10 @@
     var h = function (s) { return s.slice(0, 10) === d.desde && d.desde === d.hasta ? s.slice(11, 16) : fechaHora(s); };
     var p = function (op, v, l, cls) { return '<div class="p' + (cls ? ' ' + cls : '') + '"><b>' + (op ? '<em>' + op + '</em>' : '') + num(v) + '</b><span>' + l + '</span></div>'; };
     var notas = [];
-    notas.push('Entradas leídas: ' + num(c.entradas) + (c.entradas_repetidas ? ' · ' + num(c.entradas_repetidas) + ' de quien ya estaba dentro (leída dos veces): no cambian a cuántos hay dentro' : ''));
+    notas.push('Entradas leídas: ' + num(c.entradas) + (c.entradas_repetidas ? ' · ' + num(c.entradas_repetidas) + ' repetidas no cuentan: a quien se le leyó la entrada varias veces sin salida le cuenta sólo la última' : ''));
     notas.push('Salidas leídas: ' + num(c.salidas) +
-      (c.salidas_turno_anterior ? ' · ' + num(c.salidas_turno_anterior) + ' de quien entró antes del reinicio de las ' + c.reinicio + ' (cuentan en su turno, p. ej. el de noche)' : '') +
-      (c.salidas_sin_entrada ? ' · ' + num(c.salidas_sin_entrada) + ' de quien no tenía entrada registrada (no pasó su credencial al entrar)' : ''));
+      (c.salidas_turno_anterior ? ' · ' + num(c.salidas_turno_anterior) + ' de quien entró antes del reinicio de las ' + c.reinicio + ' (cuentan en su turno, p. ej. el de noche; aquí no se restan)' : '') +
+      (c.salidas_sin_entrada ? ' · ' + num(c.salidas_sin_entrada) + ' sin entrada registrada (no pasó su credencial al entrar): no se restan, porque no se contó su entrada. Están en «Movimientos» como «Sin entrada registrada»' : ''));
     if (c.vencidas) notas.push(num(c.vencidas) + ' no registraron su salida antes del reinicio de las ' + c.reinicio + ': ya no cuentan como dentro');
     if (c.sin_id) notas.push(num(c.sin_id) + ' lecturas sin ID (sólo foto) no entran en el cuadre');
     $('cuadre').innerHTML = '<h2>Cuadre del periodo</h2><div class="ec">' +

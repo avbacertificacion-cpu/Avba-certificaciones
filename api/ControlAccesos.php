@@ -553,13 +553,24 @@ class ControlAccesos {
         if ($caseta) { $donde .= " AND usuario = ?"; $args[] = (string)$usr['usuario']; }
         $donde .= " AND " . Omitidos::fuera($this->pdo);       // lo de los días omitidos (pruebas) no cuenta
 
+        // Totales y numeración con la regla de qué cuenta (clasificar): se revisan las lecturas de todas las
+        // casetas de esos días (y uno antes y dos después), y se cuentan las de esta vista
         $tot = [];
-        foreach ($turnos as $t) $tot[$t[0] . '-' . $t[1]] = ['entrada' => 0, 'salida' => 0];
-        $st = $this->pdo->prepare("SELECT turno_fecha, turno, tipo, COUNT(*) AS n FROM accesos_registros WHERE $donde GROUP BY turno_fecha, turno, tipo");
-        $st->execute($args);
-        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        foreach ($turnos as $t) $tot[$t[0] . '-' . $t[1]] = ['entrada' => 0, 'salida' => 0, 'repetidas' => 0, 'sin_entrada' => 0];
+        $fechas = array_column($turnos, 0);
+        $cod = self::conTarjeta($this->pdo) ? 'codigo' : "'' AS codigo";
+        $st = $this->pdo->prepare("SELECT id, tipo, capturado, $cod, turno_fecha, turno, lugar, usuario FROM accesos_registros
+                                    WHERE fecha BETWEEN ? AND ? AND " . Omitidos::fuera($this->pdo) . " ORDER BY capturado, id");
+        $st->execute([date('Y-m-d', strtotime(min($fechas) . ' 12:00:00 -1 day')), date('Y-m-d', strtotime(max($fechas) . ' 12:00:00 +2 days'))]);
+        $contexto = $st->fetchAll(PDO::FETCH_ASSOC);
+        $clase = self::clasificar($contexto);
+        $numDe = []; $cuenta = [];
+        foreach ($contexto as $r) {
             $kt = $r['turno_fecha'] . '-' . $r['turno'];
-            if (isset($tot[$kt][$r['tipo']])) $tot[$kt][$r['tipo']] = (int)$r['n'];
+            if (!isset($tot[$kt]) || ($lugar !== '' && $r['lugar'] !== $lugar) || ($caseta && $r['usuario'] !== (string)$usr['usuario'])) continue;
+            $c = $clase[(int)$r['id']] ?? '';
+            if ($c === '') { $numDe[(int)$r['id']] = ++$tot[$kt][$r['tipo']]; continue; }
+            $tot[$kt][$c === 'repetida' ? 'repetidas' : 'sin_entrada']++;
         }
 
         $lugares = [];
@@ -578,16 +589,11 @@ class ControlAccesos {
             $pag = " AND (a.capturado < ? OR (a.capturado = ? AND a.id < ?))";
             array_push($argsPag, $antesCap, $antesCap, $antesId);
         }
-        $num = "(SELECT COUNT(*) FROM accesos_registros b WHERE b.turno_fecha = a.turno_fecha AND b.turno = a.turno AND b.tipo = a.tipo"
-             . ($lugar !== '' ? " AND b.lugar = a.lugar" : '')
-             . ($caseta ? " AND b.usuario = a.usuario" : '')
-             . " AND " . Omitidos::fuera($this->pdo, 'b.capturado')
-             . " AND (b.capturado < a.capturado OR (b.capturado = a.capturado AND b.id <= a.id)))";
         $dondeA = preg_replace('/\b(turno_fecha|turno|lugar|usuario|capturado)\b/', 'a.$1', $donde);
         $st = $this->pdo->prepare(
             "SELECT a.id, a.uid, a.tipo, a.capturado, a.recibido, a.lugar, a.nota, a.usuario, a.usuario_nombre,
                     a.turno_fecha, a.turno, " . (self::conTarjeta($this->pdo) ? "a.nombre AS persona, a.codigo, a.origen" : "'' AS persona, '' AS codigo, 'foto' AS origen") . ",
-                    (a.foto <> '') AS con_foto, $num AS num
+                    (a.foto <> '') AS con_foto
                FROM accesos_registros a
               WHERE $dondeA$pag
               ORDER BY a.capturado DESC, a.id DESC LIMIT " . ($limite + 1)
@@ -601,7 +607,8 @@ class ControlAccesos {
         $out = [];
         foreach ($filas as $f) {
             $out[] = [
-                'id' => (int)$f['id'], 'uid' => $f['uid'], 'tipo' => $f['tipo'], 'num' => (int)$f['num'],
+                'id' => (int)$f['id'], 'uid' => $f['uid'], 'tipo' => $f['tipo'], 'num' => $numDe[(int)$f['id']] ?? 0,
+                'no_cuenta' => $clase[(int)$f['id']] ?? '',
                 'turno' => $f['turno_fecha'] . '-' . $f['turno'],
                 'capturado' => $f['capturado'], 'hora' => substr((string)$f['capturado'], 11, 8),
                 'lugar' => $f['lugar'], 'nota' => $f['nota'],
@@ -981,6 +988,38 @@ class ControlAccesos {
     }
 
     /** Junta la entrada y la salida de cada persona (por su ID), en orden. */
+    /**
+     * Qué lecturas cuentan (la misma regla en la lista del turno, el tablero y sus reportes), por ID y en
+     * orden de hora, con las lecturas de todas las casetas:
+     *  - Varias ENTRADAS seguidas sin salida (lo regresaron sin pasar su salida): sólo cuenta la última;
+     *    las anteriores son «repetida». Si entre una y otra pasó el reinicio de las 05:30, las dos cuentan.
+     *  - Una SALIDA cuenta si su lectura anterior es una entrada de las últimas HORAS_JORNADA_MAX horas;
+     *    si no, es «sin_entrada» y va aparte (no descuadra las cifras).
+     * Las lecturas sin ID (sólo foto) cuentan como están. @return array<int,string> id → '' (cuenta) | motivo
+     */
+    public static function clasificar(array $filas): array {
+        $porId = []; $out = [];
+        foreach ($filas as $f) {
+            $out[(int)$f['id']] = '';
+            if ((string)($f['codigo'] ?? '') !== '') $porId[self::claveId((string)$f['codigo'])][] = $f;
+        }
+        foreach ($porId as $regs) {
+            usort($regs, fn($a, $b) => [$a['capturado'], (int)$a['id']] <=> [$b['capturado'], (int)$b['id']]);
+            $n = count($regs);
+            for ($i = 0; $i < $n; $i++) {
+                $t = strtotime((string)$regs[$i]['capturado']);
+                if ($regs[$i]['tipo'] === 'entrada') {
+                    $sig = $regs[$i + 1] ?? null;
+                    if ($sig && $sig['tipo'] === 'entrada' && strtotime((string)$sig['capturado']) < self::reinicioDespues($t)) $out[(int)$regs[$i]['id']] = 'repetida';
+                } else {
+                    $ant = $regs[$i - 1] ?? null;
+                    if (!$ant || $ant['tipo'] !== 'entrada' || $t - strtotime((string)$ant['capturado']) > self::HORAS_JORNADA_MAX * 3600) $out[(int)$regs[$i]['id']] = 'sin_entrada';
+                }
+            }
+        }
+        return $out;
+    }
+
     public static function emparejar(array $filas): array {
         $porId = [];
         foreach ($filas as $f) {
@@ -1007,7 +1046,9 @@ class ControlAccesos {
             $abierta = null;
             foreach ($regs as $r) {
                 if ($r['tipo'] === 'entrada') {
-                    if ($abierta) $out[] = $renglon($abierta, null);          // entró otra vez sin salida
+                    // Entró otra vez sin salida: queda la última entrada; la anterior sólo queda (sin salida)
+                    // si entre las dos pasó el reinicio de las 05:30
+                    if ($abierta && strtotime((string)$r['capturado']) >= self::reinicioDespues(strtotime((string)$abierta['capturado']))) $out[] = $renglon($abierta, null);
                     $abierta = $r;
                 } else {
                     $out[] = $renglon($abierta, $r);                          // con o sin entrada
@@ -1221,7 +1262,9 @@ class ControlAccesos {
         $info = [
             'turno' => $t, 'personas' => $personas,
             'entradas' => count(array_filter($renglones, fn($r) => $r['entrada'] !== '')),
-            'salidas' => count(array_filter($renglones, fn($r) => $r['salida'] !== '')),
+            // Salidas que cuentan: las que cierran una entrada (las que no tienen entrada van aparte; así
+            // entradas − salidas = entradas sin salida)
+            'salidas' => count(array_filter($renglones, fn($r) => $r['entrada'] !== '' && $r['salida'] !== '')),
             'sin_salida' => count(array_filter($renglones, fn($r) => $r['entrada'] !== '' && $r['salida'] === '')),
             'sin_entrada' => count(array_filter($renglones, fn($r) => $r['entrada'] === '')),
             'sin_codigo' => $conFotoSinCodigo,
@@ -1264,9 +1307,12 @@ class ControlAccesos {
            . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Personas:</b> ' . number_format($info['personas']) . '</td>'
            . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Entradas:</b> ' . number_format($info['entradas']) . '</td>'
            . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Salidas:</b> ' . number_format($info['salidas']) . '</td>'
+           . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Sin salida:</b> ' . number_format($info['sin_salida']) . '</td>'
            . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Generado:</b> ' . date('d/m/Y H:i') . '</td></tr>'
-           . '<tr><td colspan="5" style="padding:2mm 3mm;color:#5a6072;font-size:8.5pt">Nombre e ID leídos de la credencial de acceso en el teléfono de la caseta. '
-           . 'La entrada y la salida de cada persona se juntan por su ID (el número del recuadro azul). Generado por ' . self::h($usr['nombre'] ?? $usr['usuario'] ?? '') . '.</td></tr></table>';
+           . '<tr><td colspan="6" style="padding:2mm 3mm;color:#5a6072;font-size:8.5pt">Nombre e ID leídos de la credencial de acceso en el teléfono de la caseta. '
+           . 'La entrada y la salida de cada persona se juntan por su ID (el número del recuadro azul). Entradas − salidas = sin salida. '
+           . 'Si a alguien se le leyó la entrada varias veces sin salida, cuenta sólo la última; las salidas sin entrada se listan pero no se cuentan. '
+           . 'Generado por ' . self::h($usr['nombre'] ?? $usr['usuario'] ?? '') . '.</td></tr></table>';
         $th = 'background:#0C447C;color:#fff;font-weight:bold;padding:2mm 2mm;text-align:left;font-size:9pt';
         $h .= '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:4mm;font-size:9.5pt" repeat_header="1">'
             . '<thead><tr><th style="' . $th . ';width:7mm">#</th><th style="' . $th . '">Nombre</th><th style="' . $th . '">ID</th>'
@@ -1287,7 +1333,7 @@ class ControlAccesos {
         $h .= '</tbody></table>';
         $notas = [];
         if ($info['sin_salida']) $notas[] = number_format($info['sin_salida']) . ' entrada' . ($info['sin_salida'] === 1 ? '' : 's') . ' sin salida registrada en este turno';
-        if ($info['sin_entrada']) $notas[] = number_format($info['sin_entrada']) . ' salida' . ($info['sin_entrada'] === 1 ? '' : 's') . ' sin entrada registrada en este turno';
+        if ($info['sin_entrada']) $notas[] = number_format($info['sin_entrada']) . ' salida' . ($info['sin_entrada'] === 1 ? '' : 's') . ' sin entrada registrada en este turno (no se cuentan en «Salidas»)';
         if ($info['sin_codigo']) $notas[] = number_format($info['sin_codigo']) . ' registro' . ($info['sin_codigo'] === 1 ? '' : 's') . ' con foto y sin código (están en el PDF con fotos)';
         if ($notas) $h .= '<p style="font-size:8.5pt;color:#5a6072;margin-top:3mm">' . self::h(implode(' · ', $notas)) . '.</p>';
         return $h;

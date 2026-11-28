@@ -70,15 +70,16 @@ ok(r.status === 'success' && r.rol === 'CLIENTE' && /Cliente/.test(r.nombre_rol)
 r = await get('TABLERO', 'tok-cliente', periodo);
 const k = r.kpis;
 ok(r.desde === dia(3) && r.hasta === hoy && r.dias === 4, `periodo del ${r.desde} al ${r.hasta} (${r.dias} días)`);
-ok(k.entradas === 6 && k.salidas === 3, `entradas ${k.entradas} y salidas ${k.salidas} (sin lo de hace 10 días)`);
+ok(k.entradas === 5 && k.salidas === 3, `entradas ${k.entradas} y salidas ${k.salidas} (sin lo de hace 10 días ni la lectura sin ID; la salida de la noche a las 06:10 sí cuenta)`);
+ok(k.entradas - k.salidas - r.cuadre.vencidas === k.dentro && r.cuadre.inicio === 0, `cuadra: ${k.entradas} − ${k.salidas} − ${r.cuadre.vencidas} sin salida al reinicio = ${k.dentro} dentro`);
 ok(k.personas === 4 && k.sin_id === 1, `personas distintas ${k.personas} (412 = 00412) y 1 sólo foto (${k.sin_id})`);
 ok(k.visitas === 3 && k.minutos === 750 + 730 + 865 && k.promedio_min === 782, `3 visitas completas: ${k.minutos} min, promedio ${k.promedio_min}`);
 ok(k.sin_salida === 1, `1 entrada sin salida (quien sigue dentro no cuenta): ${k.sin_salida}`);
 ok(k.dentro === 1 && r.en_planta[0].id === '00500' && r.en_planta[0].registro === undefined, 'dentro ahora: el 00500 (sin datos internos del registro)');
 ok(k.incidencias === 1 && r.incidencias_tipo.find(x => x.tipo === 'ALCOHOLIMETRO').n === 1, 'incidencias del periodo: 1 alcoholímetro (la de hace 20 días no)');
-ok(k.entradas_dia === 5 && k.entradas_noche === 1, `entradas por turno: día ${k.entradas_dia}, noche ${k.entradas_noche}`);
+ok(k.entradas_dia === 4 && k.entradas_noche === 1, `entradas por turno: día ${k.entradas_dia}, noche ${k.entradas_noche}`);
 const pd = Object.fromEntries(r.por_dia.map(x => [x.fecha, x]));
-ok(pd[dia(3)].entradas === 2 && pd[dia(3)].salidas === 1 && pd[dia(2)].entradas === 2 && pd[dia(2)].salidas === 1 && pd[dia(2)].incidencias === 1,
+ok(pd[dia(3)].entradas === 2 && pd[dia(3)].salidas === 1 && pd[dia(2)].entradas === 1 && pd[dia(2)].salidas === 1 && pd[dia(2)].incidencias === 1,
    'por día: cada lectura en el día en que se hizo');
 const hDentro = +yaDentro.slice(11, 13);                                                   // la entrada de «ahora» cae en su hora
 ok(r.por_hora[6].entradas === 3 + (hDentro === 6) && r.por_hora[18].entradas === 1 + (hDentro === 18) && r.por_hora[18].salidas === 1,
@@ -172,7 +173,7 @@ r = await post('LOGIN', 'x', { usuario: 'cliente.planta', password: 'contrasena-
 ok(r.status === 'success' && r.rol === 'CLIENTE', 'el cliente nuevo entra con su contraseña');
 const tNuevo = r.token;
 r = await get('TABLERO', tNuevo, periodo);
-ok(r.status === 'success' && r.kpis.entradas === 6, 'y ve el tablero');
+ok(r.status === 'success' && r.kpis.entradas === 5, 'y ve el tablero');
 r = await post('CAMBIAR_MI_CONTRASENA', tNuevo, { actual: 'contrasena-larga', nueva: 'otra-contrasena-larga' });
 ok(r.status === 'success', 'y puede cambiar su contraseña');
 r = await get('CUENTAS_LISTAR', 'tok-admin');

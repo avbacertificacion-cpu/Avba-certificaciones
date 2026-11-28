@@ -234,6 +234,7 @@
   .banda{background:var(--rojo-light);color:var(--rojo);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13.5px;line-height:1.45}
   .banda .btn{margin-top:8px}
   .badge.cola{background:#e8edf4;color:#3a4a60}
+  .bloque-turno .aparte{margin:6px 2px 0;font-size:12px;color:var(--texto-sub);line-height:1.4}
   .badge.rech{background:var(--rojo-light);color:var(--rojo)}
   .mini-acc{display:flex;gap:6px;margin-top:6px}
   .mini-acc button{border:1px solid var(--borde);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer}
@@ -1764,12 +1765,14 @@
       (n > 1 ? '<div class="bt-tit"><b>' + nombreTurno(k) + '</b><span>' + esc(rangoTurno(k)) + '</span>' + etq + '</div>' : '') +
       '<div class="totales"><div class="tot e"><b>' + numero(t.entrada) + '</b><span>Entradas</span></div>' +
       '<div class="tot s"><b>' + numero(t.salida) + '</b><span>Salidas</span></div>' +
-      '<div class="tot d"><b>' + numero(t.entrada - t.salida) + '</b><span>Diferencia</span></div></div></div>';
+      '<div class="tot d"><b>' + numero(t.entrada - t.salida) + '</b><span>Diferencia</span></div></div>' +
+      (t.repetidas || t.sin_entrada ? '<p class="aparte">No cuentan (aparte, para revisar): ' + [t.repetidas ? numero(t.repetidas) + (t.repetidas === 1 ? ' entrada repetida' : ' entradas repetidas') + ' (entró otra vez sin salida: cuenta la última)' : '',
+        t.sin_entrada ? numero(t.sin_entrada) + (t.sin_entrada === 1 ? ' salida sin entrada' : ' salidas sin entrada') : ''].filter(Boolean).join(' · ') + '.</p>' : '') + '</div>';
   }
   function pintarLista() {
     if (modoPlanta) { pintarPlanta(); return; }
     var filtro = seg('filtro'), pend = enColaVisible(), sueltos = enviadosSinListar(), ks = turnosVista(), tot = {};
-    ks.forEach(function (k) { var t = (datos.totales || {})[k] || {}; tot[k] = { entrada: t.entrada || 0, salida: t.salida || 0 }; });
+    ks.forEach(function (k) { var t = (datos.totales || {})[k] || {}; tot[k] = { entrada: t.entrada || 0, salida: t.salida || 0, repetidas: t.repetidas || 0, sin_entrada: t.sin_entrada || 0 }; });
     pend.forEach(function (x) { if (!x.error && tot[x.turno]) tot[x.turno][x.tipo]++; });
     sueltos.forEach(function (x) { if (tot[x.turno]) tot[x.turno][x.tipo]++; });
     $('totales').innerHTML = ks.map(function (k, i) { return bloqueTurno(k, tot[k], i, ks.length); }).join('');
@@ -1804,7 +1807,8 @@
       var ent = x.tipo === 'entrada';
       var foto = imgRegistro(x, 'data-id="' + x.id + '"', urlFoto(x.id, true));
       return '<li class="reg">' + cuadro(x, foto) +
-        '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') + '</span>' + esc(hora(x)) + '</div>' + persona(x) +
+        '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + (ent ? 'ENTRADA' : 'SALIDA') + (x.num ? ' ' + String(x.num).padStart(3, '0') : '') + '</span>' + esc(hora(x)) +
+        (x.no_cuenta ? ' <span class="badge pend" title="No entra en los contadores">' + (x.no_cuenta === 'repetida' ? 'No cuenta: entró otra vez sin salida' : 'No cuenta: sin entrada') + '</span>' : '') + '</div>' + persona(x) +
         '<div class="l2">' + esc(nombrePunto(x.lugar)) + ' · ' + esc(x.nombre) + deTurno(x) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div>' +
         (x.puede_borrar ? '<button class="borrar" type="button" data-borrar="' + x.id + '" aria-label="Eliminar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>' : '') +
         '</li>';

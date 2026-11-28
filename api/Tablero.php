@@ -119,14 +119,20 @@ class Tablero {
         $porHora = array_fill(0, 24, ['entradas' => 0, 'salidas' => 0]);
         $k = ['entradas' => 0, 'salidas' => 0, 'ent_dia' => 0, 'ent_noche' => 0, 'sin_id' => 0];
         $ids = [];
+        // El cuadre del periodo y quién está dentro al corte (con la misma regla que «En planta»); las cifras
+        // y las gráficas cuentan sólo lo que entra en el cuadre: entradas − salidas cuadran con quién está dentro
+        [$cuadre, $dentro, $cuenta] = self::cuadre($filas, $tIni, $corte);
         foreach ($filas as $f) {
             $cap = (string)$f['capturado'];
             if ($cap < $ini || $cap > $fin) continue;
             $d = substr($cap, 0, 10);
-            $tipo = $f['tipo'] === 'salida' ? 'salidas' : 'entradas';
-            $k[$tipo]++;
-            $dias[$d][$tipo]++;
-            $porHora[(int)substr($cap, 11, 2)][$tipo]++;
+            $q = $cuenta[(int)$f['id']] ?? '';
+            $tipo = $q === 'E' ? 'entradas' : ($q === 'S' ? 'salidas' : '');
+            if ($tipo !== '') {
+                $k[$tipo]++;
+                $dias[$d][$tipo]++;
+                $porHora[(int)substr($cap, 11, 2)][$tipo]++;
+            }
             if ($tipo === 'entradas' && ($f['turno'] === 'D' || $f['turno'] === 'N')) {
                 $t = $f['turno'] === 'D' ? 'ent_dia' : 'ent_noche';
                 $k[$t]++;
@@ -139,8 +145,6 @@ class Tablero {
         }
         foreach ($idsDia as $d => $s) $dias[$d]['personas'] = count($s);
 
-        // El cuadre del periodo y quién está dentro al corte (con la misma regla que «En planta»)
-        [$cuadre, $dentro] = self::cuadre($filas, $tIni, $corte);
         $idsDentro = [];
         foreach ($dentro as $x) $idsDentro[ControlAccesos::claveId((string)$x['id'])] = true;
 
@@ -263,6 +267,9 @@ class Tablero {
               'salidas_validas' => 0, 'salidas_turno_anterior' => 0, 'salidas_sin_entrada' => 0, 'vencidas' => 0, 'fin' => 0, 'sin_id' => 0,
               'desde' => date('Y-m-d H:i:s', $tIni), 'corte' => date('Y-m-d H:i:s', $corte), 'reinicio' => ControlAccesos::hora(ControlAccesos::REINICIO)];
         $estado = []; $quien = [];                         // clave → hora de su última entrada (sin salida) · [codigos, nombre]
+        // Qué cuenta de cada lectura del periodo (para las cifras y las gráficas): id → 'E' | 'S' | motivo.
+        // De varias entradas seguidas sin salida cuenta la última (la marca pasa a la nueva).
+        $marca = []; $cuenta = [];
         $dentroEn = fn(int $e, int $t): bool => $e >= ControlAccesos::reinicioAntes($t);
         // Quien estaba dentro y lo quitó un reinicio dentro del periodo
         $quitadoEnPeriodo = fn(int $e): bool => ControlAccesos::reinicioDespues($e) > $tIni;
@@ -274,22 +281,38 @@ class Tablero {
                 $empezo = true;
                 foreach ($estado as $e) if ($dentroEn($e, $tIni)) $c['inicio']++;
             }
-            if ($empezo && (string)$f['codigo'] === '') { $c['sin_id']++; $c[$f['tipo'] === 'salida' ? 'salidas' : 'entradas']++; continue; }
+            if ($empezo && (string)$f['codigo'] === '') { $c['sin_id']++; $c[$f['tipo'] === 'salida' ? 'salidas' : 'entradas']++; $cuenta[(int)$f['id']] = 'sin_id'; continue; }
             if ((string)$f['codigo'] === '') continue;
             $k = ControlAccesos::claveId((string)$f['codigo']);
             $quien[$k] = [array_merge($quien[$k][0] ?? [], [(string)$f['codigo']]), (string)$f['nombre'] !== '' ? (string)$f['nombre'] : ($quien[$k][1] ?? '')];
             $antes = $estado[$k] ?? null;
             $esta = $antes !== null && $dentroEn($antes, $t);
             if ($empezo && $antes !== null && !$esta && $quitadoEnPeriodo($antes)) $c['vencidas']++;   // la quitó el reinicio
+            if (!$esta) unset($marca[$k]);
+            $rid = (int)$f['id'];
             if ($f['tipo'] === 'salida') {
                 if ($empezo) {
                     $c['salidas']++;
                     // Sin entrada desde el reinicio: si entró en las 16 h anteriores (p. ej. de noche), cuenta en su turno
-                    $c[$esta ? 'salidas_validas' : ($antes !== null && $t - $antes <= $jornada ? 'salidas_turno_anterior' : 'salidas_sin_entrada')]++;
+                    $q = $esta ? 'salidas_validas' : ($antes !== null && $t - $antes <= $jornada ? 'salidas_turno_anterior' : 'salidas_sin_entrada');
+                    // Entró de noche y sale después del reinicio de las 05:30: si el reinicio fue dentro del periodo
+                    // (se contó «sin salida al reinicio»), es una salida normal y ya no cuenta como sin salida
+                    if ($q === 'salidas_turno_anterior' && $quitadoEnPeriodo($antes)) { $c['vencidas']--; $q = 'salidas_validas'; }
+                    $c[$q]++;
+                    $cuenta[$rid] = $q === 'salidas_validas' ? 'S' : $q;
                 }
-                unset($estado[$k]);
+                unset($estado[$k], $marca[$k]);
             } else {
-                if ($empezo) { $c['entradas']++; $c[$esta ? 'entradas_repetidas' : 'entradas_validas']++; }
+                if ($empezo) {
+                    $c['entradas']++;
+                    if (!$esta) { $c['entradas_validas']++; $cuenta[$rid] = 'E'; $marca[$k] = $rid; }
+                    else {
+                        $c['entradas_repetidas']++;
+                        // Ya estaba dentro: si su entrada era de este periodo, ahora cuenta esta (la última)
+                        if (isset($marca[$k])) { $cuenta[$marca[$k]] = 'entradas_repetidas'; $cuenta[$rid] = 'E'; $marca[$k] = $rid; }
+                        else $cuenta[$rid] = 'entradas_repetidas';
+                    }
+                }
                 $estado[$k] = $t;                           // la última entrada (como «En planta»)
             }
         }
@@ -305,7 +328,7 @@ class Tablero {
         $c['fin'] = count($lista);
         $orden = ['limite' => 0, 'aviso' => 1, '' => 2];                    // primero quien ya cumplió 16 h o está por cumplirlas
         usort($lista, fn($x, $y) => [$orden[$x['alerta']], $y['entrada']] <=> [$orden[$y['alerta']], $x['entrada']]);
-        return [$c, $lista];
+        return [$c, $lista, $cuenta];
     }
 
     /** ¿Esa entrada es la última lectura de esa persona? (entonces sigue dentro) */
@@ -340,6 +363,7 @@ class Tablero {
                 $reinicio = ControlAccesos::reinicioDespues($ini);
                 if ($i + 1 < $n) {
                     $sig = strtotime((string)$regs[$i + 1]['capturado']);
+                    if ($regs[$i + 1]['tipo'] === 'entrada' && $sig < $reinicio) continue;   // entró otra vez sin salida: cuenta la última
                     $fin = $regs[$i + 1]['tipo'] === 'salida' && $sig - $ini <= $jornada ? $sig : min($sig, $reinicio);
                 } else {
                     $fin = min($ahora, $reinicio);
@@ -411,9 +435,11 @@ class Tablero {
             ['   − salidas (de quien estaba dentro)', $q['salidas_validas'], 'entero'],
             ['   − sin salida al reinicio de las ' . $q['reinicio'] . ' (ya no cuentan)', $q['vencidas'], 'entero'],
             ['   = dentro al corte (' . self::fechaHora($q['corte']) . ')', $q['fin'], 'entero'],
-            ['   entradas repetidas (ya estaba dentro: no cambian el cuadre)', $q['entradas_repetidas'], 'entero'],
+            ['NO CUENTAN (aparte, para revisar):', '', 'texto'],
+            ['   entradas repetidas (varias seguidas sin salida: cuenta la última)', $q['entradas_repetidas'], 'entero'],
             ['   salidas de quien entró antes del reinicio (cuentan en su turno, p. ej. de noche)', $q['salidas_turno_anterior'], 'entero'],
-            ['   salidas sin entrada registrada (no cambian el cuadre)', $q['salidas_sin_entrada'], 'entero'],
+            ['   salidas sin entrada registrada (no se restan: no se contó su entrada)', $q['salidas_sin_entrada'], 'entero'],
+            ['   lecturas sin ID (sólo foto)', $q['sin_id'], 'entero'],
             ['Entradas', $k['entradas'], 'entero'],
             ['   del turno de día', $k['entradas_dia'], 'entero'],
             ['   del turno de noche', $k['entradas_noche'], 'entero'],
@@ -536,7 +562,8 @@ class Tablero {
                            . ($k['dentro_aviso'] ? $k['dentro_aviso'] . ' cumplen ' . ControlAccesos::HORAS_LIMITE . ' h en menos de ' . ControlAccesos::HORAS_AVISO . ' h' : ''), ' ·')
                        : ($k['dentro_revisar'] ? $k['dentro_revisar'] . ' con más de 13 h dentro' : 'Al corte del reporte'))
                . $caja('Entradas', $n($k['entradas']), 'Turno de día ' . $n($k['entradas_dia']) . ' · noche ' . $n($k['entradas_noche']))
-               . $caja('Salidas', $n($k['salidas']), $k['sin_salida'] ? $n($k['sin_salida']) . ($k['sin_salida'] === 1 ? ' entrada' : ' entradas') . ' sin salida registrada' : 'En el periodo')
+               . $caja('Salidas', $n($k['salidas']), ($q0 = $c['cuadre']['salidas_sin_entrada'] + $c['cuadre']['salidas_turno_anterior'])
+                       ? $n($q0) . ' sin entrada en el periodo: van aparte' : ($k['sin_salida'] ? $n($k['sin_salida']) . ($k['sin_salida'] === 1 ? ' entrada' : ' entradas') . ' sin salida registrada' : 'En el periodo'))
                . '</tr><tr>'
                . $caja('Personas distintas', $n($k['personas']), 'Por su ID de credencial')
                . $caja('Horas en planta', $n(round($k['minutos'] / 60)), 'Promedio por visita: ' . self::hm($k['promedio_min']))
@@ -553,10 +580,10 @@ class Tablero {
                . $paso($q['inicio'], 'Dentro al ' . self::fechaHora($q['desde'])) . $op('+') . $paso($q['entradas_validas'], 'Entradas')
                . $op('−') . $paso($q['salidas_validas'], 'Salidas') . ($q['vencidas'] ? $op('−') . $paso($q['vencidas'], 'Sin salida al reinicio (' . $q['reinicio'] . ')') : '')
                . $op('=') . $paso($q['fin'], 'Dentro al ' . self::fechaHora($q['corte']), true) . '</tr></table>'
-               . '<p class="nota">Entradas leídas: ' . $n($q['entradas']) . ($q['entradas_repetidas'] ? ' (' . $n($q['entradas_repetidas']) . ' de quien ya estaba dentro: leída dos veces, no cambia a cuántos hay dentro)' : '')
+               . '<p class="nota">Entradas leídas: ' . $n($q['entradas']) . ($q['entradas_repetidas'] ? ' (' . $n($q['entradas_repetidas']) . ' repetidas no cuentan: a quien se le leyó la entrada varias veces sin salida le cuenta sólo la última)' : '')
                . '. Salidas leídas: ' . $n($q['salidas'])
                . ($q['salidas_turno_anterior'] ? ' (' . $n($q['salidas_turno_anterior']) . ' de quien entró antes del reinicio de las ' . $q['reinicio'] . ': cuentan en su turno)' : '')
-               . ($q['salidas_sin_entrada'] ? ' (' . $n($q['salidas_sin_entrada']) . ' de quien no tenía entrada registrada)' : '') . '.'
+               . ($q['salidas_sin_entrada'] ? ' (' . $n($q['salidas_sin_entrada']) . ' sin entrada registrada: no se restan, porque no se contó su entrada)' : '') . '.'
                . ($q['vencidas'] ? ' ' . $n($q['vencidas']) . ' no registraron su salida antes del reinicio de las ' . $q['reinicio'] . ': ya no cuentan como dentro.' : '')
                . ($q['sin_id'] ? ' ' . $n($q['sin_id']) . ' lecturas sin ID (sólo foto) no entran en el cuadre.' : '') . '</p>';
 

@@ -82,7 +82,7 @@ r = await get('LISTAR_ACCESOS', 'tok-punto2', { turnos: '2026-11-26-D', disposit
 r = await get('LISTAR_ACCESOS', 'tok-admin', { turnos: '2026-11-26-D,2026-11-26-N', limite: 200 });
 const usuarios = [...new Set(r.registros.map(x => x.usuario))].sort().join(',');
 ok(usuarios === 'noche1,noche2,punto1,punto2,punto3', 'Administración ve lo de todos los guardias: ' + usuarios);
-ok(r.totales['2026-11-26-D'].entrada === 17 && r.totales['2026-11-26-D'].salida === 18, 'turno de día del 26: ' + JSON.stringify(r.totales['2026-11-26-D']));
+ok(r.totales['2026-11-26-D'].entrada === 17 && r.totales['2026-11-26-D'].salida === 17 && r.totales['2026-11-26-D'].sin_entrada === 1, 'turno de día del 26 (la salida de 00702 a las 20:40 no tiene entrada: va aparte): ' + JSON.stringify(r.totales['2026-11-26-D']));
 r = await get('SESION', 'tok-noche1');
 ok(r.turno === 'N', 'SESION dice el turno de la cuenta');
 
