@@ -58,7 +58,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `omitidos.html` | **Días omitidos** (sólo ADMIN): los días con registros de los últimos 60 (cuántos, de qué hora a qué hora, con qué cuentas) para reconocer los de **prueba**; omitir un día completo o unas horas (antes dice cuánto se deja de contar; **hoy sólo hasta ahora**), volver a contar e historial. |
 | `api/Omitidos.php` | Tabla `accesos_omitidos` (desde, hasta, motivo, quién; volver a contar = `activo` 0). **No borra nada:** `Omitidos::fuera($pdo, 'col')` es la condición SQL que deja fuera lo leído (`capturado`) en un periodo omitido y va en **todas** las consultas que cuentan: turnos y su PDF, `listar` (totales y numeración), En planta, movimientos por ID, incidencias, tablero y sus descargas, IDs fuera de la base, entrada abierta. **No** se filtra `ACCESOS_EXISTEN` ni la búsqueda por uid (la cola del teléfono). Acciones `OMITIDOS_LISTAR`, `OMITIR` (sin `aplicar` sólo revisa), `OMITIDO_QUITAR`. |
 | `api/lib/xlsx_lector.php` | Lee .xlsx (abre el ZIP con zlib, sin extensión zip) y .csv (también los de Excel en Windows); regresa los renglones con su número de Excel. |
-| `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. `digitosId` 5 y `minDigitos` 5: el ID impreso trae 5 dígitos (corrige las rayas de la impresora y nunca toma un pedazo del número). `appMinima`: versión de la app desde la que el lector trae lo último (la caseta y el servicio médico piden instalar la nueva si `disponible().version` es menor). |
+| `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). `camara`: con cuál empieza el lector, **frontal** (la que se usa) o trasera. `digitosId` 5 y `minDigitos` 5: el ID impreso trae 5 dígitos (corrige las rayas de la impresora y nunca toma un pedazo del número). `subirFotos` (false: la foto de la credencial se queda en el teléfono) y `diasFotosLocales` (7). `appMinima`: versión de la app desde la que el lector trae lo último (la caseta y el servicio médico piden instalar la nueva si `disponible().version` es menor). |
 | `api/lib/qrcode.php` | Generador de códigos QR (lo usa la portada de la maqueta). |
 | `demo/` | **La maqueta** que hay que volver real: `control-accesos.html` (panel), `caseta.html` (guardia), `demo-datos.js` (datos ficticios y reglas), `index.html` (portada), `sala.php` (sincroniza la demo entre equipos). **Sólo Administración:** `solo-admin.js` regresa a su inicio a quien entre con otro perfil (sin sesión sí abre, para el teléfono que entra con el QR de la portada). |
 | `mobile/caseta/` | App Android «AVBA Control de Accesos» (Capacitor): abre `accesos.html` y agrega el lector nativo de la credencial (CameraX + ML Kit sin internet, `AnalizadorTarjeta.java` con sus pruebas). Cámara frontal o trasera según la regla `camara`; el botón «Cambiar cámara» pasa a la otra y el teléfono la recuerda mientras la regla no cambie. `esperaNombre` (0 con la base del personal): tras confirmar el ID no espera el nombre. **Lectura continua** (`continuo`, eventos `lectura`/`cerrado`, `mostrar`, `detener`; `disponible()` responde `continuo: true`): la cámara no se cierra, cada credencial se avisa a la página, la misma credencial frente a la cámara no se reenvía (6 s), muestra en grande lo que dice la página (o «Leída» si no contesta en 2.5 s), con tono; salir = mantener 3 s. |
@@ -140,9 +140,16 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
    entrada ni salida, ni en «En planta» ni en los PDF), misma cola sin señal, foto como
    evidencia, turno del reloj (sin el margen de 2 h). Sin credencial se reporta con el
    nombre. Administración ve una franja naranja con las nuevas y el historial por ID.
-7. **Foto de evidencia:** cada lectura guarda la foto de la credencial (sale de la misma
-   imagen en la que se leyó el ID). Las fotos viven en `uploads/accesos/` (protegida) y
-   se sirven sólo con sesión.
+7. **Foto de la credencial: sólo en el teléfono.** Cada lectura toma la foto de la credencial
+   (de la misma imagen en la que se leyó el ID), pero **no se sube**: al servidor sólo va la
+   información (ID, nombre de la base, hora, tipo). La foto se queda en el equipo (IndexedDB
+   `ca_accesos`, almacén `fotos`, `diasFotosLocales` días, luego se borra sola) y el guardia la
+   ve en su lista (`img[data-local]`, «foto guardada sólo en este equipo»). Lo mismo en las
+   incidencias. **Sí se suben:** la foto del pase de un **permiso** (referencia) y la de un
+   registro **sin ID ni nombre** (cámara del navegador: la foto es todo el registro).
+   `subeFoto(it)` en `accesos.html`; la regla `subirFotos: true` (en `api/accesos-tarjeta.json`)
+   vuelve a subirlas todas. Las fotos subidas viven en `uploads/accesos/` (protegida) y se
+   sirven sólo con sesión; los registros de antes conservan la suya.
 8. **Base del personal y permisos en la caseta:** el teléfono guarda una copia de la base
    (`ca_padron`, se actualiza al entrar, cada 5 min y al volver la señal) y funciona sin
    señal. Al leer: nombre de la base, sus permisos en la confirmación (dura 3.5 s si hay

@@ -574,10 +574,10 @@
      internet (la imagen no sale del equipo) y el registro queda guardado al
      instante, sin foto. En el navegador sigue la foto de la identificación. */
   var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
-  var REGLAS_TARJETA = { minDigitos: 5, maxDigitos: 12, longitud: 0, digitosId: 5, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal', repetirSeg: 120, appMinima: 0 };
+  var REGLAS_TARJETA = { minDigitos: 5, maxDigitos: 12, longitud: 0, digitosId: 5, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true, camara: 'frontal', repetirSeg: 120, appMinima: 0, subirFotos: false, diasFotosLocales: 7 };
   function mezclarReglas(g) {
     if (!g || typeof g !== 'object') return;
-    ['minDigitos', 'maxDigitos', 'longitud', 'digitosId', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara', 'repetirSeg', 'esperaNombre', 'appMinima'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+    ['minDigitos', 'maxDigitos', 'longitud', 'digitosId', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto', 'camara', 'repetirSeg', 'esperaNombre', 'appMinima', 'subirFotos', 'diasFotosLocales'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
   }
   /** Credenciales con rayas blancas de la impresora: la app anterior puede leer la raya como un dígito de
    *  más («0|0287» → «010287»). Si ese ID no está en la base, se prueba quitando un «1» o un dígito
@@ -620,7 +620,7 @@
       if (j && j.status === 'success' && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('ca_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
     }).catch(function () {});
     $('lbl-ent').textContent = $('lbl-sal').textContent = 'Leer tarjeta';
-    $('ayuda-lugar').textContent = 'Cada registro se guarda con el nombre, el ID y la foto de la credencial (evidencia), el punto de control y la hora.';
+    $('ayuda-lugar').textContent = 'Cada registro se guarda con el nombre, el ID, el punto de control y la hora. La foto de la credencial se queda sólo en este equipo.';
     // Los PDF se abren fuera de la app (en el visor del teléfono)
     document.addEventListener('click', function (ev) {
       var a = ev.target.closest && ev.target.closest('a[href*="descargar.php"]');
@@ -793,17 +793,21 @@
     if (dbProm) return dbProm;
     dbProm = new Promise(function (ok, mal) {
       if (!window.indexedDB) { mal(new Error('sin IndexedDB')); return; }
-      var r = indexedDB.open('ca_accesos', 1);
-      r.onupgradeneeded = function () { r.result.createObjectStore('cola', { keyPath: 'uid' }); };
+      var r = indexedDB.open('ca_accesos', 2);
+      r.onupgradeneeded = function () {
+        var d = r.result;
+        if (!d.objectStoreNames.contains('cola')) d.createObjectStore('cola', { keyPath: 'uid' });
+        if (!d.objectStoreNames.contains('fotos')) d.createObjectStore('fotos', { keyPath: 'uid' });   // fotos de credenciales: sólo en este equipo
+      };
       r.onsuccess = function () { ok(r.result); };
       r.onerror = function () { mal(r.error); };
     });
     return dbProm;
   }
-  function tx(modo, fn) {
+  function tx(modo, fn, almacen) {
     return db().then(function (d) {
       return new Promise(function (ok, mal) {
-        var t = d.transaction('cola', modo), st = t.objectStore('cola'), res, rq = fn(st);
+        var t = d.transaction(almacen || 'cola', modo), st = t.objectStore(almacen || 'cola'), res, rq = fn(st);
         if (rq) rq.onsuccess = function () { res = rq.result; };
         t.oncomplete = function () { ok(res); }; t.onerror = t.onabort = function () { mal(t.error); };
       });
@@ -826,6 +830,51 @@
   function ponerEnCola(it) { return tx('readwrite', function (st) { return st.put(it); }).then(leerCola); }
   function quitarDeCola(uid) { return tx('readwrite', function (st) { return st.delete(uid); }).then(leerCola); }
 
+  /* ── Fotos de las credenciales: sólo en este equipo ──
+     Al servidor se sube la información (ID, nombre, hora, tipo); la foto de la credencial de cada
+     entrada, salida o incidencia se queda en el teléfono (diasFotosLocales días) para consultarla
+     aquí. Sí se suben: la foto del pase de un permiso (referencia) y la de un registro sin ID
+     (tomado con la cámara del navegador: la foto es todo el registro). Regla subirFotos: true
+     vuelve a subirlas todas. */
+  function subeFoto(it) { return esPermiso(it) || !!REGLAS_TARJETA.subirFotos || (!it.codigo && !it.persona); }
+  var fotosLocales = {};                           // uid → miniatura
+  function guardarFotoLocal(it) {
+    var f = { uid: it.uid, creado: Date.now(), capturado: it.capturado, tipo: it.tipo, codigo: it.codigo || '', persona: it.persona || '',
+              mini: it.mini || '', datos: it.datos, mime: it.mime || 'image/jpeg' };
+    fotosLocales[it.uid] = f.mini;
+    return tx('readwrite', function (st) { return st.put(f); }, 'fotos').catch(function () {});
+  }
+  function fotoLocal(uid) { return tx('readonly', function (st) { return st.get(uid); }, 'fotos').catch(function () { return null; }); }
+  /* Carga las miniaturas y borra las fotos de más de diasFotosLocales días */
+  function cargarFotosLocales() {
+    var limite = Date.now() - Math.max(1, +REGLAS_TARJETA.diasFotosLocales || 7) * 86400000;
+    return tx('readwrite', function (st) {
+      var rq = st.openCursor();
+      rq.onsuccess = function () {
+        var c = rq.result; if (!c) return;
+        if ((c.value.creado || 0) < limite) c.delete(); else fotosLocales[c.value.uid] = c.value.mini || '';
+        c.continue();
+      };
+    }, 'fotos').catch(function () {});
+  }
+  function verFotoLocal(uid, pie) {
+    fotoLocal(uid).then(function (f) {
+      if (!f) { toast('La foto ya no está en este equipo.', true); return; }
+      var img = $('foto-grande');
+      if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); delete img.dataset.url; }
+      if (f.datos) { img.dataset.url = URL.createObjectURL(new Blob([f.datos], { type: f.mime || 'image/jpeg' })); img.src = img.dataset.url; }
+      else img.src = f.mini;
+      $('foto-pie').textContent = pie + ' · foto guardada sólo en este equipo';
+      $('v-foto').hidden = false;
+    });
+  }
+  /* La miniatura de un registro: la de este equipo, o la del servidor si es de antes (cuando se subían) */
+  function imgRegistro(x, atrServidor, urlServidor) {
+    if (fotosLocales[x.uid]) return '<img alt="" data-local="' + esc(x.uid) + '" src="' + esc(fotosLocales[x.uid]) + '">';
+    if (!x.con_foto) return '';
+    return '<img loading="lazy" alt="" ' + atrServidor + ' src="' + esc(urlServidor) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">';
+  }
+
   var enviando = null, espera = 0, tReintento = null, enviados = {};
   /* ¿El servidor ya lo tiene guardado? Se le pregunta después de cada envío:
      la foto sólo sale del equipo cuando el servidor confirma que la tiene. */
@@ -843,7 +892,7 @@
     ['uid', 'tipo', 'capturado', 'lugar', 'nota'].forEach(function (k) { fd.append(k, it[k] || ''); });
     if (it.codigo) { fd.append('codigo', it.codigo); fd.append('persona', it.persona || ''); fd.append('origen', it.origen || 'tarjeta'); }
     fd.append('dispositivo', EQUIPO.id); fd.append('dispositivo_desc', EQUIPO.desc);
-    if (it.datos) fd.append('foto', new Blob([it.datos], { type: it.mime || 'image/jpeg' }), it.uid + '.jpg');
+    if (it.datos && subeFoto(it)) fd.append('foto', new Blob([it.datos], { type: it.mime || 'image/jpeg' }), it.uid + '.jpg');
     if (esInc(it)) {                               // botón INCIDENCIA: misma cola, su propia acción
       fd.append('incidencia', it.incidencia); fd.append('detalle', it.detalle || '');
       if (!it.codigo) fd.append('persona', it.persona || '');
@@ -889,6 +938,7 @@
                 }
                 hubo++;
                 enviados[it.uid] = ya[it.uid];
+                if (it.datos && !subeFoto(it)) guardarFotoLocal(it);         // en cola de antes, con su foto: se queda aquí
                 if (esRegistro(it)) recienEnviados.push(resumen(it, ya[it.uid]));
                 if (esPermiso(it)) setTimeout(actualizarPadron, 300);     // la copia de la base trae el permiso ya guardado
                 recienEnviados = recienEnviados.slice(-50);
@@ -959,6 +1009,11 @@
             : esInc(it) ? 'Incidencia ' + it.capturado.slice(11, 16) + ' guardada (' + TIPOS_INC[it.incidencia] + ')'
             : (it.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + it.capturado.slice(11, 16) + ' guardada' + (it.persona ? ': ' + it.persona : '');
     it.cuenta = cuentaActual();
+    if (it.datos && !subeFoto(it)) {               // la foto de la credencial se queda en este equipo; al servidor sólo los datos
+      var conFoto = it;
+      it = Object.assign({}, it); delete it.datos; delete it.mime;
+      guardarFotoLocal(conFoto);
+    }
     if (sinCola) {                                 // sin almacenamiento local: se envía y se espera
       return enviarUno(it).then(function (r) {
         enviando = null;
@@ -1055,7 +1110,7 @@
       '<div class="n">' + esc(it.persona || (inc && !it.codigo ? 'Sin credencial' : 'Nombre no leído')) + '</div>' +
       '<div class="c">' + (it.codigo ? 'ID ' + esc(it.codigo) + ' · ' : '') + esc(it.capturado.slice(11, 16)) + '</div>' +
       avisosPersona(it.codigo) +
-      (it.mini ? '<img class="foto" alt="Foto de la credencial" src="' + esc(it.mini) + '"><div class="ev">Foto guardada como evidencia</div>' : '');
+      (it.mini ? '<img class="foto" alt="Foto de la credencial" src="' + esc(it.mini) + '"><div class="ev">' + (subeFoto(it) ? 'Foto guardada como evidencia' : 'Foto guardada en este equipo') + '</div>' : '');
     el.hidden = false;
     if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
     // Con permisos o fuera de la base, se queda más tiempo para leerlo
@@ -1296,8 +1351,7 @@
   }
   /* Tarjeta «Incidencias» de los turnos a la vista: lo que está en cola y lo del servidor */
   function filaInc(x, pendiente) {
-    var foto = x.mini ? '<img alt="" src="' + esc(x.mini) + '">'
-             : (x.con_foto ? '<img loading="lazy" alt="" data-inc="' + x.id + '" src="' + esc(urlFotoInc(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">' : '');
+    var foto = x.mini ? '<img alt="" src="' + esc(x.mini) + '">' : imgRegistro(x, 'data-inc="' + x.id + '"', urlFotoInc(x.id, true));
     var estado = pendiente ? (x.error ? ' <span class="badge rech">No se aceptó</span>' : enviando === x.uid ? ' <span class="badge pend">Enviando…</span>' : ' <span class="badge cola">En cola</span>') : '';
     var id = !x.codigo ? '' : CASETA ? ' · <span>' + esc(x.codigo) + '</span>'
            : ' · <button type="button" class="ver-id" data-persona="' + esc(x.codigo) + '" title="Ver sus entradas, salidas e incidencias">' + esc(x.codigo) + '</button>';
@@ -1361,6 +1415,11 @@
       api('INCIDENCIA_ELIMINAR', { id: +t.dataset.borrarInc }).then(function (r) {
         if (r.status !== 'success') throw new Error(r.message); toast(r.message); cargar(true);
       }).catch(function (e) { toast(e.message || 'No se pudo eliminar.', true); });
+      return;
+    }
+    if ((t = ev.target.closest('img[data-local]'))) {
+      var xi = (datos.incidencias || []).filter(function (r) { return r.uid === t.dataset.local; })[0] || {};
+      verFotoLocal(t.dataset.local, 'INCIDENCIA · ' + (xi.tipo_nombre || '') + ' · ' + (xi.capturado || '').slice(11, 19));
       return;
     }
     if ((t = ev.target.closest('img[data-inc]'))) {
@@ -1697,7 +1756,7 @@
     }).join('');
     html += (datos.registros || []).filter(function (x) { return ks.indexOf(x.turno) >= 0; }).filter(porTipo).map(function (x) {
       var ent = x.tipo === 'entrada';
-      var foto = x.con_foto === false ? '' : '<img loading="lazy" alt="" data-id="' + x.id + '" src="' + esc(urlFoto(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">';
+      var foto = imgRegistro(x, 'data-id="' + x.id + '"', urlFoto(x.id, true));
       return '<li class="reg">' + cuadro(x, foto) +
         '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') + '</span>' + esc(hora(x)) + '</div>' + persona(x) +
         '<div class="l2">' + esc(nombrePunto(x.lugar)) + ' · ' + esc(x.nombre) + deTurno(x) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div>' +
@@ -1728,6 +1787,11 @@
       }).catch(function (e) { toast(e.message || 'No se pudo eliminar.', true); });
       return;
     }
+    if ((t = ev.target.closest('img[data-local]'))) {
+      var xl = (datos.registros || []).filter(function (r) { return r.uid === t.dataset.local; })[0] || {};
+      verFotoLocal(t.dataset.local, (xl.tipo === 'entrada' ? 'ENTRADA ' : 'SALIDA ') + String(xl.num || '').padStart(3, '0') + ' · ' + (xl.capturado || '').slice(11, 19));
+      return;
+    }
     if ((t = ev.target.closest('img[data-id]'))) {
       var x = (datos.registros || []).filter(function (r) { return String(r.id) === t.dataset.id; })[0] || {};
       $('foto-grande').src = urlFoto(t.dataset.id, false);
@@ -1735,7 +1799,11 @@
       $('v-foto').hidden = false;
     }
   });
-  $('foto-cerrar').onclick = function () { $('v-foto').hidden = true; $('foto-grande').removeAttribute('src'); };
+  $('foto-cerrar').onclick = function () {
+    var img = $('foto-grande');
+    $('v-foto').hidden = true; img.removeAttribute('src');
+    if (img.dataset.url) { URL.revokeObjectURL(img.dataset.url); delete img.dataset.url; }
+  };
   $('v-foto').addEventListener('click', function (ev) { if (ev.target === $('v-foto')) $('foto-cerrar').onclick(); });
 
   /* ══ En planta (administración) ══════════════════════════════════════
@@ -2231,7 +2299,7 @@
     $('sub-usuario').textContent = nombrePunto(p) + (MODO_FIJO ? ' · Equipo fijo de ' + MODO_FIJO : '') +
       (TURNO_CUENTA ? ' · Turno de ' + (TURNO_CUENTA === 'N' ? 'noche' : 'día') : '') + ' · ' + (ses.nombre || ses.usuario || '');
     $('ayuda-lugar').textContent = 'Donde registras. ' +
-      (LECTOR ? 'Cada registro se guarda con el nombre, el ID y la foto de la credencial (evidencia) y la hora.' : 'Cada registro se guarda con la hora en que se toma la foto.');
+      (LECTOR ? 'Cada registro se guarda con el nombre, el ID y la hora; la foto de la credencial se queda sólo en este equipo.' : 'Cada registro se guarda con la hora en que se toma la foto.');
   }
   function bloquear(msg) {
     bloqueado = !!msg;
@@ -2252,6 +2320,7 @@
 
   /* ── Arranque ── */
   // Lo que quedó en cola y el servidor ya tiene (se cortó la señal a medio envío) sale sin volver a subir la foto
+  cargarFotosLocales().then(function () { try { pintarLista(); } catch (e) {} });
   leerCola().then(function (c) {
     if (!c.length) return;
     return api('ACCESOS_EXISTEN', { uids: c.map(function (x) { return x.uid; }) }).then(function (r) {

@@ -71,8 +71,9 @@ const tarjetaInc = p => p.$$eval('#lista-inc li', l => l.map(x => x.innerText.re
   ok(hecho.vis && /INCIDENCIA REGISTRADA/.test(hecho.txt) && /Alcoholímetro positivo/.test(hecho.txt) && /incidencia/.test(hecho.clase), 'confirmación: «' + hecho.txt.slice(0, 80) + '»');
   await K.p.screenshot({ path: D + 'inc_hecho.png' });
   await K.p.waitForTimeout(3500);
-  ok(sql("SELECT CONCAT(tipo,'|',codigo,'|',lugar,'|',(foto<>''),'|',detalle) FROM accesos_incidencias") === 'ALCOHOLIMETRO|00287|ACCESO|1|Prueba positiva 0.4, se le negó el acceso',
-     'en el servidor: tipo, ID, punto, foto y descripción');
+  ok(sql("SELECT CONCAT(tipo,'|',codigo,'|',lugar,'|',(foto<>''),'|',detalle) FROM accesos_incidencias") === 'ALCOHOLIMETRO|00287|ACCESO|0|Prueba positiva 0.4, se le negó el acceso',
+     'en el servidor: tipo, ID, punto y descripción (la foto de la credencial no se sube)');
+  ok(await K.p.$$eval('#lista-inc img[data-local]', l => l.length) === 1, 'el guardia ve la foto en su teléfono');
   let filas = await tarjetaInc(K.p);
   ok(filas.length === 1 && /ALCOHOLÍMETRO POSITIVO/.test(filas[0]) && /RAMIRO ESTEBAN VILLARREAL DUARTE · 00287/.test(filas[0]), 'la tarjeta «Tus incidencias» la muestra: ' + (filas[0] || '').slice(0, 90));
   const tot = await K.p.$eval('#totales', e => e.innerText.replace(/\s+/g, ' '));
@@ -90,7 +91,7 @@ const tarjetaInc = p => p.$$eval('#lista-inc li', l => l.map(x => x.innerText.re
   ok(sql("SELECT COUNT(*) FROM accesos_incidencias WHERE tipo='CONDUCTA'") === '0', 'todavía no llega al servidor');
   await K.ctx.setOffline(false);
   await K.p.evaluate(() => window.dispatchEvent(new Event('online'))); await K.p.waitForTimeout(4000);
-  ok(sql("SELECT CONCAT(codigo,'|',(foto<>'')) FROM accesos_incidencias WHERE tipo='CONDUCTA'") === '00412|1', 'al volver la señal se envía (con su foto)');
+  ok(sql("SELECT CONCAT(codigo,'|',(foto<>'')) FROM accesos_incidencias WHERE tipo='CONDUCTA'") === '00412|0', 'al volver la señal se envía (la foto se queda en el teléfono)');
   filas = await tarjetaInc(K.p);
   ok(filas.length === 2 && !filas.some(t => /En cola/.test(t)), 'y la tarjeta ya no la marca en cola');
 
@@ -122,7 +123,7 @@ const tarjetaInc = p => p.$$eval('#lista-inc li', l => l.map(x => x.innerText.re
   await A.p.click('#lista-inc [data-persona="00287"]'); await A.p.waitForTimeout(1200);
   const per = await A.p.$eval('#per-inc', e => e.hidden ? '' : e.innerText.replace(/\s+/g, ' '));
   ok(/Incidencias \(1\)/.test(per) && /ALCOHOLÍMETRO POSITIVO/.test(per) && /negó el acceso/.test(per), 'historial del 00287: ' + per.slice(0, 90));
-  ok(await A.p.$$eval('#per-inc img[data-foto-inc]', l => l.length) === 1, 'con la foto de la credencial');
+  ok(await A.p.$$eval('#per-inc img[data-foto-inc]', l => l.length) === 0, 'sin la foto de la credencial (se quedó en el teléfono del guardia)');
   await A.p.screenshot({ path: D + 'inc_persona.png' });
   await A.p.click('#per-cerrar');
   // Borrar (Administración)
@@ -138,7 +139,7 @@ const tarjetaInc = p => p.$$eval('#lista-inc li', l => l.map(x => x.innerText.re
   ok(await N.p.isVisible('#v-inc') && await N.p.isVisible('#inc-img') && (await N.p.inputValue('#inc-id')) === '', 'navegador: la foto va a la ventana y el ID se escribe a mano');
   await N.p.fill('#inc-id', '287'); await N.p.click('#inc-tipos [data-v="PERSONA"]');
   await N.p.click('#inc-guardar'); await N.p.waitForTimeout(3500);
-  ok(sql("SELECT CONCAT(codigo,'|',origen,'|',(foto<>'')) FROM accesos_incidencias WHERE tipo='PERSONA'") === '287|manual|1', 'guardada con el ID escrito y la foto');
+  ok(sql("SELECT CONCAT(codigo,'|',origen,'|',(foto<>'')) FROM accesos_incidencias WHERE tipo='PERSONA'") === '287|manual|0', 'guardada con el ID escrito (la foto se queda en el equipo)');
   ok(!N.p.errores.length, 'sin errores de JavaScript (navegador)' + (N.p.errores.length ? ': ' + N.p.errores.join(' | ') : ''));
 
   await b.close();
