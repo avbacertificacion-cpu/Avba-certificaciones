@@ -85,7 +85,7 @@ try {
             'SESION', 'CAMBIAR_MI_CONTRASENA',
             'ACCESO_REGISTRAR', 'LISTAR_ACCESOS', 'LISTAR_ACCESOS_LUGARES', 'ACCESO_ELIMINAR',
             'ACCESO_INCIDENCIA', 'INCIDENCIA_ELIMINAR',
-            'ACCESOS_EXISTEN', 'ACCESOS_MI_PUNTO', 'ACCESOS_TARJETA_REGLAS',
+            'ACCESOS_EXISTEN', 'ACCESOS_MI_PUNTO', 'ACCESOS_TARJETA_REGLAS', 'ACCESOS_ALERTAS_16H',
             'PADRON_CAJA', 'PERMISO_AGREGAR', 'PERMISO_QUITAR',
         ], true)) {
         respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo puede registrar entradas y salidas.'], 403);
@@ -142,6 +142,7 @@ try {
         case 'ACCESOS_MI_PUNTO':       respuesta($ca->miPunto($datos, $usr));
         case 'ACCESOS_TARJETA_REGLAS': respuesta(ControlAccesos::reglasTarjeta());
         case 'ACCESOS_EN_PLANTA':      respuesta($ca->enPlanta($datos, $usr));
+        case 'ACCESOS_ALERTAS_16H':    respuesta($ca->alertas16($usr));
         case 'ACCESOS_PERSONA':        respuesta($ca->persona($datos, $usr));
         case 'ACCESOS_DAR_SALIDA':     respuesta($ca->darSalida($datos, $usr));
         case 'ACCESOS_PDF':            respuesta($ca->generarPdf($datos, $usr));

@@ -47,7 +47,7 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `js/destinos.js` | Pantalla de inicio de cada perfil y la clave de la sesión (`ca_sesion`). |
 | `accesos.html` | Módulo real que ya funcionaba en el Sistema de Gestión: pantalla del guardia (lee la credencial con la app, ENTRADA/SALIDA, cola sin señal, foto de evidencia) y del administrador (registros por turno, **En planta**, movimientos por ID, dar salida, incidencias, PDF). |
 | `api/ControlAccesos.php` | Lógica del servidor del módulo (registros, turnos, puntos y equipos, en planta, PDF con mPDF). |
-| `tablero.html` | **Tablero** (perfil CLIENTE; también PLANTA y ADMIN), con dos pestañas: **Accesos** y **Servicio médico** (`ca_tablero_vista`; ver `Medico.php`). Accesos: periodo (hoy, 7 y 30 días, mes, otras fechas; hasta 93 días), cifras, gráficas con Chart.js (`js/chart/`, colores validados: entradas azul `#257de0`, salidas naranja `#f47230`, tiempo dentro en escala de azules), «Ver datos» de cada gráfica, quién está dentro e incidencias. Descarga Excel y PDF (el PDF lleva las gráficas que dibuja la pantalla). |
+| `tablero.html` | **Tablero** (perfil CLIENTE; también PLANTA y ADMIN), con dos pestañas: **Accesos** y **Servicio médico** (`ca_tablero_vista`; ver `Medico.php`). Accesos: periodo (hoy, 7 y 30 días, mes, otras fechas; hasta 93 días), cifras, gráficas con Chart.js (`js/chart/`, colores validados: entradas azul `#257de0`, salidas naranja `#f47230`, tiempo dentro en escala de azules), «Ver datos» de cada gráfica, quién está dentro e incidencias. Descarga Excel y PDF (el PDF lleva las gráficas que dibuja la pantalla). **Turno de hoy (desde 06:00)** y horas en «Otras fechas» (`hora_desde`/`hora_hasta`; antes de las 06:00 el turno de hoy empezó ayer): el **corte** es el fin o ahora. **Cuadre** (`Tablero::cuadre`, con la regla de En planta): dentro al inicio + entradas − salidas − sin salida por más de 48 h = dentro al corte; aparte, entradas repetidas (ya estaba dentro), salidas sin entrada y lecturas sin ID. Las cifras de las otras pantallas cuentan distinto: la lista por turno usa el turno de cada guardia y sus márgenes de 2 h, y «Hoy» empieza a las 00:00. |
 | `api/Tablero.php` | Cálculos del tablero (acciones `TABLERO`, `TABLERO_EXCEL`, `TABLERO_PDF`): entradas, salidas, personas por ID, visitas (entrada con su salida; más de 24 h no cuenta en horas), personas dentro hora por hora o máximo por día, tiempo dentro, más horas, incidencias. Archivos en `uploads/accesos/reportes/` (se borran al día). |
 | `api/lib/xlsx.php` | Excel (.xlsx) propio, sin librerías ni extensión zip: hojas con títulos fijos, filtros, fechas y el ID como texto. |
 | `personal.html` | **Personal y permisos** (ADMIN y PLANTA): la base de IDs y nombres (buscar, agregar, cambiar —cambiar el ID se lleva sus permisos—, quitar), **cargar Excel** (revisa primero: columnas reconocidas o elegidas a mano, nuevos, con cambios, renglones con problema —sin ID, sin nombre, un ID sin número (un nombre en la columna del ID) o el mismo ID con dos personas distintas: no se cargan—; el mismo ID con la misma persona queda el último renglón; no quita a nadie), descargar Excel, IDs leídos en la caseta que no están en la base, y **permisos** por ID con checklist (herramienta, celular, computadora, otro), foto del pase y/o datos del equipo y vigencia. `personal.html?id=287` abre a esa persona. |
@@ -172,6 +172,12 @@ rechaza todo lo demás y `descargar.php` no le da nada). Cada guardia tiene su *
    de `repetirSeg` (120 s, en `api/accesos-tarjeta.json`): «YA REGISTRADA» en amarillo. A la
    app le manda `mostrar` (verde entrada, azul salida, amarillo con permiso vencido o ID
    fuera de la base). La app vieja (sin `continuo`) pide instalar la nueva y deja los botones.
+10. **Aviso de las 16 h en planta** (`ControlAccesos::HORAS_LIMITE` 16, `HORAS_AVISO` 2,
+   `alerta16`): quien cumple 16 h dentro en menos de 2 h sale con `alerta` «aviso» y quien ya
+   las cumplió con «limite» (con `limite`, la hora en que las cumple). Franja `#banda-16` en
+   `accesos.html` para la caseta y Administración (acción `ACCESOS_ALERTAS_16H`, permitida a la
+   caseta: sólo ID, nombre y horas; se revisa cada minuto); En planta los pone primero y
+   marcados; el tablero, su Excel y su PDF también.
 
 ## Cómo probar
 

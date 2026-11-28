@@ -54,6 +54,20 @@
   .kpi.hero .v{color:#fff}
   .estado{display:inline-flex;align-items:center;gap:4px;font-weight:700;color:var(--ambar)}
   .kpi.hero .estado{color:#ffd57a}
+  .cuadre{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:14px 16px;margin-bottom:12px}
+  .cuadre h2{font-size:15px;margin:0 0 8px}
+  .cuadre .ec{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px}
+  .cuadre .t{border:0;margin:0}
+  .cuadre .p{flex:1 1 110px;background:#f3f6fa;border-radius:10px;padding:8px 10px;min-width:0}
+  .cuadre .p b{display:block;font-size:22px;color:var(--marino)}
+  .cuadre .p span{font-size:12px;color:var(--sub);font-weight:600}
+  .cuadre .p em{font-style:normal;font-weight:800;color:var(--sub);margin-right:4px}
+  .cuadre .p.fin em{color:#fff}
+  .cuadre .p.fin{background:var(--marino)}.cuadre .p.fin b,.cuadre .p.fin span{color:#fff}
+  .cuadre ul{margin:10px 0 0;padding-left:18px;font-size:13px;color:var(--sub);line-height:1.5}
+  .lim{display:inline-block;border-radius:999px;padding:2px 8px;font-size:12px;font-weight:700;white-space:nowrap}
+  .lim.aviso{background:#FFF1D6;color:#8A5300}.lim.limite{background:#FCEBEB;color:#A32D2D}
+  .fechas .horas{display:flex;gap:8px;flex-wrap:wrap}
   .estado svg{width:14px;height:14px}
 
   /* Gráficas */
@@ -111,6 +125,7 @@
   </div>
   <section class="card filtros" aria-label="Periodo y descargas">
     <div class="periodos" id="periodos" role="group" aria-label="Periodo">
+      <button type="button" data-p="turno">Turno de hoy (desde 06:00)</button>
       <button type="button" data-p="hoy">Hoy</button>
       <button type="button" data-p="7">7 días</button>
       <button type="button" data-p="30">30 días</button>
@@ -125,6 +140,7 @@
     <form class="fechas" id="fechas" hidden>
       <label>Desde <input type="date" id="desde" required></label>
       <label>Hasta <input type="date" id="hasta" required></label>
+      <span class="horas"><label>De las <input type="time" id="hdesde" value="00:00"></label><label>a las <input type="time" id="hhasta" value="23:59"></label></span>
       <button class="btn chico" type="submit">Ver</button>
       <small style="color:var(--sub);font-size:12px">Hasta 3 meses.</small>
     </form>
@@ -134,6 +150,7 @@
 
   <div id="v-accesos" role="tabpanel">
   <div class="kpis" id="kpis"></div>
+  <section class="cuadre" id="cuadre" hidden aria-label="Cuadre del periodo"></section>
 
   <div class="rejilla">
     <section class="card graf ancha" data-g="ocupacion">
@@ -266,21 +283,30 @@
   function aviso(html, tipo) { var m = $('msg'); m.innerHTML = html; m.className = 'aviso ' + (tipo || 'info'); m.hidden = !html; }
 
   /* ══ Periodo ══ */
-  var P = { p: '7', desde: '', hasta: '' };
+  var P = { p: '7', desde: '', hasta: '', hdesde: '', hhasta: '' };
   try { var g = JSON.parse(localStorage.getItem(CLAVE_PERIODO) || 'null'); if (g && g.p) P = g; } catch (e) {}
   function rango(p) {
     var h = new Date(), hoy = iso(h), menos = function (n) { var d = new Date(h); d.setDate(d.getDate() - n); return iso(d); };
     if (p === 'hoy') return [hoy, hoy];
+    if (p === 'turno') return [h.getHours() < 6 ? menos(1) : hoy, hoy];          // antes de las 06:00, el turno empezó ayer
     if (p === '30') return [menos(29), hoy];
     if (p === 'mes') return [iso(new Date(h.getFullYear(), h.getMonth(), 1)), hoy];
     if (p === 'mesant') return [iso(new Date(h.getFullYear(), h.getMonth() - 1, 1)), iso(new Date(h.getFullYear(), h.getMonth(), 0))];
     if (p === 'otro' && P.desde && P.hasta) return [P.desde, P.hasta];
     return [menos(6), hoy];
   }
+  /** Las horas del periodo: el turno de hoy desde las 06:00 hasta ahora; en otras fechas, las elegidas. */
+  function horas(p) {
+    if (p === 'turno') return ['06:00', ''];
+    if (p === 'otro') return [P.hdesde && P.hdesde !== '00:00' ? P.hdesde : '', P.hhasta && P.hhasta !== '23:59' ? P.hhasta : ''];
+    return ['', ''];
+  }
+  function qHoras(p) { var h = horas(p); return (h[0] ? '&hora_desde=' + h[0] : '') + (h[1] ? '&hora_hasta=' + h[1] : ''); }
   function marcar() {
     document.querySelectorAll('#periodos button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.p === P.p ? 'true' : 'false'); });
     $('fechas').hidden = P.p !== 'otro';
     var r = rango(P.p); $('desde').value = r[0]; $('hasta').value = r[1]; $('desde').max = $('hasta').max = iso(new Date());
+    $('hdesde').value = P.hdesde || '00:00'; $('hhasta').value = P.hhasta || '23:59';
   }
   $('periodos').addEventListener('click', function (ev) {
     var b = ev.target.closest('button[data-p]'); if (!b) return;
@@ -294,6 +320,7 @@
     ev.preventDefault();
     if (!$('desde').value || !$('hasta').value) return;
     P.desde = $('desde').value; P.hasta = $('hasta').value;
+    P.hdesde = $('hdesde').value || '00:00'; P.hhasta = $('hhasta').value || '23:59';
     cargar();
   });
 
@@ -513,12 +540,31 @@
     var k = d.kpis;
     var caja = function (l, v, s, hero) { return '<div class="kpi' + (hero ? ' hero' : '') + '"><div class="l">' + l + '</div><div class="v">' + v + '</div><div class="s">' + s + '</div></div>'; };
     $('kpis').innerHTML =
-      caja('Dentro de la planta ahora', num(k.dentro), k.dentro_revisar ? '<span class="estado">' + ICO_AVISO + num(k.dentro_revisar) + ' con más de 13 h dentro</span>' : 'Al ' + fechaHora(d.generado), true) +
+      caja(d.corte.slice(0, 16) >= d.generado.slice(0, 16) ? 'Dentro de la planta ahora' : 'Dentro de la planta a las ' + d.corte.slice(11, 16), num(k.dentro),
+           k.dentro_limite || k.dentro_aviso ? '<span class="estado">' + ICO_AVISO + [k.dentro_limite ? num(k.dentro_limite) + ' con ' + d.horas_limite + ' h o más' : '',
+             k.dentro_aviso ? num(k.dentro_aviso) + ' cumplen ' + d.horas_limite + ' h en menos de ' + d.horas_aviso + ' h' : ''].filter(Boolean).join(' · ') + '</span>'
+           : k.dentro_revisar ? '<span class="estado">' + ICO_AVISO + num(k.dentro_revisar) + ' con más de 13 h dentro</span>' : 'Al ' + fechaHora(d.corte), true) +
       caja('Entradas', num(k.entradas), 'Turno de día ' + num(k.entradas_dia) + ' · noche ' + num(k.entradas_noche)) +
       caja('Salidas', num(k.salidas), k.sin_salida ? num(k.sin_salida) + (k.sin_salida === 1 ? ' entrada sin salida registrada' : ' entradas sin salida registrada') : 'Todas las entradas con su salida') +
       caja('Personas distintas', num(k.personas), 'Por el ID de su credencial') +
       caja('Horas en planta', num(Math.round(k.minutos / 60)), k.visitas ? 'Promedio por visita: ' + hm(k.promedio_min) : 'Sin visitas completas') +
       caja('Incidencias', num(k.incidencias), 'Reportadas en la caseta');
+    pintarCuadre(d);
+  }
+  /* El cuadre: dentro al inicio + entradas − salidas − sin salida por más de 48 h = dentro al corte */
+  function pintarCuadre(d) {
+    var c = d.cuadre; if (!c) { $('cuadre').hidden = true; return; }
+    var h = function (s) { return s.slice(0, 10) === d.desde && d.desde === d.hasta ? s.slice(11, 16) : fechaHora(s); };
+    var p = function (op, v, l, cls) { return '<div class="p' + (cls ? ' ' + cls : '') + '"><b>' + (op ? '<em>' + op + '</em>' : '') + num(v) + '</b><span>' + l + '</span></div>'; };
+    var notas = [];
+    notas.push('Entradas leídas: ' + num(c.entradas) + (c.entradas_repetidas ? ' · ' + num(c.entradas_repetidas) + ' de quien ya estaba dentro (leída dos veces): no cambian a cuántos hay dentro' : ''));
+    notas.push('Salidas leídas: ' + num(c.salidas) + (c.salidas_sin_entrada ? ' · ' + num(c.salidas_sin_entrada) + ' de quien no tenía entrada registrada (no pasó su credencial al entrar)' : ''));
+    if (c.vencidas) notas.push(num(c.vencidas) + ' llevaban más de 48 h sin registrar su salida: ya no cuentan como dentro');
+    if (c.sin_id) notas.push(num(c.sin_id) + ' lecturas sin ID (sólo foto) no entran en el cuadre');
+    $('cuadre').innerHTML = '<h2>Cuadre del periodo</h2><div class="ec">' +
+      p('', c.inicio, 'Dentro a las ' + h(c.desde)) + p('+', c.entradas_validas, 'Entradas') + p('−', c.salidas_validas, 'Salidas') +
+      (c.vencidas ? p('−', c.vencidas, 'Sin salida (+48 h)') : '') + p('=', c.fin, 'Dentro a las ' + h(c.corte), 'fin') + '</div><ul>' + notas.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>';
+    $('cuadre').hidden = false;
   }
   var DENTRO = [];
   function pintarPlanta() {
@@ -526,12 +572,14 @@
     var l = DENTRO.filter(function (x) { return !q || (x.nombre || '').toUpperCase().indexOf(q) >= 0 || String(x.id).replace(/^0+/, '').indexOf(qId) === 0; });
     $('n-planta').textContent = num(DENTRO.length) + (DENTRO.length === 1 ? ' persona' : ' personas');
     $('t-planta').innerHTML = !DENTRO.length ? '<p class="pie">Nadie aparece dentro de la planta en este momento.</p>' : !l.length ? '<p class="pie">Nadie coincide con «' + esc(q) + '».</p>' :
-      '<table class="t"><thead><tr><th>ID</th><th>Nombre</th><th>Entrada</th><th class="n">Dentro</th></tr></thead><tbody>' +
+      '<table class="t"><thead><tr><th>ID</th><th>Nombre</th><th>Entrada</th><th class="n">Dentro</th><th>Cumple ' + ((DATOS && DATOS.horas_limite) || 16) + ' h</th></tr></thead><tbody>' +
       l.map(function (x) {
         var hoy = x.entrada.slice(0, 10) === iso(new Date());
         return '<tr><td class="id">' + esc(x.id) + '</td><td>' + esc(x.nombre || 'Sin nombre leído') + '</td><td style="white-space:nowrap">' +
           esc(hoy ? x.entrada.slice(11, 16) : fechaHora(x.entrada)) + '</td><td class="n">' +
-          (x.revisar ? '<span class="estado" title="Más de 13 h dentro: ¿salió sin registrar?">' + ICO_AVISO + esc(hm(x.minutos)) + '</span>' : esc(hm(x.minutos))) + '</td></tr>';
+          (x.revisar ? '<span class="estado" title="Más de 13 h dentro: ¿salió sin registrar?">' + ICO_AVISO + esc(hm(x.minutos)) + '</span>' : esc(hm(x.minutos))) + '</td><td>' +
+          (x.alerta === 'limite' ? '<span class="lim limite">Ya cumplió (' + esc(fechaHora(x.limite)) + ')</span>'
+           : x.alerta === 'aviso' ? '<span class="lim aviso">A las ' + esc(x.limite.slice(11, 16)) + '</span>' : esc(x.limite ? fechaHora(x.limite) : '')) + '</td></tr>';
       }).join('') + '</tbody></table>';
   }
   $('buscar-planta').addEventListener('input', pintarPlanta);
@@ -611,12 +659,15 @@
     try { localStorage.setItem(CLAVE_PERIODO, JSON.stringify(P)); } catch (e) {}
     $('todo').classList.add('cargando');
     var medico = VISTA === 'medico';
-    return api((medico ? 'MEDICO_TABLERO' : 'TABLERO') + '&desde=' + r[0] + '&hasta=' + r[1]).then(function (d) {
+    return api((medico ? 'MEDICO_TABLERO' : 'TABLERO') + '&desde=' + r[0] + '&hasta=' + r[1] + (medico ? '' : qHoras(P.p))).then(function (d) {
       if (yo !== pedido) return;
       $('todo').classList.remove('cargando');
       if (!d || d.status !== 'success') { aviso(esc((d && d.message) || 'No se pudo cargar el tablero.'), 'mal'); return; }
       if ($('msg').classList.contains('mal')) aviso('');
-      $('periodo-txt').innerHTML = '<b>' + (d.desde === d.hasta ? fechaLarga(d.desde) : 'Del ' + fechaLarga(d.desde) + ' al ' + fechaLarga(d.hasta)) + '</b>' +
+      var conHoras = !medico && (d.hora_desde !== '00:00' || d.hora_hasta !== '23:59' || P.p === 'turno');
+      $('periodo-txt').innerHTML = '<b>' + (conHoras ? (d.desde === d.hasta ? fechaLarga(d.desde) + ', de las ' + d.hora_desde + ' a las ' + d.corte.slice(11, 16)
+                                                                       : 'Del ' + fechaLarga(d.desde) + ' ' + d.hora_desde + ' al ' + fechaLarga(d.corte.slice(0, 10)) + ' ' + d.corte.slice(11, 16))
+                                             : (d.desde === d.hasta ? fechaLarga(d.desde) : 'Del ' + fechaLarga(d.desde) + ' al ' + fechaLarga(d.hasta))) + '</b>' +
         '<span>' + d.dias + (d.dias === 1 ? ' día' : ' días') + '</span><span>Actualizado ' + d.generado.slice(11, 16) + '</span>';
       if (medico) {
         DATOS_M = d;
@@ -669,6 +720,7 @@
     boton.disabled = true; boton.textContent = 'Preparando…';
     aviso('Preparando el ' + nombre + '…', 'info');
     var payload = { desde: D.desde, hasta: D.hasta };
+    if (VISTA !== 'medico') { var hh = horas(P.p); if (hh[0]) payload.hora_desde = hh[0]; if (hh[1]) payload.hora_hasta = hh[1]; }
     var mas = extra ? extra() : {};
     for (var k in mas) payload[k] = mas[k];
     api(accion, payload).then(function (r) {

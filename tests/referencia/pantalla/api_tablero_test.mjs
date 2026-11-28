@@ -124,11 +124,11 @@ print(json.dumps({'hojas': wb.sheetnames, 'movs': len(filas), 'id': filas[0][0],
                   'personas': wb['Por persona'].max_row - 5, 'inc': wb['Incidencias'].max_row - 5}))
 EOF`).toString();
 const x = JSON.parse(py);
-ok(x.hojas.join(',') === 'Resumen,Por día,Movimientos,Por persona,Por hora,Tiempo dentro,Incidencias,En planta ahora', 'hojas: ' + x.hojas.join(', '));
+ok(x.hojas.join(',') === 'Resumen,Por día,Movimientos,Por persona,Por hora,Tiempo dentro,Incidencias,En planta al corte', 'hojas: ' + x.hojas.join(', '));
 ok(x.movs === 5 && x.id === '00287' && x.tipoId === 'str', `movimientos: ${x.movs}, el ID va como texto con sus ceros (${x.id})`);
 ok(x.entrada === `${dia(3)} 06:00:00` && x.horas === 12.5, `fecha y hora de Excel (${x.entrada}) y horas en número (${x.horas})`);
 ok(x.obs.includes('Sin salida registrada') && x.obs.includes('Dentro de la planta'), 'observaciones: ' + x.obs.join(' | '));
-ok(x.resumen[0][0] === 'Dentro de la planta ahora' && x.resumen[0][1] === '1', 'resumen: ' + JSON.stringify(x.resumen[0]));
+ok(/^Dentro de la planta al corte \(/.test(x.resumen[0][0]) && x.resumen[0][1] === '1', 'resumen: ' + JSON.stringify(x.resumen[0]));
 ok(x.personas === 4 && x.inc === 1, `por persona ${x.personas}, incidencias ${x.inc}`);
 
 // ── 4) PDF ──

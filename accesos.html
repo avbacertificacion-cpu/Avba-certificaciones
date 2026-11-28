@@ -163,6 +163,14 @@
   .reg.planta:hover,.reg.planta:focus{background:#f5f8fc;outline:none}
   .reg.planta .nom{font-size:14.5px;overflow-wrap:anywhere}
   .reg.planta .nom.sin{color:var(--texto-hint);font-weight:600}
+  .banda-16{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;cursor:pointer;font-family:inherit;
+    background:#FFF1D6;color:#7A4A00;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13.5px;line-height:1.45}
+  .banda-16.rojo{background:var(--rojo-light);color:var(--rojo)}
+  .banda-16 svg{width:26px;height:26px;flex-shrink:0;margin-top:1px}
+  .banda-16 ul{margin:4px 0 0;padding-left:16px}
+  .banda-16 small{display:block;opacity:.85;font-size:12px;margin-top:4px}
+  .aviso-16{font-size:12px;font-weight:700;margin-top:5px;padding:4px 8px;border-radius:8px;display:inline-block;background:#FFF1D6;color:#7A4A00}
+  .aviso-16.rojo{background:var(--rojo-light);color:var(--rojo)}
   .aviso-13{font-size:12px;color:var(--ambar);background:var(--ambar-light);font-weight:700;margin-top:5px;padding:4px 8px;border-radius:8px;display:inline-block}
   .ver-id{border:0;background:none;padding:0;font:inherit;font-weight:800;color:var(--azul);text-decoration:underline;cursor:pointer;white-space:nowrap}
   .per-cab{display:flex;align-items:center;gap:12px;margin-bottom:6px}
@@ -312,6 +320,9 @@
   <button type="button" class="banda-inc" id="banda-inc" hidden role="alert">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
     <span><b id="banda-inc-txt"></b><small>Toca para verla</small></span></button>
+  <button type="button" class="banda-16" id="banda-16" hidden role="alert">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+    <span><b id="banda-16-txt"></b><ul id="banda-16-lista"></ul><small id="banda-16-pie"></small></span></button>
   <div class="banda" id="banda-sesion" hidden>
     <b>Tu sesión venció.</b> Lo capturado sigue guardado en este equipo y se enviará en cuanto vuelvas a entrar.
     <br><a class="btn prim" href="login.html?volver=accesos.html">Iniciar sesión</a>
@@ -1840,6 +1851,42 @@
                              : 'Sin señal: la lista se actualiza al volver la señal.';
     }).then(function () { if (mio === pedidoPlanta && modoPlanta) pintarPlanta(); });
   }
+  /* ══ Aviso de las 16 h en planta ══════════════════════════════════════
+     Quien cumple 16 h dentro de la planta en las próximas 2 h (o ya las cumplió) sale en una franja
+     arriba, en la caseta y en Administración. Se revisa cada minuto. */
+  var HORAS_LIMITE = 16, alertas16 = [];
+  function revisar16() {
+    if (!enLinea() || document.hidden) return;
+    api('ACCESOS_ALERTAS_16H', {}, 'GET').then(function (r) {
+      if (!r || r.status !== 'success') return;
+      HORAS_LIMITE = r.horas_limite || 16;
+      alertas16 = r.personas || [];
+      pintar16(r.horas_aviso || 2);
+    }).catch(function () {});
+  }
+  function pintar16(aviso) {
+    var b = $('banda-16'), l = alertas16;
+    b.hidden = !l.length;
+    if (!l.length) return;
+    var ya = l.filter(function (x) { return x.alerta === 'limite'; }).length;
+    b.classList.toggle('rojo', ya > 0);
+    $('banda-16-txt').textContent = ya === l.length
+      ? (ya === 1 ? '1 persona ya cumplió ' : ya + ' personas ya cumplieron ') + HORAS_LIMITE + ' h en planta'
+      : ya ? (ya === 1 ? '1 persona ya cumplió ' : ya + ' personas ya cumplieron ') + HORAS_LIMITE + ' h en planta y ' + (l.length - ya) + ' ' + (l.length - ya === 1 ? 'las cumple' : 'las cumplen') + ' en menos de ' + aviso + ' h'
+      : (l.length === 1 ? '1 persona cumple ' : l.length + ' personas cumplen ') + HORAS_LIMITE + ' h en planta en menos de ' + aviso + ' h';
+    $('banda-16-lista').innerHTML = l.slice(0, 6).map(function (x) {
+      return '<li>' + esc(x.nombre || 'Nombre no leído') + ' · ID ' + esc(x.id) + ' · ' +
+        (x.alerta === 'limite' ? 'ya cumplió (' + esc(cuando(x.limite)) + ')' : 'a las ' + esc(cuando(x.limite))) + '</li>';
+    }).join('') + (l.length > 6 ? '<li>y ' + (l.length - 6) + ' más</li>' : '');
+    $('banda-16-pie').textContent = CASETA ? 'Avísale a tu supervisor o a Administración de la planta.' : 'Toca para ver En planta';
+  }
+  $('banda-16').onclick = function () {
+    if (CASETA || modoPlanta) return;
+    var b = $('f-planta'); if (b && !b.hidden) b.click();
+  };
+  revisar16();
+  setInterval(revisar16, 60000);
+  window.addEventListener('online', revisar16);
   function textoBusqueda(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim(); }
   function claveId(t) { var x = String(t || '').trim().toUpperCase(); return /^\d+$/.test(x) ? (x.replace(/^0+/, '') || '0') : x; }
   function duracion(min) {
@@ -1871,12 +1918,16 @@
       (planta.lugar ? ' (entraron por ' + nombrePunto(planta.lugar) + ')' : '') +
       (q && planta.cargado ? ' · ' + numero(lista.length) + ' con «' + q + '»' : '');
     $('err-lista').hidden = !planta.err; $('err-lista').textContent = planta.err;
+    var rango = { limite: 0, aviso: 1 };
+    lista = lista.slice().sort(function (a, b) { return (rango[a.alerta] !== undefined ? rango[a.alerta] : 2) - (rango[b.alerta] !== undefined ? rango[b.alerta] : 2); });
     var html = lista.map(function (x) {
       return '<li class="reg planta" data-persona="' + esc(x.id) + '" tabindex="0" role="button" aria-label="Ver entradas y salidas de ' + esc(x.nombre || 'ID ' + x.id) + '">' +
         '<span class="id-azul">' + esc(x.id) + '</span>' +
         '<div class="info"><div class="l1 nom' + (x.nombre ? '' : ' sin') + '">' + esc(x.nombre || 'Nombre no leído') + '</div>' +
         '<div class="l2">Entró ' + esc(cuando(x.entrada)) + ' · ' + esc(nombrePunto(x.lugar)) + ' · <b>' + duracion(x.minutos + extra) + '</b> dentro</div>' +
-        (x.revisar ? '<div class="aviso-13">Más de 13 h dentro: ¿salió sin pasar su credencial?</div>' : '') +
+        (x.alerta === 'limite' ? '<div class="aviso-16 rojo">Ya cumplió ' + HORAS_LIMITE + ' h en planta (a las ' + esc(cuando(x.limite)) + ')</div>'
+         : x.alerta === 'aviso' ? '<div class="aviso-16">Cumple ' + HORAS_LIMITE + ' h en planta a las ' + esc(cuando(x.limite)) + '</div>'
+         : x.revisar ? '<div class="aviso-13">Más de 13 h dentro: ¿salió sin pasar su credencial?</div>' : '') +
         '</div></li>';
     }).join('');
     if (!html) {

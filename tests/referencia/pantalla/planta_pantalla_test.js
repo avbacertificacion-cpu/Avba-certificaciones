@@ -34,8 +34,9 @@ const filas = p => p.$$eval('#lista li.planta', l => l.map(x => x.innerText.repl
   let f = await filas(A.p);
   ok((await A.p.textContent('#planta-n')) === '4' && f.length === 4, 'cuatro personas en planta: ' + await A.p.textContent('#planta-n'));
   ok(!f.some(t => /00412|ANA SOFIA/.test(t)), 'quien ya salió (por otro punto) NO aparece');
-  ok(/^00316 PEDRO VEGA CRUZ Entró \d\d:\d\d · Punto de control 2 · 30 min dentro/.test(f[0]), 'la más reciente primero, con su ID: «' + f[0] + '»');
-  ok(f.some(t => /^00500 .*Más de 13 h dentro/.test(t)), 'quien lleva más de 13 h queda marcado');
+  ok(/^00500 .*Cumple 16 h en planta a las \d\d:\d\d/.test(f[0]) && /^00316 PEDRO VEGA CRUZ Entró \d\d:\d\d · Punto de control 2 · 30 min dentro/.test(f[1]),
+     'primero quien está por cumplir 16 h (15 h dentro), luego la más reciente, con su ID: «' + f[0] + '» · «' + f[1] + '»');
+  ok(f.some(t => /^00500 .*Cumple 16 h/.test(t)) && /cumple 16 h en planta en menos de 2 h/i.test(await A.p.textContent('#banda-16')), 'quien lleva 15 h queda marcado y sale la franja del aviso de 16 h');
   ok(await A.p.$eval('#lista li.planta .id-azul', e => getComputedStyle(e).backgroundColor) === 'rgb(29, 95, 168)', 'el ID va en azul, como en la credencial');
   await A.p.screenshot({ path: D + 'planta_tel.png' });
 

@@ -72,7 +72,14 @@ class Tablero {
         if (self::diasEntre($desde, $hasta) + 1 > self::DIAS_MAX) {
             return 'El periodo puede ser de hasta ' . self::DIAS_MAX . ' días (unos 3 meses). Para más tiempo, descarga un Excel por cada periodo.';
         }
-        return [$desde, $hasta];
+        // Horas (opcional): desde las hora_desde del primer día hasta las hora_hasta del último (el corte del
+        // turno: de las 06:00 a la hora en que se pide el reporte)
+        $hora = fn($h, string $omision): string => is_string($h) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $h) ? $h : $omision;
+        $hIni = $hora($p['hora_desde'] ?? null, '00:00');
+        $hFin = $hora($p['hora_hasta'] ?? null, '23:59');
+        if ($desde === $hasta && $hFin <= $hIni) return 'La hora final debe ser después de la hora inicial.';
+        if (strtotime($desde . ' ' . $hIni . ':00') > time()) return 'El periodo empieza a las ' . $hIni . ': todavía no hay datos.';
+        return [$desde, $hasta, $hIni, $hFin];
     }
     public static function masDias(string $f, int $n): string { return date('Y-m-d', strtotime($f . ' 12:00:00 ' . ($n >= 0 ? '+' : '') . $n . ' days')); }
     public static function diasEntre(string $a, string $b): int { return (int)round((strtotime($b . ' 12:00:00') - strtotime($a . ' 12:00:00')) / 86400); }
@@ -80,17 +87,19 @@ class Tablero {
     /* ── Cálculo ─────────────────────────────────────────────────────────── */
 
     /** Todo lo del periodo, con el detalle (movimientos y personas) para el Excel y el PDF. */
-    private function calcular(string $desde, string $hasta, array $usr): array {
+    private function calcular(string $desde, string $hasta, array $usr, string $hIni = '00:00', string $hFin = '23:59'): array {
         ControlAccesos::asegurarTabla($this->pdo);
         ControlAccesos::asegurarIncidencias($this->pdo);
         $ahora = time();
-        $tIni = strtotime($desde . ' 00:00:00');
-        $tFin = strtotime($hasta . ' 23:59:59');
+        $tIni = strtotime($desde . ' ' . $hIni . ':00');
+        $tFin = strtotime($hasta . ' ' . $hFin . ($hFin === '23:59' ? ':59' : ':00'));
         $ini = date('Y-m-d H:i:s', $tIni);
         $fin = date('Y-m-d H:i:s', $tFin);
-        // Con margen a los lados, para juntar entradas y salidas que cruzan el principio o el fin
+        $corte = min($tFin, $ahora);                                       // el momento del reporte: el fin, o ahora
+        // Con margen a los lados, para juntar entradas y salidas que cruzan el principio o el fin; hacia atrás,
+        // lo que revisa «En planta» (48 h), para saber quién estaba dentro al empezar
         $margen = ControlAccesos::HORAS_JORNADA_MAX * 3600;
-        $a = date('Y-m-d H:i:s', $tIni - $margen);
+        $a = date('Y-m-d H:i:s', $tIni - max($margen, ControlAccesos::HORAS_EN_PLANTA * 3600));
         $b = date('Y-m-d H:i:s', $tFin + $margen);
         $cols = ControlAccesos::conTarjeta($this->pdo) ? 'nombre, codigo, origen' : "'' AS nombre, '' AS codigo, 'foto' AS origen";
         $st = $this->pdo->prepare(
@@ -131,12 +140,8 @@ class Tablero {
         }
         foreach ($idsDia as $d => $s) $dias[$d]['personas'] = count($s);
 
-        // Quién está dentro ahora (lo mismo que «En planta»)
-        $enPlanta = (new ControlAccesos($this->pdo))->enPlanta([], $usr);
-        $dentro = array_map(fn($x) => [
-            'id' => $x['id'], 'nombre' => $x['nombre'], 'entrada' => $x['entrada'],
-            'minutos' => $x['minutos'], 'revisar' => $x['revisar'],
-        ], $enPlanta['personas'] ?? []);
+        // El cuadre del periodo y quién está dentro al corte (con la misma regla que «En planta»)
+        [$cuadre, $dentro] = self::cuadre($filas, $tIni, $corte);
         $idsDentro = [];
         foreach ($dentro as $x) $idsDentro[ControlAccesos::claveId((string)$x['id'])] = true;
 
@@ -219,9 +224,13 @@ class Tablero {
         }
 
         return [
-            'desde' => $desde, 'hasta' => $hasta, 'dias' => $nDias, 'generado' => date('Y-m-d H:i:s', $ahora),
+            'desde' => $desde, 'hasta' => $hasta, 'hora_desde' => $hIni, 'hora_hasta' => $hFin, 'corte' => date('Y-m-d H:i:s', $corte),
+            'dias' => $nDias, 'generado' => date('Y-m-d H:i:s', $ahora), 'cuadre' => $cuadre,
+            'horas_limite' => ControlAccesos::HORAS_LIMITE, 'horas_aviso' => ControlAccesos::HORAS_AVISO,
             'kpis' => [
                 'dentro' => count($dentro), 'dentro_revisar' => count(array_filter($dentro, fn($x) => $x['revisar'])),
+                'dentro_aviso' => count(array_filter($dentro, fn($x) => $x['alerta'] === 'aviso')),
+                'dentro_limite' => count(array_filter($dentro, fn($x) => $x['alerta'] === 'limite')),
                 'entradas' => $k['entradas'], 'salidas' => $k['salidas'], 'personas' => count($ids),
                 'entradas_dia' => $k['ent_dia'], 'entradas_noche' => $k['ent_noche'],
                 'visitas' => $visitas, 'minutos' => $minTotal, 'promedio_min' => $visitas ? (int)round($minTotal / $visitas) : 0,
@@ -238,6 +247,58 @@ class Tablero {
             'incidencias' => $incidencias,
             'en_planta' => $dentro,
         ];
+    }
+
+    /**
+     * El cuadre del periodo, con la regla de «En planta» (una persona está dentro si su última lectura, de las
+     * últimas 48 h, es una ENTRADA). Así los números siempre cuadran:
+     *     dentro al inicio + entradas − salidas − sin salida por más de 48 h = dentro al corte
+     * Las lecturas que no cambian nada se cuentan aparte: una ENTRADA de quien ya estaba dentro (repetida) y
+     * una SALIDA de quien no estaba dentro (sin entrada). Las lecturas sin ID no entran en el cuadre.
+     * @return array{0:array,1:array}  [cuadre, quién está dentro al corte]
+     */
+    public static function cuadre(array $filas, int $tIni, int $corte): array {
+        $ventana = ControlAccesos::HORAS_EN_PLANTA * 3600;
+        $c = ['inicio' => 0, 'entradas' => 0, 'entradas_validas' => 0, 'entradas_repetidas' => 0, 'salidas' => 0,
+              'salidas_validas' => 0, 'salidas_sin_entrada' => 0, 'vencidas' => 0, 'fin' => 0, 'sin_id' => 0,
+              'desde' => date('Y-m-d H:i:s', $tIni), 'corte' => date('Y-m-d H:i:s', $corte)];
+        $estado = []; $quien = [];                         // clave → hora de su entrada (está dentro) · [codigo, nombre]
+        $empezo = false;
+        foreach ($filas as $f) {
+            $t = strtotime((string)$f['capturado']);
+            if ($t > $corte) break;
+            if (!$empezo && $t >= $tIni) {                  // quién estaba dentro al empezar
+                $empezo = true;
+                foreach ($estado as $k => $e) if ($e >= $tIni - $ventana) $c['inicio']++;
+            }
+            if ($empezo && (string)$f['codigo'] === '') { $c['sin_id']++; $c[$f['tipo'] === 'salida' ? 'salidas' : 'entradas']++; continue; }
+            if ((string)$f['codigo'] === '') continue;
+            $k = ControlAccesos::claveId((string)$f['codigo']);
+            $quien[$k] = [array_merge($quien[$k][0] ?? [], [(string)$f['codigo']]), (string)$f['nombre'] !== '' ? (string)$f['nombre'] : ($quien[$k][1] ?? '')];
+            $esta = isset($estado[$k]) && $estado[$k] >= $t - $ventana;
+            if ($empezo && isset($estado[$k]) && !$esta && $estado[$k] + $ventana >= $tIni) $c['vencidas']++;   // lleva más de 48 h sin salida
+            if (!$esta) unset($estado[$k]);
+            if ($f['tipo'] === 'salida') {
+                if ($empezo) { $c['salidas']++; $c[$esta ? 'salidas_validas' : 'salidas_sin_entrada']++; }
+                unset($estado[$k]);
+            } else {
+                if ($empezo) { $c['entradas']++; $c[$esta ? 'entradas_repetidas' : 'entradas_validas']++; }
+                $estado[$k] = $t;                           // la última entrada (como «En planta»)
+            }
+        }
+        if (!$empezo) foreach ($estado as $k => $e) if ($e >= $tIni - $ventana) $c['inicio']++;
+        $lista = [];
+        foreach ($estado as $k => $e) {
+            if ($e >= $corte - $ventana) {
+                $min = max(0, (int)floor(($corte - $e) / 60));
+                $lista[] = ['id' => ControlAccesos::idMostrado($quien[$k][0]), 'nombre' => $quien[$k][1], 'entrada' => date('Y-m-d H:i:s', $e),
+                            'minutos' => $min, 'revisar' => $min > ControlAccesos::MINUTOS_REVISAR] + ControlAccesos::alerta16($e, $corte);
+            } elseif ($e + $ventana >= $tIni) $c['vencidas']++;
+        }
+        $c['fin'] = count($lista);
+        $orden = ['limite' => 0, 'aviso' => 1, '' => 2];                    // primero quien ya cumplió 16 h o está por cumplirlas
+        usort($lista, fn($x, $y) => [$orden[$x['alerta']], $y['entrada']] <=> [$orden[$y['alerta']], $x['entrada']]);
+        return [$c, $lista];
     }
 
     /** ¿Esa entrada es la última lectura de esa persona? (entonces sigue dentro) */
@@ -312,7 +373,7 @@ class Tablero {
     public function datos(array $p, array $usr): array {
         $per = self::periodo($p);
         if (is_string($per)) return ['status' => 'error', 'message' => $per];
-        $c = $this->calcular($per[0], $per[1], $usr);
+        $c = $this->calcular($per[0], $per[1], $usr, $per[2], $per[3]);
         return ['status' => 'success',
                 'top_personas' => array_slice(array_values(array_filter($c['personas'], fn($q) => $q['minutos'] > 0)), 0, 10),
                 'incidencias' => array_slice($c['incidencias'], 0, 100),
@@ -326,14 +387,24 @@ class Tablero {
         $per = self::periodo($p);
         if (is_string($per)) return ['status' => 'error', 'message' => $per];
         if (function_exists('set_time_limit')) @set_time_limit(120);
-        $c = $this->calcular($per[0], $per[1], $usr);
+        $c = $this->calcular($per[0], $per[1], $usr, $per[2], $per[3]);
         $k = $c['kpis'];
         $titulo = ['Control de accesos · Tablero', 'Periodo: ' . self::periodoTexto($c), self::generadoTexto($c, $usr)];
 
         $x = new XlsxSimple();
+        $q = $c['cuadre'];
         $x->resumen('Resumen', $titulo, [
-            ['Dentro de la planta ahora', $k['dentro'], 'entero'],
+            ['Dentro de la planta al corte (' . self::fechaHora($c['corte']) . ')', $k['dentro'], 'entero'],
+            ['   de ellos, con ' . ControlAccesos::HORAS_LIMITE . ' h o más dentro', $k['dentro_limite'], 'entero'],
+            ['   de ellos, cumplen ' . ControlAccesos::HORAS_LIMITE . ' h en menos de ' . ControlAccesos::HORAS_AVISO . ' h', $k['dentro_aviso'], 'entero'],
             ['   de ellos, con más de 13 h dentro (revisar)', $k['dentro_revisar'], 'entero'],
+            ['CUADRE: dentro al inicio (' . self::fechaHora($q['desde']) . ')', $q['inicio'], 'entero'],
+            ['   + entradas (de quien no estaba dentro)', $q['entradas_validas'], 'entero'],
+            ['   − salidas (de quien estaba dentro)', $q['salidas_validas'], 'entero'],
+            ['   − sin salida por más de 48 h (ya no cuentan)', $q['vencidas'], 'entero'],
+            ['   = dentro al corte (' . self::fechaHora($q['corte']) . ')', $q['fin'], 'entero'],
+            ['   entradas repetidas (ya estaba dentro: no cambian el cuadre)', $q['entradas_repetidas'], 'entero'],
+            ['   salidas sin entrada registrada (no cambian el cuadre)', $q['salidas_sin_entrada'], 'entero'],
             ['Entradas', $k['entradas'], 'entero'],
             ['   del turno de día', $k['entradas_dia'], 'entero'],
             ['   del turno de noche', $k['entradas_noche'], 'entero'],
@@ -368,10 +439,11 @@ class Tablero {
         $x->hoja('Incidencias', ['Fecha y hora', 'Tipo', 'ID', 'Nombre', 'Qué pasó', 'Reportó'],
             array_map(fn($i) => [$i['capturado'], $i['nombre_tipo'], $i['id'], $i['nombre'], $i['detalle'], $i['reporto']], $c['incidencias']),
             [17, 24, 9, 34, 50, 22], ['fechahora', 'texto', 'texto', 'texto', 'texto', 'texto'], $titulo);
-        $x->hoja('En planta ahora', ['ID', 'Nombre', 'Entrada', 'Tiempo dentro', 'Revisar'],
-            array_map(fn($d) => [$d['id'], $d['nombre'] !== '' ? $d['nombre'] : 'Sin nombre leído', $d['entrada'], self::hm((int)$d['minutos']),
-                                 $d['revisar'] ? 'Más de 13 h: ¿salió sin registrar?' : ''], $c['en_planta']),
-            [9, 38, 17, 14, 34], ['texto', 'texto', 'fechahora', 'texto', 'texto'], $titulo);
+        $x->hoja('En planta al corte', ['ID', 'Nombre', 'Entrada', 'Tiempo dentro', 'Cumple ' . ControlAccesos::HORAS_LIMITE . ' h', 'Aviso'],
+            array_map(fn($d) => [$d['id'], $d['nombre'] !== '' ? $d['nombre'] : 'Sin nombre leído', $d['entrada'], self::hm((int)$d['minutos']), $d['limite'],
+                                 $d['alerta'] === 'limite' ? 'Ya cumplió ' . ControlAccesos::HORAS_LIMITE . ' h' : ($d['alerta'] === 'aviso' ? 'Cumple ' . ControlAccesos::HORAS_LIMITE . ' h en menos de ' . ControlAccesos::HORAS_AVISO . ' h'
+                                 : ($d['revisar'] ? 'Más de 13 h: ¿salió sin registrar?' : ''))], $c['en_planta']),
+            [9, 38, 17, 14, 17, 34], ['texto', 'texto', 'fechahora', 'texto', 'fechahora', 'texto'], $titulo);
 
         $archivo = self::nombreArchivo($c, 'xlsx');
         if (!$x->guardar(self::carpetaReportes() . $archivo)) return ['status' => 'error', 'message' => 'No se pudo guardar el Excel en el servidor.'];
@@ -392,7 +464,7 @@ class Tablero {
             require_once $autoload;
         }
         if (function_exists('set_time_limit')) @set_time_limit(120);
-        $c = $this->calcular($per[0], $per[1], $usr);
+        $c = $this->calcular($per[0], $per[1], $usr, $per[2], $per[3]);
         $dir = self::carpetaReportes();
         $tmp = $dir . 'tmp-' . bin2hex(random_bytes(6)) . '/';
         @mkdir($tmp, 0755, true);
@@ -450,7 +522,10 @@ class Tablero {
             . '<div style="font-size:17pt;font-weight:bold;color:#0B2545">' . $h($valor) . '</div>'
             . '<div style="font-size:8pt;color:#5a6072">' . $h($sub) . '</div></td>';
         $html .= '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:4mm"><tr>'
-               . $caja('Dentro de la planta ahora', $n($k['dentro']), $k['dentro_revisar'] ? $k['dentro_revisar'] . ' con más de 13 h dentro' : 'Al ' . self::fechaHora($c['generado']))
+               . $caja('Dentro de la planta al ' . self::fechaHora($c['corte']), $n($k['dentro']),
+                       $k['dentro_limite'] || $k['dentro_aviso'] ? trim(($k['dentro_limite'] ? $k['dentro_limite'] . ' con ' . ControlAccesos::HORAS_LIMITE . ' h o más · ' : '')
+                           . ($k['dentro_aviso'] ? $k['dentro_aviso'] . ' cumplen ' . ControlAccesos::HORAS_LIMITE . ' h en menos de ' . ControlAccesos::HORAS_AVISO . ' h' : ''), ' ·')
+                       : ($k['dentro_revisar'] ? $k['dentro_revisar'] . ' con más de 13 h dentro' : 'Al corte del reporte'))
                . $caja('Entradas', $n($k['entradas']), 'Turno de día ' . $n($k['entradas_dia']) . ' · noche ' . $n($k['entradas_noche']))
                . $caja('Salidas', $n($k['salidas']), $k['sin_salida'] ? $n($k['sin_salida']) . ($k['sin_salida'] === 1 ? ' entrada' : ' entradas') . ' sin salida registrada' : 'En el periodo')
                . '</tr><tr>'
@@ -458,6 +533,21 @@ class Tablero {
                . $caja('Horas en planta', $n(round($k['minutos'] / 60)), 'Promedio por visita: ' . self::hm($k['promedio_min']))
                . $caja('Incidencias', $n($k['incidencias']), 'Reportadas en la caseta')
                . '</tr></table>';
+
+        // El cuadre: dentro al inicio + entradas − salidas − sin salida por más de 48 h = dentro al corte
+        $q = $c['cuadre'];
+        $paso = fn($v, $t, $fin = false) => '<td style="padding:2mm 3mm;background:' . ($fin ? '#0B2545' : '#eef3f9') . ';text-align:center">'
+            . '<div style="font-size:15pt;font-weight:bold;color:' . ($fin ? '#ffffff' : '#0B2545') . '">' . $n($v) . '</div>'
+            . '<div style="font-size:7.5pt;color:' . ($fin ? '#ffffff' : '#5a6072') . '">' . $h($t) . '</div></td>';
+        $op = fn($s) => '<td style="padding:0 2mm;font-size:14pt;font-weight:bold;color:#5a6072;text-align:center">' . $s . '</td>';
+        $html .= '<h2>Cuadre del periodo</h2><table cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>'
+               . $paso($q['inicio'], 'Dentro al ' . self::fechaHora($q['desde'])) . $op('+') . $paso($q['entradas_validas'], 'Entradas')
+               . $op('−') . $paso($q['salidas_validas'], 'Salidas') . ($q['vencidas'] ? $op('−') . $paso($q['vencidas'], 'Sin salida (+48 h)') : '')
+               . $op('=') . $paso($q['fin'], 'Dentro al ' . self::fechaHora($q['corte']), true) . '</tr></table>'
+               . '<p class="nota">Entradas leídas: ' . $n($q['entradas']) . ($q['entradas_repetidas'] ? ' (' . $n($q['entradas_repetidas']) . ' de quien ya estaba dentro: leída dos veces, no cambia a cuántos hay dentro)' : '')
+               . '. Salidas leídas: ' . $n($q['salidas']) . ($q['salidas_sin_entrada'] ? ' (' . $n($q['salidas_sin_entrada']) . ' de quien no tenía entrada registrada)' : '') . '.'
+               . ($q['vencidas'] ? ' ' . $n($q['vencidas']) . ' llevaban más de 48 h sin registrar su salida: ya no cuentan como dentro.' : '')
+               . ($q['sin_id'] ? ' ' . $n($q['sin_id']) . ' lecturas sin ID (sólo foto) no entran en el cuadre.' : '') . '</p>';
 
         // Gráficas, de dos en dos
         if ($graficas) {
@@ -513,16 +603,18 @@ class Tablero {
             $html .= '</tbody></table>';
         }
 
-        // Dentro ahora
-        $html .= '<h2>Dentro de la planta ahora</h2>';
+        // Dentro al corte
+        $html .= '<h2>Dentro de la planta al ' . $h(self::fechaHora($c['corte'])) . '</h2>';
         if (!$c['en_planta']) {
-            $html .= '<p class="nota">Nadie aparece dentro de la planta al ' . $h(self::fechaHora($c['generado'])) . '.</p>';
+            $html .= '<p class="nota">Nadie aparece dentro de la planta al ' . $h(self::fechaHora($c['corte'])) . '.</p>';
         } else {
-            $html .= '<table class="t" repeat_header="1"><thead><tr><th>ID</th><th>Nombre</th><th>Entrada</th><th class="n">Tiempo dentro</th></tr></thead><tbody>';
+            $html .= '<table class="t" repeat_header="1"><thead><tr><th>ID</th><th>Nombre</th><th>Entrada</th><th class="n">Tiempo dentro</th><th>Cumple ' . ControlAccesos::HORAS_LIMITE . ' h</th></tr></thead><tbody>';
             foreach ($c['en_planta'] as $d) {
+                $rojo = $d['alerta'] === 'limite' || $d['revisar'];
                 $html .= '<tr><td><b>' . $h($d['id']) . '</b></td><td>' . $h($d['nombre'] !== '' ? $d['nombre'] : 'Sin nombre leído') . '</td>'
-                       . '<td>' . $h(self::fechaHora($d['entrada'])) . '</td><td class="n"' . ($d['revisar'] ? ' style="color:#A32D2D;font-weight:bold"' : '') . '>'
-                       . $h(self::hm((int)$d['minutos'])) . '</td></tr>';
+                       . '<td>' . $h(self::fechaHora($d['entrada'])) . '</td><td class="n"' . ($rojo ? ' style="color:#A32D2D;font-weight:bold"' : '') . '>'
+                       . $h(self::hm((int)$d['minutos'])) . '</td><td' . ($d['alerta'] !== '' ? ' style="color:' . ($d['alerta'] === 'limite' ? '#A32D2D' : '#8A5300') . ';font-weight:bold"' : '') . '>'
+                       . $h(self::fechaHora($d['limite']) . ($d['alerta'] === 'limite' ? ' (ya cumplió)' : ($d['alerta'] === 'aviso' ? ' (en menos de ' . ControlAccesos::HORAS_AVISO . ' h)' : ''))) . '</td></tr>';
             }
             $html .= '</tbody></table>';
         }
@@ -589,6 +681,9 @@ class Tablero {
     public static function fecha(string $f): string { return substr($f, 8, 2) . '/' . substr($f, 5, 2) . '/' . substr($f, 0, 4); }
     public static function fechaHora(string $f): string { return $f === '' ? '' : self::fecha($f) . ' ' . substr($f, 11, 5); }
     private static function periodoTexto(array $c): string {
+        if (($c['hora_desde'] ?? '00:00') !== '00:00' || ($c['hora_hasta'] ?? '23:59') !== '23:59') {
+            return 'del ' . self::fechaHora($c['desde'] . ' ' . $c['hora_desde']) . ' al ' . self::fechaHora($c['corte']);
+        }
         return $c['desde'] === $c['hasta'] ? 'del ' . self::fecha($c['desde']) : 'del ' . self::fecha($c['desde']) . ' al ' . self::fecha($c['hasta']);
     }
     private static function generadoTexto(array $c, array $usr): string {

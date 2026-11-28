@@ -928,7 +928,7 @@ class ControlAccesos {
     }
 
     /** Cómo se muestra el ID: la forma más leída (con sus ceros, «00287»); en empate, la más larga. */
-    private static function idMostrado(array $codigos): string {
+    public static function idMostrado(array $codigos): string {
         $cuenta = [];
         foreach ($codigos as $c) { $c = (string)$c; if ($c !== '') $cuenta[$c] = ($cuenta[$c] ?? 0) + 1; }
         $mejor = ''; $v = 0;
@@ -982,6 +982,33 @@ class ControlAccesos {
     public const HORAS_EN_PLANTA = 48;
     /** Más de esto dentro: probablemente salió sin pasar su credencial. */
     public const MINUTOS_REVISAR = 13 * 60;
+    /** Lo más que una persona puede estar en planta (horas) y con cuánto tiempo antes se avisa. */
+    public const HORAS_LIMITE = 16;
+    public const HORAS_AVISO = 2;
+
+    /**
+     * El aviso de las 16 h de quien entró a la hora $entrada (timestamp), visto a la hora $ahora:
+     * limite (cuándo cumple 16 h), alerta ('' | 'aviso': le faltan 2 h o menos | 'limite': ya las cumplió)
+     * y minutos_limite (los que le faltan; negativo si ya pasó).
+     */
+    public static function alerta16(int $entrada, int $ahora): array {
+        $limite = $entrada + self::HORAS_LIMITE * 3600;
+        $faltan = (int)floor(($limite - $ahora) / 60);
+        $alerta = $faltan <= 0 ? 'limite' : ($faltan <= self::HORAS_AVISO * 60 ? 'aviso' : '');
+        return ['limite' => date('Y-m-d H:i:s', $limite), 'alerta' => $alerta, 'minutos_limite' => $faltan];
+    }
+
+    /**
+     * Para la caseta y Administración: quiénes cumplen 16 h en planta en las próximas 2 h o ya las cumplieron
+     * (sólo ID, nombre, entrada y la hora en que cumplen; la caseta no ve el resto de «En planta»).
+     */
+    public function alertas16(array $usr): array {
+        self::asegurarTabla($this->pdo);
+        $l = array_values(array_filter($this->dentroAhora(''), fn($x) => $x['alerta'] !== ''));
+        usort($l, fn($a, $b) => strcmp($a['limite'], $b['limite']));
+        return ['status' => 'success', 'ahora' => date('Y-m-d H:i:s'), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
+                'personas' => array_map(fn($x) => array_intersect_key($x, array_flip(['id', 'nombre', 'entrada', 'limite', 'alerta', 'minutos_limite', 'minutos'])), $l)];
+    }
 
     /**
      * Quiénes están en planta: cada ID cuya última lectura (de las últimas 48 h, en cualquier
@@ -991,10 +1018,16 @@ class ControlAccesos {
     public function enPlanta(array $p, array $usr): array {
         if (self::esCaseta($usr)) return ['status' => 'error', 'message' => 'Esta cuenta sólo registra entradas y salidas.'];
         self::asegurarTabla($this->pdo);
+        $out = $this->dentroAhora(textoEstandar($p['lugar'] ?? ''));
+        return ['status' => 'success', 'personas' => $out, 'total' => count($out), 'horas' => self::HORAS_EN_PLANTA,
+                'ahora' => date('Y-m-d H:i:s'), 'horas_limite' => self::HORAS_LIMITE, 'horas_aviso' => self::HORAS_AVISO,
+                'aviso' => count(array_filter($out, fn($x) => $x['alerta'] === 'aviso')), 'limite' => count(array_filter($out, fn($x) => $x['alerta'] === 'limite'))];
+    }
+
+    /** Quiénes están dentro ahora (la regla de «En planta»), con su aviso de las 16 h. */
+    private function dentroAhora(string $lugar): array {
         $ahora = time();
-        $base = ['status' => 'success', 'personas' => [], 'total' => 0, 'horas' => self::HORAS_EN_PLANTA,
-                 'ahora' => date('Y-m-d H:i:s', $ahora)];
-        if (!self::conTarjeta($this->pdo)) return $base;
+        if (!self::conTarjeta($this->pdo)) return [];
         $desde = date('Y-m-d H:i:s', $ahora - self::HORAS_EN_PLANTA * 3600);
         $st = $this->pdo->prepare(
             "SELECT id, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre, (foto <> '') AS con_foto
@@ -1005,7 +1038,6 @@ class ControlAccesos {
         $st->execute([substr($desde, 0, 10), $desde]);
         $porId = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) $porId[self::claveId((string)$f['codigo'])][] = $f;
-        $lugar = textoEstandar($p['lugar'] ?? '');
         $out = [];
         foreach ($porId as $regs) {
             $ult = $regs[count($regs) - 1];
@@ -1019,10 +1051,10 @@ class ControlAccesos {
                 'minutos' => $min, 'revisar' => $min > self::MINUTOS_REVISAR,
                 'caseta' => (string)$ult['usuario_nombre'], 'origen' => (string)$ult['origen'],
                 'registro' => (int)$ult['id'], 'con_foto' => (bool)$ult['con_foto'],
-            ];
+            ] + self::alerta16(strtotime((string)$ult['capturado']), $ahora);
         }
         usort($out, fn($a, $b) => strcmp($b['entrada'], $a['entrada']));    // las entradas más recientes primero
-        return ['personas' => $out, 'total' => count($out)] + $base;
+        return $out;
     }
 
     /** Los movimientos de un ID (por omisión, de los últimos 30 días): cada entrada con su salida. */
